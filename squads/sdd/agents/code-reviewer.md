@@ -36,7 +36,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **Naming** — variable/function/class names, consistency
    - **Comments** — useful where needed, not where redundant
    - **Pattern-fit complexity** — patterns that should be simplified per project conventions (NOT functional complexity — that's logic-reviewer)
-5. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)

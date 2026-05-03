@@ -9,7 +9,7 @@
 set +e  # don't exit on individual check failure — we tally and report
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-EXAMPLE="$REPO_ROOT/examples/FEAT-001-fake"
+EXAMPLE="$REPO_ROOT/examples/sdd-FEAT-001-fake"
 
 PASS=0
 FAIL=0
@@ -68,7 +68,7 @@ done
 if command -v npx >/dev/null 2>&1; then
   for op in "$EXAMPLE"/outputs/*.json; do
     name=$(basename "$op")
-    check "$name validates against output-packet.schema.json (ajv)" "npx -y -p ajv-cli ajv validate -s '$REPO_ROOT/templates/output-packet.schema.json' -d '$op'"
+    check "$name validates against output-packet.schema.json (ajv)" "npx -y -p ajv-cli ajv validate -s '$REPO_ROOT/shared/schemas/output-packet.schema.json' -d '$op'"
   done
 fi
 

@@ -74,7 +74,7 @@ Recap from [`skill-vs-subagent.md`](skill-vs-subagent.md):
 
 ## Override path — Work Packet `effort` field
 
-The Work Packet (concept #7, `templates/work-packet.json`) carries an optional `effort` field. When present, it overrides the Subagent's frontmatter default **for that single dispatch**. The next dispatch reverts to the default.
+The Work Packet (concept #7, `../templates/work-packet.json`) carries an optional `effort` field. When present, it overrides the Subagent's frontmatter default **for that single dispatch**. The next dispatch reverts to the default.
 
 Use cases:
 

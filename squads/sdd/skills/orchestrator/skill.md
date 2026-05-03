@@ -51,7 +51,7 @@ While ready queue is non-empty OR any task is in-flight:
 ### 4. Per-task state machine (orchestrator-managed, atomic write)
 Each task transitions through: `pending` → `running` → (`done` | `blocked` | `pending_human` | `failed`).
 
-Pipeline per task (per `docs/concepts/pipeline.md`):
+Pipeline per task (per `squads/sdd/docs/concepts/pipeline.md`):
 - Dispatch `dev`. On `dev` Output Packet `status: done`: dispatch `code-reviewer` ‖ `logic-reviewer` in parallel (counts against the 5-cap).
 - If reviewers return findings: loop to `dev` (cap: `review_loops_max=3`).
 - If reviewers conflict on same `file:line`: cascade to `blocker-specialist`.
@@ -149,4 +149,4 @@ The Subagent body's "Input contract" specifies which fields are required for tha
 - **Concurrent `/orchestrator` on same `FEAT-NNN`:** undefined behavior. Sole-writer invariant assumes one orchestrator process per Session. Lockfile is TODO Phase 5 — relies on human discipline for MVP.
 
 ## Why a Skill (not a Subagent)
-Subagents in Claude Code cannot spawn other Subagents (platform constraint). The orchestrator must run in the main session to dispatch the workers via the `Task` tool. Also satisfies "dispatches Subagents" criterion (see `docs/concepts/skill-vs-subagent.md`).
+Subagents in Claude Code cannot spawn other Subagents (platform constraint). The orchestrator must run in the main session to dispatch the workers via the `Task` tool. Also satisfies "dispatches Subagents" criterion (see `shared/concepts/skill-vs-subagent.md`).

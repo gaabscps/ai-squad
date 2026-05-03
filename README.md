@@ -69,7 +69,7 @@ When you start, a checkbox lets you pick which phases to run. Skip any of them, 
 
 ## See it work end-to-end
 
-[`examples/FEAT-001-fake/`](examples/FEAT-001-fake/) — a complete walk-through of a real feature ("/health endpoint"). Every artifact each phase produces, the dispatch packets, the final handoff message.
+[`examples/sdd-FEAT-001-fake/`](examples/sdd-FEAT-001-fake/) — a complete walk-through of a real feature ("/health endpoint"). Every artifact each phase produces, the dispatch packets, the final handoff message.
 
 To verify the pipeline contracts hold:
 
@@ -180,13 +180,24 @@ Subagent models are fixed in their definitions per [`docs/concepts/effort.md`](d
 <br/>
 
 ```
-skills/        Claude Code Skills (run in main session, slash-invoked)
-agents/        Claude Code Subagents (isolated context, dispatched by orchestrator)
-templates/     Spec/Plan/Tasks (Markdown), Work/Output Packets (JSON), Session (YAML)
-docs/          Glossary + 11 concept files (the deep dive)
-examples/      Worked artifact set (FEAT-001-fake)
-scripts/       smoke-walkthrough.sh
-tools/         deploy.sh
+squads/
+  sdd/                     The SDD squad (Specify → Plan → Tasks → Implementation)
+    skills/                4 conversational Skills, slash-invoked
+    agents/                5 autonomous Subagents (Phase 4 workers)
+    templates/             Spec / Plan / Tasks templates
+    docs/concepts/         Squad-specific concepts (spec, pipeline, escalation)
+  discovery/               Reserved for the upcoming Discovery squad
+shared/
+  skills/                  Cross-squad Skills (none yet)
+  agents/                  Cross-squad Subagents (none yet)
+  templates/               Work/Output Packets (JSON), Session (YAML)
+  schemas/                 JSON Schema for Output Packet
+  concepts/                Cross-squad concepts (role, phase, evidence, ...)
+  glossary.md              Canonical vocabulary
+examples/
+  sdd-FEAT-001-fake/       Worked SDD artifact set
+scripts/                   smoke-walkthrough.sh
+tools/                     deploy.sh (squad-aware: ./deploy.sh sdd)
 ```
 
 </details>
@@ -196,8 +207,9 @@ tools/         deploy.sh
 
 <br/>
 
-- [`docs/glossary.md`](docs/glossary.md) — canonical vocabulary used across docs and role files. **Read this first.**
-- [`docs/concepts/`](docs/concepts/) — 11 concept files: `role`, `skill-vs-subagent`, `effort`, `spec`, `evidence`, `output-packet`, `work-packet`, `phase`, `pipeline`, `escalation`, `session`.
+- [`shared/glossary.md`](shared/glossary.md) — canonical vocabulary used across squads. **Read this first.**
+- [`shared/concepts/`](shared/concepts/) — cross-squad concepts: `role`, `skill-vs-subagent`, `effort`, `evidence`, `output-packet`, `work-packet`, `phase`, `session`.
+- [`squads/sdd/docs/concepts/`](squads/sdd/docs/concepts/) — SDD-specific concepts: `spec`, `pipeline`, `escalation`.
 
 The git history is intentionally readable — each commit corresponds to a build phase with a research-backed decision trail.
 

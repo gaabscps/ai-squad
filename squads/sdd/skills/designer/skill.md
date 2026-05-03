@@ -30,7 +30,7 @@ The Skill that turns an approved Spec into an approved Plan: architecture, data 
 2. Read approved Spec; extract the full set of `AC-XXX` IDs from all User Stories — this is the **AC universe** the Plan must cover.
 
 ### 2. Generate first draft (Hybrid drafting — Spec Kit/Kiro pattern)
-Produce a full draft of `plan.md` from `templates/plan.md`, populated from the Spec:
+Produce a full draft of `plan.md` from `squads/sdd/templates/plan.md`, populated from the Spec:
 - Fill Architecture decisions, Data model, API surface (and UX surface if Spec has visual surface) with the most defensible choice given the Spec and `project_context`.
 - **Tag every decision inline with the AC IDs it covers** — `Decision X — uses REST over gRPC (covers: AC-001, AC-003).` (Kiro forward-traceability pattern.)
 - For uncertain decisions: insert `[NEEDS CLARIFICATION] <specific question>` markers (cap: 3).
@@ -82,7 +82,7 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 4. On `No`: return to step 5.
 
 ## Output
-- Path: `.agent-session/<task_id>/plan.md` (template at `templates/plan.md`).
+- Path: `.agent-session/<task_id>/plan.md` (template at `squads/sdd/templates/plan.md`).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Required sections at approval: Architecture, Data model, API surface, UX (if applicable), Risks (5 categories), AC Coverage Map. Notes optional but holds MADR alternatives.
@@ -102,4 +102,4 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 - **Architecture decisions conflict during refinement** (e.g., two decisions cover the same AC differently): chat-flag the conflict; let human resolve; re-tag affected ACs in both decisions.
 
 ## Why a Skill (not a Subagent)
-Phase 2 has the human in-the-loop refining design decisions. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `docs/concepts/skill-vs-subagent.md`).
+Phase 2 has the human in-the-loop refining design decisions. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `shared/concepts/skill-vs-subagent.md`).

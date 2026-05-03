@@ -1,6 +1,6 @@
 ---
 name: spec-writer
-description: Phase 1 entry point. Asks the human which Phases this Session will run (interactive checkbox via AskUserQuestion), then conducts an interactive spec-writing session — drafts a Spec from `templates/spec.md`, refines with the human, gets explicit approval, hands off to the next planned Phase.
+description: Phase 1 entry point. Asks the human which Phases this Session will run (interactive checkbox via AskUserQuestion), then conducts an interactive spec-writing session — drafts a Spec from `squads/sdd/templates/spec.md`, refines with the human, gets explicit approval, hands off to the next planned Phase.
 ---
 
 # Spec Writer — Phase 1 (Specify)
@@ -45,7 +45,7 @@ Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Pow
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
 
 ### 4. Generate first draft (Hybrid drafting — Spec Kit style)
-Produce a full draft of `spec.md` from `templates/spec.md`, populated from the pitch:
+Produce a full draft of `spec.md` from `squads/sdd/templates/spec.md`, populated from the pitch:
 - Fill all sections you can confidently infer (Problem, Goal, Constraints, Notes).
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 3 — see step 5).
 - Generate at least one `US-001 [P1]` from the pitch.
@@ -86,7 +86,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 4. On `No`: return to step 6.
 
 ## Output
-- Path: `.agent-session/<task_id>/spec.md` (template at `templates/spec.md`).
+- Path: `.agent-session/<task_id>/spec.md` (template at `squads/sdd/templates/spec.md`).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.specify` populated at approval; `current_phase` advances at approval.
@@ -107,4 +107,4 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 - (TODO Phase 2 if needed: concurrent-edit lockfile — only add if real conflict observed in practice.)
 
 ## Why a Skill (not a Subagent)
-Phase 1 has the human in-the-loop refining the Spec. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `docs/concepts/skill-vs-subagent.md`).
+Phase 1 has the human in-the-loop refining the Spec. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `shared/concepts/skill-vs-subagent.md`).

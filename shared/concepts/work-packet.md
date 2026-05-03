@@ -44,7 +44,7 @@ It is the **yang to the Output Packet's yin**: same FS layout (`.agent-session/<
 | `max_loops` | integer | no | Loop cap for this Role within the current Pipeline phase. Default 3 from Session config. |
 | `previous_findings` | array | no | Findings from the immediately prior loop iteration. Populated by the orchestrator on re-runs. |
 
-Full template at [`templates/work-packet.json`](../../templates/work-packet.json).
+Full template at [`shared/templates/work-packet.json`](../templates/work-packet.json).
 
 ## Symmetry with Output Packet
 

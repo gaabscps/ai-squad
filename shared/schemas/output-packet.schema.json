@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "ai-squad/templates/output-packet.schema.json",
+  "$id": "ai-squad/shared/schemas/output-packet.schema.json",
   "title": "ai-squad Output Packet",
   "description": "Canonical structural contract for Output Packets emitted by all Phase 4 Subagents (dev, code-reviewer, logic-reviewer, qa, blocker-specialist). Subagents self-validate against this schema before atomic write; orchestrator re-validates on read and adds semantic checks (paths exist, commit SHA resolves, status enum matches Role's allowed transitions).",
   "type": "object",

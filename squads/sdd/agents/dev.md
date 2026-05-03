@@ -37,7 +37,7 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 6. Run the tests scoped to `ac_scope`. Record commands + exit codes as evidence.
 7. **If no test framework / runner exists** for the relevant `scope_files` → emit `status: blocked, blocker_kind: missing_test_infra`. Do NOT proceed without verification (Anthropic best-practice: "give Claude a way to verify its work").
 8. Atomic commit using Conventional Commits format: `<type>(<scope>): <imperative summary>` — one commit per task.
-9. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+9. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 10. Emit Output Packet (atomic write: tmp + rename).
 
 ## Output contract (Output Packet)
@@ -53,7 +53,7 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 - Never: emit `status: done` without running the relevant tests (Anthropic verify-your-work guidance).
 - Never: edit existing tests to make them pass — write new tests or fix the code (TDD discipline against the documented "test-tampering" failure mode).
 - Always: emit exactly one Output Packet at end (atomic write).
-- Always: every Output Packet evidence is a pointer (per `docs/concepts/evidence.md`).
+- Always: every Output Packet evidence is a pointer (per `shared/concepts/evidence.md`).
 - Always: validate Output Packet against the canonical schema before emitting.
 - Always: one atomic commit per task (Conventional Commits format).
 

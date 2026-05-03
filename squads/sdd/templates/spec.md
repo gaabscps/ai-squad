@@ -23,7 +23,7 @@ created: YYYY-MM-DD
 ## User Scenarios
 
 > P1, P2, P3 priority. Each scenario is independently shippable and testable.
-> Use EARS notation for acceptance criteria. See `docs/concepts/spec.md` for the cheat sheet.
+> Use EARS notation for acceptance criteria. See `../docs/concepts/spec.md` for the cheat sheet.
 
 ### US-001 [P1] — <short title>
 

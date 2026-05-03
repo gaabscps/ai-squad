@@ -35,7 +35,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **Partial-failure paths** — cleanup, rollback, retries, idempotency
    - **Race conditions** — concurrent access, ordering, atomicity
    - **Broken invariants** — assumptions the code violates
-5. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)
@@ -60,4 +60,4 @@ Orchestrator can dispatch multiple `logic-reviewer` instances across parallel ta
 `code-reviewer` (same diff, same task) — independent isolated contexts, no coordination. The Google-style dimension split prevents overlap.
 
 ## Why opus (not sonnet)
-Detecting behavioral edge cases, race conditions, and invariant breaks needs strong reasoning. This is the Subagent where Opus pays the most (see `docs/concepts/effort.md`).
+Detecting behavioral edge cases, race conditions, and invariant breaks needs strong reasoning. This is the Subagent where Opus pays the most (see `shared/concepts/effort.md`).

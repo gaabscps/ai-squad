@@ -3,7 +3,7 @@
 # Removed entirely by /ship FEAT-XXX after the human accepts the handoff.
 #
 # Atomic writes: every update follows tmp + rename pattern (POSIX atomic).
-# Schema and full lifecycle in docs/concepts/session.md.
+# Schema and full lifecycle in shared/concepts/session.md.
 
 # Identification
 task_id: "FEAT-XXX"                              # canonical ID — sequential FEAT-NNN, scoped to this consumer project

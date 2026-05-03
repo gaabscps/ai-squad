@@ -33,7 +33,7 @@ If any required field is missing → emit `status: escalate, blocker_kind: contr
 4. Choose ONE of two paths:
    - **Resolvable** → write decision memo at `.agent-session/<task_id>/decisions/<topic>-<timestamp>.md` (see "Memo schema"); emit `status: done` with the memo path as evidence.
    - **Unresolvable** → emit `status: escalate` with structured `blockers[]` for human review (task enters `pending_human` terminal state; other tasks continue independently).
-5. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit).
+5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
 
 ## Memo schema (Nygard ADR — 5 fields, ≤40 lines)
 Use Nygard's canonical ADR fields. Keep each section to 1-3 lines.
@@ -81,4 +81,4 @@ You decide HOW (implementation choices, library selection, refactor approach). Y
 Singular escalation handler per blocker. Never N parallel specialists for the same blocker.
 
 ## Why opus + xhigh
-High-stakes arbitration; last line before the human. Both levers maxed because dispatch frequency is low (escalation only). See `docs/concepts/effort.md`.
+High-stakes arbitration; last line before the human. Both levers maxed because dispatch frequency is low (escalation only). See `shared/concepts/effort.md`.

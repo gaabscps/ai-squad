@@ -89,7 +89,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 4. On `No`: return to step 7.
 
 ## Output
-- Path: `.agent-session/<task_id>/tasks.md` (template at `templates/tasks.md`).
+- Path: `.agent-session/<task_id>/tasks.md` (template at `squads/sdd/templates/tasks.md`).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted change AND on final approval.
 - Each task has: `T-XXX` ID, optional `[P]` marker, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths), `AC covered:`, optional `Depends on:`, `Estimated complexity:`.

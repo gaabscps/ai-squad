@@ -41,7 +41,7 @@ Every Spec has the same 9 sections in this order. **Sections are never removed; 
 
 (11 sections counting Frontmatter and Notes; the "spine" is sections 2–10.)
 
-The template lives at [`templates/spec.md`](../../templates/spec.md).
+The template lives at [`../../templates/spec.md`](../../templates/spec.md).
 
 ## The frontmatter contract
 

@@ -32,7 +32,7 @@ The **Output Packet** is the only structured channel from a Subagent back to its
 | `next_role` | string | no | Suggested next Role for the orchestrator. See [next_role semantics](#next_role-semantics). |
 | `ac_coverage` | object | required if `role: qa`, forbidden otherwise | Maps `AC-ref` → array of evidence IDs that validate it. See [ac_coverage](#ac_coverage-qa-specific) below. |
 
-Full template at [`templates/output-packet.json`](../../templates/output-packet.json).
+Full template at [`shared/templates/output-packet.example.json`](../templates/output-packet.example.json).
 
 ## Status enum semantics
 
