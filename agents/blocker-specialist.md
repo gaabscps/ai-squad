@@ -5,6 +5,7 @@ model: opus
 tools: Read, Grep, Bash
 effort: xhigh
 fan_out: false
+permissionMode: bypassPermissions
 ---
 
 # Blocker Specialist

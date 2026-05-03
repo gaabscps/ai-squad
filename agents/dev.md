@@ -5,6 +5,7 @@ model: sonnet
 tools: Read, Edit, Write, Bash, Grep
 effort: high
 fan_out: true
+permissionMode: bypassPermissions
 ---
 
 # Dev

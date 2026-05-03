@@ -5,6 +5,7 @@ model: sonnet
 tools: Read, Grep
 effort: medium
 fan_out: true
+permissionMode: bypassPermissions
 ---
 
 # Code Reviewer

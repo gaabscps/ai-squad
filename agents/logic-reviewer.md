@@ -5,6 +5,7 @@ model: opus
 tools: Read, Grep
 effort: high
 fan_out: true
+permissionMode: bypassPermissions
 ---
 
 # Logic Reviewer

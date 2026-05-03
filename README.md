@@ -107,6 +107,22 @@ Skills inherit the model from the human's main session. Set with `/model` before
 
 Subagent models are fixed in the Role definitions and follow the calibration in [`docs/concepts/effort.md`](docs/concepts/effort.md) — Sonnet for most Roles; Opus for `logic-reviewer` and `blocker-specialist`.
 
+## Permissions — Phase 4 runs in bypass mode
+
+All 5 Phase 4 Subagents declare `permissionMode: bypassPermissions` in their frontmatter. Phase 4 is autonomous by design — interrupting for permission prompts on every Edit/Write/Bash call inside `dev`/`qa`/etc. defeats the orchestrator's whole purpose.
+
+The blast radius is bounded by defense-in-depth, not by Claude Code's permission prompt:
+- Per-Subagent `tools:` allowlist (e.g., reviewers only get `Read, Grep` — no write tools at all).
+- Per-task `scope_files` Hard rule (`dev` may only edit files declared in the task's `Files:`).
+- Per-Role authority boundary (`blocker-specialist` may not edit Spec/Plan/Tasks; `qa` may not write to source tree).
+
+**Safety expectation for the consumer project:**
+- `.agent-session/` MUST be in `.gitignore` (spec-writer refuses to start otherwise).
+- Run ai-squad in a project where you trust the work to be done autonomously — e.g., a feature branch you'd review before merging.
+- Do NOT run Phase 4 in a directory mixed with secrets, production credentials, or other repos. Subagents see what `Read` can reach.
+
+If you want stricter prompting, remove `permissionMode: bypassPermissions` from the Subagents you want gated — Phase 4 will then prompt the human on each tool use inside that Subagent.
+
 ## Persistence model — runtime only
 
 ai-squad treats all Phase artifacts (Spec / Plan / Tasks / Work Packets / Output Packets / logs) as **runtime contracts**, not long-term documentation. They live under `.agent-session/<task_id>/` in the consumer project, which **must be gitignored**.

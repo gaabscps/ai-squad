@@ -5,6 +5,7 @@ model: sonnet
 tools: Read, Bash, Grep, Write
 effort: medium
 fan_out: true
+permissionMode: bypassPermissions
 ---
 
 # QA
