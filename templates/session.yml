@@ -6,7 +6,8 @@
 # Schema and full lifecycle in docs/concepts/session.md.
 
 # Identification
-task_id: "FEAT-XXX"
+task_id: "FEAT-XXX"                              # canonical ID — sequential FEAT-NNN, scoped to this consumer project
+feature_name: ""                                  # human-readable Spec title; populated by spec-writer at first draft
 schema_version: 1                                # forward-compat anchor; not used at MVP
 
 # Artifact references (paths relative to consumer project root)

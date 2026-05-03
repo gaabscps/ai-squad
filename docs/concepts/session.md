@@ -170,7 +170,8 @@ Skipped Phases are visible in the final handoff so the human (and any future rev
 
 ```yaml
 # Identification
-task_id: "FEAT-042"                             # required, must match folder name
+task_id: "FEAT-042"                             # required, must match folder name; sequential FEAT-NNN scoped per project
+feature_name: "User-authenticated photo uploads" # human-readable Spec title; populated by spec-writer at first draft
 schema_version: 1                                # for future migration; see "Schema versioning" below
 
 # Artifact references
