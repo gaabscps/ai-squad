@@ -6,11 +6,13 @@
 # Schema and full lifecycle in shared/concepts/session.md.
 
 # Identification
-task_id: "FEAT-XXX"                              # canonical ID — sequential FEAT-NNN, scoped to this consumer project
-feature_name: ""                                  # human-readable Spec title; populated by spec-writer at first draft
+task_id: "FEAT-XXX"                              # canonical ID — squad-prefixed sequential (FEAT-NNN for sdd, DISC-NNN for discovery), scoped to this consumer project
+squad: "sdd"                                     # which squad owns this Session: sdd | discovery (extensible). Determines the valid `current_phase` enum and which Skills/Subagents may dispatch.
+feature_name: ""                                  # human-readable artifact title; populated by the entry Skill at first draft
 schema_version: 1                                # forward-compat anchor; not used at MVP
 
 # Artifact references (paths relative to consumer project root)
+# SDD squad uses spec/plan/tasks; Discovery squad uses memo (see Discovery template).
 spec_ref: "./.agent-session/FEAT-XXX/spec.md"
 plan_ref: "./.agent-session/FEAT-XXX/plan.md"   # absent if Phase 2 not in planned_phases
 tasks_ref: "./.agent-session/FEAT-XXX/tasks.md" # absent if Phase 3 not in planned_phases
@@ -20,12 +22,15 @@ started_at: ""
 last_activity_at: ""                             # updated on every write
 completed_at: ""                                 # set on terminal state (done | paused | escalated)
 
-# Current state
-current_phase: "specify"                         # specify | plan | tasks | implementation | paused | done | escalated
+# Current state — enum is squad-scoped:
+#   sdd:       specify | plan | tasks | implementation | paused | done | escalated
+#   discovery: frame | investigate | decide | paused | done | escalated
+current_phase: "specify"
 current_owner: "spec-writer"                     # which Role currently has write authority
 
-# Planned phases — selected by human at /spec-writer entry via AskUserQuestion (or via --plan flag)
-# Default is all 4 checked. Skipping any Phase ends the Session in `paused` state after the last planned Phase.
+# Planned phases — selected by human at the entry Skill via AskUserQuestion (or via --plan flag)
+# Default is all the squad's Phases checked. Skipping any Phase ends the Session in `paused` state after the last planned Phase.
+# Values are squad-scoped (see current_phase enum above).
 planned_phases:
   - "specify"
   - "plan"

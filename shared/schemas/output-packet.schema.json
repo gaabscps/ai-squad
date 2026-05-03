@@ -2,15 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ai-squad/shared/schemas/output-packet.schema.json",
   "title": "ai-squad Output Packet",
-  "description": "Canonical structural contract for Output Packets emitted by all Phase 4 Subagents (dev, code-reviewer, logic-reviewer, qa, blocker-specialist). Subagents self-validate against this schema before atomic write; orchestrator re-validates on read and adds semantic checks (paths exist, commit SHA resolves, status enum matches Role's allowed transitions).",
+  "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, commit SHA resolves, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
   "type": "object",
   "required": ["spec_id", "dispatch_id", "role", "status", "evidence"],
   "additionalProperties": false,
   "properties": {
     "spec_id": {
       "type": "string",
-      "pattern": "^FEAT-\\d{3,}$",
-      "description": "Sequential FEAT-NNN id of the Session"
+      "pattern": "^(FEAT|DISC)-\\d{3,}$",
+      "description": "Squad-prefixed sequential id of the Session: FEAT-NNN for sdd, DISC-NNN for discovery"
     },
     "dispatch_id": {
       "type": "string",
@@ -18,7 +18,10 @@
     },
     "role": {
       "type": "string",
-      "enum": ["dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist"],
+      "enum": [
+        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist",
+        "codebase-mapper", "risk-analyst"
+      ],
       "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch"
     },
     "status": {
@@ -27,7 +30,7 @@
     },
     "blocker_kind": {
       "type": "string",
-      "description": "Required when status is blocked or escalate; enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, timeout, etc.)"
+      "description": "Required when status is blocked or escalate; enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, opaque_repo, insufficient_data, timeout, etc.)"
     },
     "missing_for": {
       "type": "array",
@@ -54,13 +57,18 @@
           "id": { "type": "string" },
           "kind": {
             "type": "string",
-            "enum": ["file", "command", "commit", "test", "log", "url", "absence"]
+            "enum": [
+              "file", "command", "commit", "test", "log", "url", "absence",
+              "user_signal", "competitor_observation", "metric_benchmark", "expert_judgment", "code_evidence"
+            ],
+            "description": "SDD kinds: file | command | commit | test | log | url | absence. Discovery kinds: user_signal | competitor_observation | metric_benchmark | expert_judgment | code_evidence | absence (shared). Each kind defines its own additional fields via additionalProperties: true."
           }
         }
       }
     },
     "findings": {
       "type": "array",
+      "description": "code-reviewer / logic-reviewer findings. Discovery's risk findings live at top level (risk_category/verdict/risk_severity/rationale).",
       "items": {
         "type": "object",
         "required": ["id", "severity"],
@@ -115,9 +123,72 @@
       "additionalProperties": false,
       "description": "qa-only: AC id -> evidence ids that validate it; every AC in Work Packet's ac_scope MUST appear as a key"
     },
+    "risk_category": {
+      "type": "string",
+      "enum": ["value", "usability", "feasibility", "viability"],
+      "description": "risk-analyst-only: which Cagan Big Risk this dispatch investigated"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["validated", "refuted", "inconclusive", "N/A"],
+      "description": "risk-analyst-only: investigation outcome. inconclusive triggers gate; N/A requires rationale (1 sentence) explaining why this risk does not apply."
+    },
+    "risk_severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "risk-analyst-only: 3-level scale canonical in Product/PM (Asana, SVPG). Distinct from findings[].severity (dev/reviewer use, 6-level)."
+    },
+    "rationale": {
+      "type": "string",
+      "description": "risk-analyst-only: one paragraph narrative connecting evidence to verdict (pitch document pattern)."
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "risk-analyst-only: leap-of-faith items that remain unvalidated after this investigation (Torres assumption mapping). Surface to discovery-synthesizer in Phase 3.",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" },
+          "summary": { "type": "string" },
+          "validation_path": { "type": "string", "description": "How this assumption could be validated (user interview, benchmark, expert review)" }
+        }
+      }
+    },
+    "containers": {
+      "type": "array",
+      "description": "codebase-mapper-only: C4 Level 2 containers (apps/services in scope). Each item carries name, technology, responsibility, and relationships.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "technology": { "type": "string" },
+          "responsibility": { "type": "string" },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["target", "direction"],
+              "additionalProperties": true,
+              "properties": {
+                "target": { "type": "string" },
+                "direction": { "type": "string", "enum": ["uses", "used_by"] },
+                "protocol": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
     "next_role": {
       "type": "string",
-      "enum": ["dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist"],
+      "enum": [
+        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist",
+        "codebase-mapper", "risk-analyst"
+      ],
       "description": "Optional hint; orchestrator decides actual routing"
     }
   }
