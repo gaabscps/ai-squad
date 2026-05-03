@@ -225,4 +225,4 @@ Issues and PRs welcome. Before opening a PR:
 
 ## License
 
-TBD — currently no license is committed (effectively "all rights reserved"). MIT is the planned default; happy to take suggestions if you have a preference for the showcase context.
+[MIT](LICENSE) — © 2026 Gabriel Andrade.
