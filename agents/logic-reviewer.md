@@ -34,7 +34,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **Partial-failure paths** — cleanup, rollback, retries, idempotency
    - **Race conditions** — concurrent access, ordering, atomicity
    - **Broken invariants** — assumptions the code violates
-5. Validate Output Packet against `templates/output-packet.json` (self-validation pre-emit).
+5. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)

@@ -32,7 +32,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **(b)** If no existing test: write an ephemeral validation probe at `.agent-session/<task_id>/qa/<ac_id>.<ext>` (shell script, curl invocation, harness call) and run it. Probes are NEVER committed to the source tree.
    - **(c)** If the AC is unreachable both ways (e.g., requires manual UI inspection or runtime not available): emit `status: blocked, blocker_kind: missing_test_for_ac, missing_for: [AC-XXX]`. Cascades back to dev (orchestrator routes).
 4. Aggregate `ac_coverage` map: every AC ID in `ac_scope` → list of evidence IDs that validate it.
-5. Validate Output Packet against `templates/output-packet.json` (self-validation pre-emit).
+5. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)

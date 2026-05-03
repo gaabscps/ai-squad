@@ -1,0 +1,16 @@
+{
+  "task_id": "FEAT-001",
+  "dispatch_id": "dev-T-001-abc123",
+  "role": "dev",
+  "spec_ref": "./.agent-session/FEAT-001/spec.md",
+  "plan_ref": "./.agent-session/FEAT-001/plan.md",
+  "tasks_ref": "./.agent-session/FEAT-001/tasks.md",
+  "task": "T-001",
+  "ac_scope": ["AC-001", "AC-002", "AC-003"],
+  "scope_files": ["src/routes/health.ts", "src/routes/health.test.ts"],
+  "previous_findings": null,
+  "project_context": {
+    "stack": "Node.js 20, TypeScript, Express",
+    "standards_ref": "./CLAUDE.md"
+  }
+}

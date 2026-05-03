@@ -1,0 +1,40 @@
+{
+  "spec_id": "FEAT-001",
+  "dispatch_id": "dev-T-001-abc123",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implemented /health route handler with tests covering AC-001, AC-002, AC-003.",
+  "evidence": [
+    {
+      "id": "EV-001",
+      "kind": "file",
+      "path": "src/routes/health.ts",
+      "lines": "1-15",
+      "reason": "new route handler"
+    },
+    {
+      "id": "EV-002",
+      "kind": "file",
+      "path": "src/routes/health.test.ts",
+      "lines": "1-35",
+      "reason": "test suite covering AC-001, AC-002, AC-003"
+    },
+    {
+      "id": "EV-003",
+      "kind": "command",
+      "cmd": "pnpm test src/routes/health.test.ts",
+      "exit_code": 0,
+      "log_path": ".agent-session/FEAT-001/logs/dev-T-001-abc123.log",
+      "duration_ms": 1240
+    },
+    {
+      "id": "EV-004",
+      "kind": "commit",
+      "sha": "abc1234",
+      "message": "feat(health): add /health endpoint with status and timestamp",
+      "files_changed": ["src/routes/health.ts", "src/routes/health.test.ts"]
+    }
+  ],
+  "files_changed": ["src/routes/health.ts", "src/routes/health.test.ts"],
+  "next_role": "code-reviewer"
+}

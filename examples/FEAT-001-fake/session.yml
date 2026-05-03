@@ -1,0 +1,87 @@
+# Worked example — see ../README.md
+# Real Sessions live at .agent-session/<task_id>/session.yml in the consumer project.
+
+task_id: "FEAT-001"
+feature_name: "Health check endpoint"
+schema_version: 1
+
+spec_ref: "./spec.md"
+plan_ref: "./plan.md"
+tasks_ref: "./tasks.md"
+
+started_at: "2026-05-03T10:00:00Z"
+last_activity_at: "2026-05-03T10:42:00Z"
+completed_at: "2026-05-03T10:42:00Z"
+
+current_phase: "done"
+current_owner: "orchestrator"
+
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
+
+pipeline_started_at: "2026-05-03T10:30:00Z"
+pipeline_completed_at: "2026-05-03T10:42:00Z"
+
+task_states:
+  T-001:
+    state: "done"
+    review_loops: 1
+    qa_loops: 0
+    blocker_calls: 0
+    last_dispatch_id: "qa-T-001-jkl012"
+    last_diff_hash: "abc1234"
+    last_findings_hash: "def5678"
+    last_finding_set_hash: "ghi9012"
+    started_at: "2026-05-03T10:30:00Z"
+    completed_at: "2026-05-03T10:38:00Z"
+  T-002:
+    state: "done"
+    review_loops: 0
+    qa_loops: 0
+    blocker_calls: 0
+    last_dispatch_id: "qa-T-002-mno345"
+    last_diff_hash: "abc1235"
+    last_findings_hash: "def5679"
+    last_finding_set_hash: "ghi9013"
+    started_at: "2026-05-03T10:38:00Z"
+    completed_at: "2026-05-03T10:42:00Z"
+
+budget_defaults:
+  review_loops_max: 3
+  qa_loops_max: 2
+  blocker_calls_max: 2
+
+escalation_metrics:
+  total_tasks: 2
+  done_tasks: 2
+  pending_human_tasks: 0
+  escalation_rate: 0.0
+
+phase_history:
+  - phase: "specify"
+    started_at: "2026-05-03T10:00:00Z"
+    completed_at: "2026-05-03T10:10:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "plan"
+    started_at: "2026-05-03T10:10:00Z"
+    completed_at: "2026-05-03T10:20:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "tasks"
+    started_at: "2026-05-03T10:20:00Z"
+    completed_at: "2026-05-03T10:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "implementation"
+    started_at: "2026-05-03T10:30:00Z"
+    completed_at: "2026-05-03T10:42:00Z"
+    pipeline_summary: "2/2 tasks done; escalation_rate 0%"
+    skipped: false
+    skip_reason: ""

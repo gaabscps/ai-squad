@@ -36,7 +36,7 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 6. Run the tests scoped to `ac_scope`. Record commands + exit codes as evidence.
 7. **If no test framework / runner exists** for the relevant `scope_files` → emit `status: blocked, blocker_kind: missing_test_infra`. Do NOT proceed without verification (Anthropic best-practice: "give Claude a way to verify its work").
 8. Atomic commit using Conventional Commits format: `<type>(<scope>): <imperative summary>` — one commit per task.
-9. Validate Output Packet against `templates/output-packet.json` (self-validation pre-emit; orchestrator re-validates on read).
+9. Validate Output Packet against `templates/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 10. Emit Output Packet (atomic write: tmp + rename).
 
 ## Output contract (Output Packet)
