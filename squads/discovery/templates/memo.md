@@ -79,6 +79,7 @@ parent_session: "./session.yml"
 - **Value** — verdict: <validated|refuted|inconclusive|N/A> · severity: <low|medium|high>
   Rationale: <one paragraph>
   Evidence: <bullets, each with kind from Discovery taxonomy>
+  Assumptions (if inconclusive): <bullets with id · summary · validation_path · validated_at: ISO timestamp>
 - **Usability** — <same shape>
 - **Feasibility** — <same shape>
 - **Viability** — <same shape>
@@ -91,24 +92,42 @@ parent_session: "./session.yml"
 > Resolves Q10 of Cagan's Opportunity Assessment: "Given the above, what's the recommendation?"
 
 ### Options
-<!-- Table format. KILL is always present as the first row — non-negotiable
+<!-- Table populated by discovery-synthesizer. 3-5 alternatives + KILL as row 1
      (Working Backwards canonizes "do not build" as a normal outcome).
+     Avoid weighted numeric scoring (RICE/ICE) — those are for feature prioritization,
+     not Discovery decisions (Cagan: opportunity assessment frames risks, not scores features).
 
-| Option | Description | Pros | Cons | Effort | Risk after Investigate |
-|--------|-------------|------|------|--------|-----------------------|
-| Kill   | Do not pursue this opportunity | ... | ... | 0 | None |
-| ...    | ...         | ...  | ...  | ...    | ...                   |
+| # | Option | Description | Pros | Cons | Effort | Risk-coverage |
+|---|--------|-------------|------|------|--------|---------------|
+| 1 | Kill   | Do not pursue this opportunity | ... | ... | 0 | N/A |
+| 2 | <option> | ... | ... | ... | <S/M/L> | <which Cagan risks each option mitigates> |
+| ... | ...  | ...         | ...  | ...  | ...    | ...           |
 -->
 
 ### Recommendation
-<!-- Cagan Q10. discovery-synthesizer's recommended option from the table above + rationale.
-     Cite which Investigate findings drove the recommendation. -->
+<!-- Cagan Q10 ("Given the above, what's the recommendation?").
+     discovery-synthesizer applies decision rules first-pass over risk verdicts,
+     then may override with mandatory rationale. Required fields:
+
+     - **Recommended option:** #N (from Options table above)
+     - **Rule matched:** R1 | R2 | R3 | R4 | R5 (see synthesizer Skill docs)
+     - **Confidence:** high | medium | low
+     - **Cited evidence:** pointers to risk-analyst Output Packets that triggered the rule
+     - **Override rationale:** REQUIRED IF synthesizer's recommendation differs from the rule's first-pass output -->
 
 ### Decision
 <!-- Marked by the human at the Phase 3 approval gate.
-     Format: chosen option + date. -->
+     Format:
+     - **Decision:** <option #N from Options table> · <ISO timestamp>
+     - **Decided by:** <human handle, optional>
+     - **Notes:** <one line, optional> -->
 
 ### Open Questions for Delivery
-<!-- Handoff hints for whoever runs /spec-writer later (potentially months later).
-     Surface assumptions that may have decayed and need re-validation before delivery starts.
-     Format: one bullet per question. Empty section = "ready to hand off as-is". -->
+<!-- Generated automatically by discovery-synthesizer.
+     Lists assumptions whose decay would invalidate the Decision — surfaces what
+     to re-validate before /spec-writer reads this memo (potentially months later).
+     Sourced from assumptions[] across all 4 risk-analyst outputs, scoped to those
+     where validation_path is required-before-delivery.
+
+     Format: one bullet per assumption: <id> · <summary> · validated_at: ISO · validation_path. -->
+
