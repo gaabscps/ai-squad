@@ -1,75 +1,130 @@
 # ai-squad
 
-> An opinionated SDD (Spec-Driven Development) pipeline for [Claude Code](https://claude.com/claude-code).
+![version](https://img.shields.io/badge/version-v0.1-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange)
+
+> An opinionated multi-squad pipeline for [Claude Code](https://claude.com/claude-code).
 >
-> **You write the pitch. ai-squad writes the spec, plans the build, splits the work into tasks, and ships the code — pausing for your sign-off between phases.**
+> **Two squads ship today. You bring the problem signal or the pitch, ai-squad runs the right squad — pausing for your sign-off at every gate.**
 
 ```mermaid
 flowchart LR
-    Pitch([Your pitch]) --> P1
-    P1[<b>Specify</b><br/>spec.md]
-    P2[<b>Plan</b><br/>plan.md]
-    P3[<b>Tasks</b><br/>tasks.md]
-    P4[<b>Build</b><br/>code + tests]
-    Done([Handoff])
+    Signal([Fuzzy problem]) --> DF
+    Pitch([Clear pitch]) --> SS
 
-    P1 --> P2 --> P3 --> P4 --> Done
+    subgraph Discovery [<b>Discovery squad</b> — fuzzy → decision]
+        DF[<b>Frame</b><br/>Cagan Q1-Q9]
+        DI[<b>Investigate</b><br/>4× risk-analyst]
+        DD[<b>Decide</b><br/>options + recommendation]
+        DF --> DI --> DD
+    end
+
+    subgraph SDD [<b>SDD squad</b> — pitch → shipped code]
+        SS[<b>Specify</b><br/>spec.md]
+        SP[<b>Plan</b><br/>plan.md]
+        ST[<b>Tasks</b><br/>tasks.md]
+        SB[<b>Build</b><br/>code + tests]
+        SS --> SP --> ST --> SB
+    end
+
+    DD -.you read memo.<br/>recompose pitch.-> SS
+    SB --> Done([Handoff])
 
     classDef interactive fill:#e3f2fd,stroke:#1976d2,color:#000
     classDef autonomous fill:#fff3e0,stroke:#f57c00,color:#000
-    class P1,P2,P3 interactive
-    class P4 autonomous
+    class DF,DI,DD,SS,SP,ST interactive
+    class SB autonomous
 ```
 
-The first 3 steps are conversational with you. The 4th runs on its own — implementing, reviewing, testing, escalating only when it can't decide.
-
-`v0.1 — design-complete, 24/24 smoke checks PASS, MIT licensed`
+Every gate is conversational. Only SDD's Build phase runs unattended.
 
 ---
 
 ## Why
 
-Without a workflow, working with Claude Code on a real feature feels like:
+Working with AI on a real feature without a workflow is messy:
 
-- Re-prompting the same context every session.
-- Getting code that doesn't quite match what you meant.
-- Losing track of why a decision was made three days later.
+- You re-prompt the same context every session.
+- The output doesn't quite match what you meant.
+- Three days later you can't remember why a decision was made.
 
-ai-squad gives you the missing layer: **a structured pipeline with explicit approval gates, then autonomous implementation with quality checks**. It's a synthesis of [GitHub Spec Kit](https://github.com/github/spec-kit), [AWS Kiro](https://kiro.dev), [Aider](https://aider.chat), and patterns from Anthropic's [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents).
+And before "build the feature" there's an older question: **should we even build this?** Skipping it is how careful code ends up shipping for nobody.
 
-## Install in 30 seconds
+ai-squad gives you both layers:
+
+🎯 **Discovery** — turn a fuzzy opportunity into a structured decision (build it / kill it / pivot / defer).
+🚢 **SDD** — turn a clear pitch into shipped code, with explicit gates and autonomous quality checks.
+
+## Install
 
 ```bash
 git clone https://github.com/<your-handle>/ai-squad.git
 cd ai-squad
-./tools/deploy.sh
+./tools/deploy.sh                    # all squads (default)
+# or: ./tools/deploy.sh sdd          # SDD only
+# or: ./tools/deploy.sh discovery    # Discovery only
 ```
 
-This copies the commands into your `~/.claude/` so they're available in every Claude Code session, in any project.
+That's it — the slash commands are now available in every Claude Code session, in any project.
 
-## Use it
+## Pick the right squad
 
-In any project (with `.agent-session/` in your `.gitignore`):
+| Your situation | Run | Cost |
+|---------------|-----|------|
+| 🎯 You have a clear pitch | `/spec-writer "<your pitch>"` | 1 squad |
+| 🤔 You have a fuzzy idea — not sure if/what to build | `/discovery-lead "<problem signal>"` | 1 squad (may end in "kill") |
+| 🔁 Discovery decided "Proceed" — now build it | Read the memo, recompose your pitch, then `/spec-writer "<recomposed pitch>"` | Both squads chained |
+| ❌ Discovery decided "Kill" | `/ship DISC-NNN` to clean up | Discovery only |
 
-```
-/spec-writer "I want to add a /health endpoint to the API"
-```
+> **Why isn't the chain automatic?** Discovery memos can sit for weeks before delivery starts. Auto-feeding them silently propagates stale assumptions. Re-reading is your freshness check — quick, but deliberate.
 
-That's it. The command walks you through the whole flow and tells you what to type next at each step.
+---
 
-## Pick your mode
+## How each squad works
 
-When you start, a checkbox lets you pick which phases to run. Skip any of them, including the autonomous build.
+Each squad has one slash command per Phase. You run them in order; each Skill tells you what to type next.
 
-| Mode | What runs | When to use |
-|------|-----------|-------------|
-| **Full** | Spec → Plan → Tasks → Build | Default. Real features. |
-| **Plan now, build later** | Spec → Plan → Tasks | You want the artifacts now and will run the build separately. |
-| **Spec only** | Spec | You're writing a ticket and don't need ai-squad to build it. |
+### 🎯 Discovery — when you don't yet know if/what to build
 
-## See it work end-to-end
+> 3 commands · 3 Phases · output is one `memo.md` you read before composing your SDD pitch.
 
-[`examples/sdd-FEAT-001-fake/`](examples/sdd-FEAT-001-fake/) — a complete walk-through of a real feature ("/health endpoint"). Every artifact each phase produces, the dispatch packets, the final handoff message.
+| You run | The Skill does | Phase |
+|---------|----------------|-------|
+| `/discovery-lead "<problem>"` | Walks you through an interactive interview to fill in a 1-pager | 1 — **Frame** |
+| `/discovery-orchestrator DISC-NNN` | Runs 5 background analyses (1 codebase mapper + 4 risk analysts in parallel). Interrupts you only if findings need attention | 2 — **Investigate** |
+| `/discovery-synthesizer DISC-NNN` | Presents your options (kill always included) + a recommendation. You make the final call | 3 — **Decide** |
+
+**One line each:**
+
+> 💬 **discovery-lead:** "let's talk through a 1-pager about this opportunity."
+> ⚙️ **discovery-orchestrator:** "I'll run 5 background analyses and bring you the findings."
+> 🎯 **discovery-synthesizer:** "here are your options, I recommend #2 — you decide."
+
+### 🚢 SDD — when you know what to build
+
+> 4 commands · 4 Phases · output is shipped code in your repo.
+
+| You run | The Skill does | Phase |
+|---------|----------------|-------|
+| `/spec-writer "<pitch>"` | Walks you through writing the Spec — problem, user stories, acceptance criteria | 1 — **Specify** |
+| `/designer FEAT-NNN` | Walks you through architecture and design decisions | 2 — **Plan** |
+| `/task-builder FEAT-NNN` | Walks you through breaking the Plan into granular Tasks | 3 — **Tasks** |
+| `/orchestrator FEAT-NNN` | Runs the autonomous build (dev → reviewers → qa, in parallel where possible) and emits one handoff at the end | 4 — **Build** |
+
+**One line each:**
+
+> 💬 **spec-writer:** "let's write the Spec for this feature."
+> 🏗️ **designer:** "let's decide the architecture."
+> 📋 **task-builder:** "let's break this into tasks."
+> 🤖 **orchestrator:** "I'll run the build and tell you when it's done."
+
+---
+
+## See it work
+
+End-to-end worked examples (every artifact, every dispatch packet, every handoff message):
+
+- 🎯 [`examples/discovery-DISC-001-fake/`](examples/discovery-DISC-001-fake/) — *"Real-time notifications for support tickets"*
+- 🚢 [`examples/sdd-FEAT-001-fake/`](examples/sdd-FEAT-001-fake/) — *"/health endpoint"*
 
 To verify the pipeline contracts hold:
 
@@ -77,33 +132,45 @@ To verify the pipeline contracts hold:
 ./scripts/smoke-walkthrough.sh
 ```
 
-24 checks. All pass.
+59 checks across both squads. All pass.
 
 ---
 
 <details>
-<summary><b>The team — 9 specialists</b></summary>
+<summary><b>👥 The team — 14 specialists across 2 squads</b></summary>
 
 <br/>
 
-ai-squad is 9 canonical roles: 4 conversational (the first 3 phases + the orchestrator) and 5 autonomous workers (everyone in Phase 4).
+ai-squad is 14 canonical Roles split across 2 squads. Each Role is one file (Skill = conversational with you; Subagent = autonomous worker dispatched by an orchestrator).
+
+**🎯 Discovery squad — 5 Roles:**
 
 | Role | Phase | What it owns |
 |------|-------|--------------|
-| **spec-writer** | 1 | Turning your pitch into an approved Spec |
-| **designer** | 2 | Turning the Spec into a Plan (architecture, data, API, UX, risks) |
-| **task-builder** | 3 | Turning the Plan into granular Tasks with file scope and acceptance criteria |
-| **orchestrator** | 4 | Reading everything, dispatching workers in parallel, emitting one handoff |
+| **discovery-lead** | 1 — Frame | Drafting the 1-pager interactively with you |
+| **discovery-orchestrator** | 2 — Investigate | Dispatching codebase-mapper + 4× risk-analyst; conditional approval gate |
+| **codebase-mapper** | 2 | Read-only "code spelunking" producing a map of the technical surface |
+| **risk-analyst** | 2 | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability) |
+| **discovery-synthesizer** | 3 — Decide | Generating options + recommendation; conducting the approval gate |
+
+**🚢 SDD squad — 9 Roles:**
+
+| Role | Phase | What it owns |
+|------|-------|--------------|
+| **spec-writer** | 1 — Specify | Turning your pitch into an approved Spec |
+| **designer** | 2 — Plan | Turning the Spec into a Plan (architecture, data, API, UX, risks) |
+| **task-builder** | 3 — Tasks | Turning the Plan into granular Tasks |
+| **orchestrator** | 4 — Build | Reading everything, dispatching workers in parallel, emitting one handoff |
 | **dev** | 4 | Implementing one task; test-first; one commit per task |
 | **code-reviewer** | 4 | Patterns, style, naming, architectural fit |
-| **logic-reviewer** | 4 | Edge cases, race conditions, missing flows, broken invariants |
+| **logic-reviewer** | 4 | Edge cases, race conditions, missing flows |
 | **qa** | 4 | Validating each acceptance criterion is actually satisfied |
-| **blocker-specialist** | 4 (escalation) | Resolving blockers via decision memo, or escalating to you |
+| **blocker-specialist** | 4 (escalation) | Resolving blockers via decision memo, or escalating to you. Reusable cross-squad |
 
 </details>
 
 <details>
-<summary><b>Phase 4 anatomy — what happens during the autonomous build</b></summary>
+<summary><b>⚙️ SDD Build phase — what runs autonomously</b></summary>
 
 <br/>
 
@@ -153,102 +220,86 @@ Up to 5 tasks run in parallel. Async by design — one task escalating doesn't b
 </details>
 
 <details>
-<summary><b>Operational model — models, permissions, persistence</b></summary>
+<summary><b>🔍 Discovery Investigate phase — sequential bootstrap, then parallel risk fan-out</b></summary>
 
 <br/>
 
-**Recommended Claude model per phase:**
+```mermaid
+sequenceDiagram
+    autonumber
+    participant DO as discovery-orchestrator
+    participant CM as codebase-mapper
+    participant RV as risk-analyst (value)
+    participant RU as risk-analyst (usability)
+    participant RF as risk-analyst (feasibility)
+    participant RB as risk-analyst (viability)
+    participant H as you
 
-| Phase | Model | Why |
-|-------|-------|-----|
-| 1 — Specify | opus | Spec drafting is reasoning-heavy |
-| 2 — Plan | opus | Architecture decisions are reasoning-heavy |
-| 3 — Tasks | sonnet | Decomposition is more procedural |
-| 4 — Orchestrator | sonnet (opus for complex fan-out) | Sequential dispatch + state management |
+    DO->>CM: Bootstrap context (sequential)
+    CM-->>DO: Technical surface map
 
-Subagent models are fixed in their definitions per [`docs/concepts/effort.md`](docs/concepts/effort.md).
+    par parallel risk fan-out
+        DO->>RV: Investigate value risk
+        RV-->>DO: verdict + severity + evidence
+    and
+        DO->>RU: Investigate usability risk
+        RU-->>DO: ...
+    and
+        DO->>RF: Investigate feasibility risk
+        RF-->>DO: ...
+    and
+        DO->>RB: Investigate viability risk
+        RB-->>DO: ...
+    end
 
-**Permissions:** Phase 4 workers run in `bypassPermissions` mode (autonomous by design). Safety comes from defense-in-depth: per-worker tool allowlists, per-task file scope, per-role authority boundaries. Run on a feature branch you'd normally review before merging — never in a directory mixed with secrets.
+    Note over DO: Aggregate findings into memo.md
 
-**Persistence:** All artifacts live under `.agent-session/<task_id>/` in your project (gitignored). After you accept the handoff, `/ship FEAT-NNN` deletes the directory. Long-term tracking belongs in Jira/Linear/GitHub PR descriptions — the handoff message is formatted to copy-paste cleanly into those.
+    alt all clean
+        DO-->>H: Auto-advance to Decide
+    else any inconclusive OR high-severity
+        DO->>H: Approval gate (Proceed / Stop)
+    end
+```
+
+No retry loops — Discovery is timeboxed by design. `inconclusive` is a first-class outcome, not an error. Each risk-analyst can return `N/A` when a risk doesn't apply (e.g. `viability` for internal tooling).
 
 </details>
 
 <details>
-<summary><b>Repo layout</b></summary>
+<summary><b>📂 Repo layout</b></summary>
 
 <br/>
 
 ```
 squads/
-  sdd/                     The SDD squad (Specify → Plan → Tasks → Implementation)
-    skills/                4 conversational Skills, slash-invoked
-    agents/                5 autonomous Subagents (Phase 4 workers)
-    templates/             Spec / Plan / Tasks templates
-    docs/concepts/         Squad-specific concepts (spec, pipeline, escalation)
-  discovery/               Reserved for the upcoming Discovery squad
-shared/
-  skills/                  Cross-squad Skills (none yet)
-  agents/                  Cross-squad Subagents (none yet)
-  templates/               Work/Output Packets (JSON), Session (YAML)
-  schemas/                 JSON Schema for Output Packet
-  concepts/                Cross-squad concepts (role, phase, evidence, ...)
-  glossary.md              Canonical vocabulary
-examples/
-  sdd-FEAT-001-fake/       Worked SDD artifact set
+  discovery/               🎯 Discovery squad (Frame → Investigate → Decide)
+    skills/                3 conversational Skills
+    agents/                2 autonomous Subagents
+    templates/             memo template
+  sdd/                     🚢 SDD squad (Specify → Plan → Tasks → Implementation)
+    skills/                4 conversational Skills
+    agents/                5 autonomous Subagents
+    templates/             spec / plan / tasks templates
+shared/                    Cross-squad assets (concepts, schemas, glossary, packets, session)
+examples/                  Worked examples (one per squad)
+docs/                      Inspirations, operational model
 scripts/                   smoke-walkthrough.sh
-tools/                     deploy.sh (squad-aware: ./deploy.sh sdd)
+tools/                     deploy.sh
 ```
 
 </details>
 
-<details>
-<summary><b>Conceptual foundations</b> — for the "why" behind every decision</summary>
+---
 
-<br/>
+## Learn more
 
-- [`shared/glossary.md`](shared/glossary.md) — canonical vocabulary used across squads. **Read this first.**
-- [`shared/concepts/`](shared/concepts/) — cross-squad concepts: `role`, `skill-vs-subagent`, `effort`, `evidence`, `output-packet`, `work-packet`, `phase`, `session`.
-- [`squads/sdd/docs/concepts/`](squads/sdd/docs/concepts/) — SDD-specific concepts: `spec`, `pipeline`, `escalation`.
+- 📖 [`docs/inspirations.md`](docs/inspirations.md) — the industry sources that shaped each decision
+- 🔧 [`docs/operational-model.md`](docs/operational-model.md) — recommended Claude models per Phase, permissions, persistence
+- 📚 [`shared/glossary.md`](shared/glossary.md) — canonical vocabulary
 
-The git history is intentionally readable — each commit corresponds to a build phase with a research-backed decision trail.
+## Contributing
 
-</details>
-
-<details>
-<summary><b>Inspirations</b> — sources that shaped specific decisions</summary>
-
-<br/>
-
-ai-squad is a synthesis, not an invention. Each source shaped a specific decision (cited inline in commits and concept docs):
-
-| Source | Shaped |
-|--------|--------|
-| [GitHub Spec Kit](https://github.com/github/spec-kit) | `/specify`, `/clarify`, `/plan`, `/tasks` shape; `[P]` parallelization marker; per-user-story decomposition |
-| [AWS Kiro](https://kiro.dev) | Per-phase approval gate; per-task forward traceability |
-| [Aider](https://aider.chat) | One atomic Conventional Commit per task |
-| [Anthropic — Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) + [multi-agent research](https://www.anthropic.com/engineering/multi-agent-research-system) | Orchestrator-workers pattern; 3-5 parallel workers as the empirical sweet spot |
-| [Reflexion (Shinn et al., NeurIPS 2023)](https://arxiv.org/abs/2303.11366) | Retry caps and verbal feedback; ai-squad uses 3/2/2 (review/qa/blocker) |
-| [Nygard ADR](https://github.com/joelparkerhenderson/architecture-decision-record) | 5-field memo schema for blocker decisions |
-| [Google Engineering Practices](https://google.github.io/eng-practices/review/reviewer/looking-for.html) | code-reviewer (patterns) vs logic-reviewer (behavior) split |
-| [STRIDE](https://en.wikipedia.org/wiki/STRIDE_(security)) + [ATAM](https://www.sei.cmu.edu/library/architecture-tradeoff-analysis-method-collection/) | Fixed risk-category checklist in Plan |
-| [INVEST](https://en.wikipedia.org/wiki/INVEST_(mnemonic)) + [SPIDR](https://www.mountaingoatsoftware.com/blog/five-simple-but-powerful-ways-to-split-user-stories) | Task-sizing heuristics |
-| [Buck2](https://buck2.build/) | Single-coordinator pattern for state |
-
-</details>
-
-<details>
-<summary><b>Contributing</b></summary>
-
-<br/>
-
-PRs welcome. Before opening:
-
-1. `./scripts/smoke-walkthrough.sh` → 24/24 PASS
-2. `./tools/deploy.sh` → no length-budget warnings (Skill ≤ 300 lines, Subagent ≤ 150 lines)
-3. If you change an artifact contract, update the corresponding file in `docs/concepts/` to keep schema and prose aligned
-
-</details>
+PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` should still PASS, and `./tools/deploy.sh` should report no length-budget warnings.
 
 ---
 
