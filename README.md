@@ -118,26 +118,34 @@ sequenceDiagram
     participant B as blocker-specialist
 
     O->>D: Implement task
-    D-->>O: Done (with code + tests)
-    par
+    D-->>O: Done (code + tests)
+
+    par parallel review
         O->>CR: Review patterns
+        CR-->>O: Findings
     and
         O->>LR: Review behavior
+        LR-->>O: Findings
     end
-    CR-->>O: Findings
-    LR-->>O: Findings
-    alt findings exist
-        O->>D: Loop (max 3 rounds)
-    else clean
-        O->>Q: Validate acceptance criteria
-        Q-->>O: Per-AC pass/fail
-        alt all pass
-            Note over O: Task done
-        else any fails
-            O->>D: Loop (max 2 rounds)
-        end
+
+    opt findings exist
+        O->>D: Re-implement (max 3 rounds)
     end
-    Note over O,B: On any cap hit, conflict, or progress stall<br/>→ blocker-specialist resolves or escalates
+
+    O->>Q: Validate acceptance criteria
+    Q-->>O: Per-AC pass/fail
+
+    opt any AC fails
+        O->>D: Fix (max 2 rounds)
+    end
+
+    Note over O: Task done
+
+    rect rgba(255, 200, 100, 0.15)
+        Note over O,B: Escalation path<br/>any cap hit · reviewer conflict · progress stall
+        O->>B: Cascade (max 2 rounds)
+        B-->>O: Decision memo OR escalate to human
+    end
 ```
 
 Up to 5 tasks run in parallel. Async by design — one task escalating doesn't block the others.
