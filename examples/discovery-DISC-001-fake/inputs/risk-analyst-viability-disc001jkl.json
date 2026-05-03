@@ -1,0 +1,12 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-viability-disc001jkl",
+  "spec_ref": "./.agent-session/DISC-001/memo.md",
+  "to_role": "risk-analyst",
+  "risk_category": "viability",
+  "objective": "Investigate whether real-time notifications work for the business. Inspect Q7 (Go-to-Market) and Q8 (Success Metric) feasibility.",
+  "input_refs": [
+    "./memo.md",
+    "./outputs/codebase-mapper-disc001xyz.json"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-feasibility-disc001ghi",
+  "role": "risk-analyst",
+  "status": "done",
+  "risk_category": "feasibility",
+  "verdict": "validated",
+  "risk_severity": "medium",
+  "rationale": "All 3 containers exist; integration is additive (new Kafka subscriber on push-service for ticket.events topic). Only meaningful work: scale push-service WebSocket capacity from current 20 to 50+ concurrent agent connections. Estimated 1-2 weeks platform work. Severity is medium (not low) because push-service has not been load-tested above 30 connections — capacity is plausible but not proven.",
+  "summary": "feasibility: validated · medium",
+  "evidence": [
+    { "id": "f-1", "kind": "code_evidence", "ref": "push-service/src/config/capacity.ts:12-28" },
+    { "id": "f-2", "kind": "code_evidence", "ref": "ticket-api/internal/events/publisher.go:42-60" },
+    { "id": "f-3", "kind": "code_evidence", "ref": "push-service/src/ws/pool.ts:1-50" },
+    { "id": "f-4", "kind": "absence", "ref": "no load test results above 30 concurrent connections in push-service repo" }
+  ],
+  "assumptions": [
+    {
+      "id": "F-001",
+      "summary": "push-service has not been load-tested above 30 concurrent connections",
+      "validation_path": "load test in staging with 50 simulated agent connections"
+    }
+  ]
+}

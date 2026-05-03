@@ -1,0 +1,42 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "codebase-mapper-disc001xyz",
+  "role": "codebase-mapper",
+  "status": "done",
+  "summary": "Mapped 3 containers across React/Go/Node; existing push-service can absorb new event channel.",
+  "containers": [
+    {
+      "name": "support-app",
+      "technology": "React 18 + TypeScript",
+      "responsibility": "Agent-facing ticket queue UI; consumes push-service for desktop notifications.",
+      "relationships": [
+        { "target": "ticket-api", "direction": "uses", "protocol": "HTTPS REST" },
+        { "target": "push-service", "direction": "uses", "protocol": "WebSocket" }
+      ]
+    },
+    {
+      "name": "ticket-api",
+      "technology": "Go 1.22",
+      "responsibility": "Ticket CRUD + event emission (publishes to Kafka topic ticket.events).",
+      "relationships": [
+        { "target": "push-service", "direction": "used_by", "protocol": "Kafka" }
+      ]
+    },
+    {
+      "name": "push-service",
+      "technology": "Node.js 20",
+      "responsibility": "WebSocket gateway; subscribes to Kafka topics and pushes to agent browsers.",
+      "relationships": [
+        { "target": "ticket-api", "direction": "uses", "protocol": "Kafka subscribe" },
+        { "target": "support-app", "direction": "used_by", "protocol": "WebSocket" }
+      ]
+    }
+  ],
+  "evidence": [
+    { "id": "e-1", "kind": "file", "ref": "support-app/package.json:1-30" },
+    { "id": "e-2", "kind": "file", "ref": "ticket-api/go.mod:1-15" },
+    { "id": "e-3", "kind": "file", "ref": "push-service/src/index.ts:1-40" },
+    { "id": "e-4", "kind": "code_evidence", "ref": "ticket-api/internal/events/publisher.go:42-60" },
+    { "id": "e-5", "kind": "command", "ref": "find . -name 'package.json' -maxdepth 4", "exit": 0 }
+  ]
+}

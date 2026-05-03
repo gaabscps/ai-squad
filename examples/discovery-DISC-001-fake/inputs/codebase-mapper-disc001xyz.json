@@ -1,0 +1,8 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "codebase-mapper-disc001xyz",
+  "spec_ref": "./.agent-session/DISC-001/memo.md",
+  "to_role": "codebase-mapper",
+  "objective": "Map the technical surface area for real-time notifications: support-app (UI), ticket-api (events), push-service (WebSocket gateway). Stop at C4 Level 2.",
+  "input_refs": ["./memo.md"]
+}

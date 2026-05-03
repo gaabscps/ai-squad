@@ -4,11 +4,13 @@
 
 ## Definition
 
-A **Role** is the unit of *responsibility* in the squad — `dev`, `qa`, `designer`, `task-builder`, etc. It is conceptually distinct from its *materialization* on the platform (Skill or Subagent). One Role = one responsibility = one file.
+A **Role** is the unit of *responsibility* in a squad — `dev`, `qa`, `designer`, `task-builder`, `discovery-lead`, `risk-analyst`, etc. It is conceptually distinct from its *materialization* on the platform (Skill or Subagent). One Role = one responsibility = one file.
 
-The 9 canonical Roles are a **closed set**. They are not user-extensible at the framework level. Projects that need a new responsibility must fork the framework or absorb it into an existing Role.
+Roles are **organized per squad** — each squad declares its own closed set. Cross-squad reuse is allowed when the responsibility is genuinely shared (e.g. `blocker-specialist` is defined in SDD but reusable by Discovery's `discovery-orchestrator`).
 
-## The 9 canonical Roles
+ai-squad currently ships **14 canonical Roles across 2 squads** (9 SDD + 5 Discovery). The set is closed at the framework level. Projects that need a new responsibility must fork the framework, add it to an existing squad, or define a new squad. Adding extensibility later is easy; closing an open API later is painful — we default closed.
+
+## SDD squad — 9 canonical Roles
 
 | Role | Materializes as | Phase | Responsibility |
 |------|-----------------|-------|----------------|
@@ -20,9 +22,19 @@ The 9 canonical Roles are a **closed set**. They are not user-extensible at the 
 | `code-reviewer` | Subagent | 4 | Reviews implementation against codebase patterns and conventions. Read-only. |
 | `logic-reviewer` | Subagent | 4 | Reviews implementation against the Spec for behavioral gaps. Read-only. |
 | `qa` | Subagent | 4 | Validates the implemented feature against the Spec's acceptance criteria. |
-| `blocker-specialist` | Subagent | 4 (escalation) | Escalation handler. Invoked only on `status: blocked` or reviewer disagreement. |
+| `blocker-specialist` | Subagent | 4 (escalation) | Escalation handler. Invoked only on `status: blocked` or reviewer disagreement. **Reusable cross-squad** — Discovery's `discovery-orchestrator` invokes it on Phase 2 cascades. |
 
-4 Skills (one per Phase) + 5 Subagents (all in Phase 4 / escalation).
+## Discovery squad — 5 canonical Roles
+
+| Role | Materializes as | Phase | Responsibility |
+|------|-----------------|-------|----------------|
+| `discovery-lead` | Skill | 1 — Frame | Drives the interactive Frame session that produces a memo from Cagan's Opportunity Assessment Q1-Q9. |
+| `discovery-orchestrator` | Skill | 2 — Investigate | Dispatches `codebase-mapper` (sequential) → 4× `risk-analyst` (parallel, one per Cagan Big Risk); aggregates Output Packets into `## Investigate Findings`. Conditional approval gate. |
+| `codebase-mapper` | Subagent | 2 | Read-only "code spelunking" producing C4 Level 1 + Level 2 view (System Context + Containers). Feeds the 4 parallel `risk-analyst` instances. |
+| `risk-analyst` | Subagent | 2 | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability). Returns verdict + risk_severity + rationale + structured evidence + assumptions. Timebox > retry — emits `inconclusive` rather than looping. |
+| `discovery-synthesizer` | Skill | 3 — Decide | Generates Options table (kill always row 1) + Recommendation (Cagan Q10) via decision rules R1-R5; conducts RAPID-style Show-all + Recommend approval gate; writes Decision + Open Questions for Delivery. |
+
+**Total: 14 canonical Roles** across 2 squads (7 Skills + 7 Subagents). `blocker-specialist` is the only Role formally shared cross-squad — defined under SDD, reusable from Discovery's escalation paths.
 
 ## Why a closed set
 
@@ -86,14 +98,16 @@ See [`skill-vs-subagent.md`](skill-vs-subagent.md) for why frontmatter differs.
 
 `fan_out` (the orchestrator instantiating the same Role N times in parallel, each with a write-disjoint scope) applies **only to Subagents**. Skills run in the human's main session — there is one Skill instance at a time by definition.
 
-| Role | Materialization | `fan_out` | Reason |
-|------|-----------------|-----------|--------|
-| `dev` | Subagent | true | Implementation is decomposable by file/module. |
-| `code-reviewer` | Subagent | true | Review of disjoint diffs is independent. |
-| `logic-reviewer` | Subagent | true | Same — disjoint diffs reviewed independently. |
-| `qa` | Subagent | true | Acceptance criteria can be split across independent surfaces. |
-| `blocker-specialist` | Subagent | false | Singular escalation handler per blocker. |
-| `spec-writer` / `designer` / `task-builder` / `orchestrator` | Skill | n/a | Skills run in the main session; fan-out is structurally inapplicable. |
+| Role | Squad | Materialization | `fan_out` | Reason |
+|------|-------|-----------------|-----------|--------|
+| `dev` | sdd | Subagent | true | Implementation is decomposable by file/module. |
+| `code-reviewer` | sdd | Subagent | true | Review of disjoint diffs is independent. |
+| `logic-reviewer` | sdd | Subagent | true | Same — disjoint diffs reviewed independently. |
+| `qa` | sdd | Subagent | true | Acceptance criteria can be split across independent surfaces. |
+| `blocker-specialist` | sdd (cross-squad) | Subagent | false | Singular escalation handler per blocker. |
+| `codebase-mapper` | discovery | Subagent | false | Sequential bootstrap — feeds risk-analyst fan-out. One mapper per Investigate. |
+| `risk-analyst` | discovery | Subagent | true | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability). Always 4 instances per Investigate. |
+| `spec-writer` / `designer` / `task-builder` / `orchestrator` (sdd) and `discovery-lead` / `discovery-orchestrator` / `discovery-synthesizer` (discovery) | — | Skill | n/a | Skills run in the main session; fan-out is structurally inapplicable. |
 
 **Why `fan_out` is first-class** (not a future optimization): the primary motivation is **fidelity**, not throughput. A Subagent focused on a small slice has higher assertiveness than a Subagent receiving the full Spec and multiple files at once. Multi-instance amplifies the benefit of the Subagent's natively isolated context by reducing the scope inside each context.
 

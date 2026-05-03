@@ -1,0 +1,17 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-usability-disc001def",
+  "role": "risk-analyst",
+  "status": "done",
+  "risk_category": "usability",
+  "verdict": "validated",
+  "risk_severity": "low",
+  "rationale": "Existing desktop notification pattern (billing alerts via push-service) is already familiar to agents. UX team confirms visual + audio cues prevent missed events. No novel interaction required — agents click the notification to open the relevant ticket.",
+  "summary": "usability: validated · low",
+  "evidence": [
+    { "id": "u-1", "kind": "expert_judgment", "ref": "ux-review-2026-04-12.md:8-22", "reviewer": "ux-team-lead" },
+    { "id": "u-2", "kind": "user_signal", "ref": "agent-interview-billing-alerts-feedback.md:3-7" },
+    { "id": "u-3", "kind": "expert_judgment", "ref": "accessibility-audit-2026-q1.pdf", "reviewer": "a11y-consultant" }
+  ],
+  "assumptions": []
+}

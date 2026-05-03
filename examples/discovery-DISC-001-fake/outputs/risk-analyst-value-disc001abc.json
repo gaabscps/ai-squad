@@ -1,0 +1,17 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-value-disc001abc",
+  "role": "risk-analyst",
+  "status": "done",
+  "risk_category": "value",
+  "verdict": "validated",
+  "risk_severity": "low",
+  "rationale": "User pain is well-documented across 12 agent interviews citing manual refresh as their primary friction. Existing alternatives (email alerts, dashboard tabs) are demonstrably inadequate — email delays of 3-5 minutes are unacceptable when SLA windows are 15 minutes. Real-time push notifications materially beat current behavior with sub-second delivery.",
+  "summary": "value: validated · low",
+  "evidence": [
+    { "id": "v-1", "kind": "user_signal", "ref": "agent-interviews-april-2026.md:12-45", "quote_count": 12 },
+    { "id": "v-2", "kind": "metric_benchmark", "ref": "https://internal-dashboard.example.com/sla-trends" },
+    { "id": "v-3", "kind": "user_signal", "ref": "agent-survey-q1-2026.csv", "n_respondents": 38 }
+  ],
+  "assumptions": []
+}

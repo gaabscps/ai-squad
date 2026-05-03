@@ -1,0 +1,12 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-value-disc001abc",
+  "spec_ref": "./.agent-session/DISC-001/memo.md",
+  "to_role": "risk-analyst",
+  "risk_category": "value",
+  "objective": "Investigate whether agents will use real-time notifications. Compare Q1 (Problem) against Q4 (Alternatives users have today).",
+  "input_refs": [
+    "./memo.md",
+    "./outputs/codebase-mapper-disc001xyz.json"
+  ]
+}

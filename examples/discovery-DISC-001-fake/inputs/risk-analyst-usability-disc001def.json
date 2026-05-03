@@ -1,0 +1,12 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-usability-disc001def",
+  "spec_ref": "./.agent-session/DISC-001/memo.md",
+  "to_role": "risk-analyst",
+  "risk_category": "usability",
+  "objective": "Investigate whether agents can figure out how to use real-time notifications. Inspect existing UX patterns (billing alerts) and friction points.",
+  "input_refs": [
+    "./memo.md",
+    "./outputs/codebase-mapper-disc001xyz.json"
+  ]
+}

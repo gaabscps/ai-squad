@@ -1,0 +1,50 @@
+# Worked example — Discovery squad Session in `done` terminal state.
+# Lives at .agent-session/<task_id>/session.yml in the consumer project (gitignored).
+# Schema and full lifecycle in shared/concepts/session.md.
+
+# Identification
+task_id: "DISC-001"
+squad: "discovery"
+feature_name: "Real-time notifications for support tickets"
+schema_version: 1
+
+# Artifact references (paths relative to consumer project root)
+memo_ref: "./.agent-session/DISC-001/memo.md"
+
+# Time tracking
+started_at: "2026-04-15T10:00:00Z"
+last_activity_at: "2026-04-15T15:30:00Z"
+completed_at: "2026-04-15T15:30:00Z"
+
+# Current state — Discovery enum: frame | investigate | decide | paused | done | escalated
+current_phase: "done"
+current_owner: "discovery-synthesizer"
+
+# Planned phases — selected at /discovery-lead entry; full Frame → Investigate → Decide
+planned_phases:
+  - "frame"
+  - "investigate"
+  - "decide"
+
+# Phase history (one entry per Phase)
+phase_history:
+  - phase: "frame"
+    started_at: "2026-04-15T10:00:00Z"
+    completed_at: "2026-04-15T11:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+  - phase: "investigate"
+    started_at: "2026-04-15T11:30:00Z"
+    completed_at: "2026-04-15T14:00:00Z"
+    artifact_status: "approved"
+    skipped: false
+    dispatches_summary: "1 codebase-mapper + 4 risk-analyst (value, usability, feasibility, viability); auto-advanced (no inconclusive, no high-severity)"
+    escalation_count: 0
+  - phase: "decide"
+    started_at: "2026-04-15T14:00:00Z"
+    completed_at: "2026-04-15T15:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+    decision_option: 2
+    confidence: "high"
+    rule_matched: "R4"

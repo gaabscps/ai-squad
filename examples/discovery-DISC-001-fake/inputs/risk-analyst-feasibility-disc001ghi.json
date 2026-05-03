@@ -1,0 +1,12 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-feasibility-disc001ghi",
+  "spec_ref": "./.agent-session/DISC-001/memo.md",
+  "to_role": "risk-analyst",
+  "risk_category": "feasibility",
+  "objective": "Investigate whether engineering can deliver real-time notifications within constraints. Inspect codebase-mapper output, dependencies, integration risks.",
+  "input_refs": [
+    "./memo.md",
+    "./outputs/codebase-mapper-disc001xyz.json"
+  ]
+}

@@ -4,9 +4,18 @@
 
 ## Definition
 
-ai-squad has **4 Phases**: **Specify → Plan → Tasks → Implementation**. Each Phase has one Skill that conducts it (4 Skills total) and produces one persistent runtime artifact under `.agent-session/<task_id>/`. The first 3 Phases are **AI-driven with the human in-the-loop** (each ends with an explicit human-approved gate). The 4th (Implementation) is **fully autonomous** — the orchestrator dispatches Subagents, the human is absent until handoff.
+A **Phase** is a discrete unit of work in a squad's flow, conducted by exactly one Skill, ending with an explicit human-approved gate (or, in fully autonomous Phases, with a one-shot handoff to the human). Each Phase produces one persistent runtime artifact under `.agent-session/<task_id>/`.
 
-**Which Phases run is selected by the human at Session entry**, via an interactive checkbox (default: all 4). See `planned_phases` in [`session.md`](session.md). Skipping any Phase (including Implementation, for "plan now, execute later" workflows) ends the Session in a `paused` terminal-but-resumable state after the last planned Phase.
+**Phases are squad-scoped — each squad declares its own Phase enum:**
+
+| Squad | Phases | Phase that is fully autonomous (human absent) |
+|-------|--------|----------------------------------------------|
+| `sdd` | 4: **Specify → Plan → Tasks → Implementation** | Phase 4 (Implementation) |
+| `discovery` | 3: **Frame → Investigate → Decide** | None — all 3 have human-in-the-loop gates |
+
+The squad-specific Phase enum lives in `session.yml.current_phase` and is interpreted in the context of `session.yml.squad`. See [`session.md`](session.md).
+
+**Which Phases run is selected by the human at Session entry**, via an interactive checkbox (default: all of the squad's Phases). See `planned_phases` in [`session.md`](session.md). Skipping any Phase ends the Session in a `paused` terminal-but-resumable state after the last planned Phase. This enables "plan now, execute later" workflows in the SDD squad and "Frame-only / no Decide" workflows in the Discovery squad.
 
 > *Terms used in this doc:*
 > - **phase boundary:** the point where the framework moves from "human in-the-loop with the current Skill" to the next Phase. Always a deliberate human action (no auto-transition).
@@ -15,28 +24,44 @@ ai-squad has **4 Phases**: **Specify → Plan → Tasks → Implementation**. Ea
 > - **planned_phases:** the array of Phases the human selected at Session entry. Each Skill verifies its own Phase is in the array before proceeding; otherwise refuses.
 > - **paused state:** Session is in a terminal-but-resumable state when the last planned Phase has completed but later Phases were not planned. Human can resume by invoking the next Phase's Skill with `--resume`.
 
-## The 4 Phases
+## SDD squad — 4 Phases
 
 | # | Phase | Conducting Skill | Persistent artifact | Human role | Transition gate |
 |---|-------|------------------|---------------------|------------|-----------------|
-| 1 | **Specify** | `spec-writer` | `.agent-session/<task_id>/spec.md` | In-the-loop (refines Spec interactively) | `status: approved` on `spec.md` + next Skill invocation |
-| 2 | **Plan** | `designer` | `.agent-session/<task_id>/plan.md` | In-the-loop (validates design decisions) | `status: approved` on `plan.md` + next Skill invocation |
-| 3 | **Tasks** | `task-builder` | `.agent-session/<task_id>/tasks.md` | In-the-loop (reviews task decomposition) | `status: approved` on `tasks.md` + next Skill invocation |
+| 1 | **Specify** | `spec-writer` | `.agent-session/FEAT-NNN/spec.md` | In-the-loop (refines Spec interactively) | `status: approved` on `spec.md` + next Skill invocation |
+| 2 | **Plan** | `designer` | `.agent-session/FEAT-NNN/plan.md` | In-the-loop (validates design decisions) | `status: approved` on `plan.md` + next Skill invocation |
+| 3 | **Tasks** | `task-builder` | `.agent-session/FEAT-NNN/tasks.md` | In-the-loop (reviews task decomposition) | `status: approved` on `tasks.md` + next Skill invocation |
 | 4 | **Implementation** | `orchestrator` (dispatches 5 Subagents) | Repo files + Output Packets + handoff | **Absent** until handoff | (orchestrator emits handoff; pipeline ends) |
 | post | (cleanup) | `/ship FEAT-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<task_id>/` |
 
-## Why 4 Phases (not 2, not more)
+## Discovery squad — 3 Phases
 
-The number 4 comes from the SDD industry consensus (GitHub Spec Kit, Kiro, BMAD all converge on Specify → Plan → Tasks → Implementation). ai-squad adopts this division for two reasons:
+| # | Phase | Conducting Skill | Persistent artifact | Human role | Transition gate |
+|---|-------|------------------|---------------------|------------|-----------------|
+| 1 | **Frame** | `discovery-lead` | `.agent-session/DISC-NNN/memo.md` (Q1-Q9 of Cagan's Opportunity Assessment) | In-the-loop (refines Frame interactively) | `status: approved` on `memo.md` + next Skill invocation |
+| 2 | **Investigate** | `discovery-orchestrator` (dispatches `codebase-mapper` sequentially → 4× `risk-analyst` in parallel, one per Cagan Big Risk) | `## Investigate Findings` block in `memo.md` | **Conditional** — auto-advance if all risks validated/refuted/N/A and severities low/medium; gate if any inconclusive or any high-severity | Auto-advance OR explicit human approval per gate policy |
+| 3 | **Decide** | `discovery-synthesizer` | `## Decide` block in `memo.md` (Options table + Recommendation + Decision + Open Questions for Delivery) | In-the-loop as RAPID Decider (synthesizer is Recommender) | Human chooses option via `AskUserQuestion`; `phase_completed: decide` |
+| post | (cleanup) | `/ship DISC-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<task_id>/` |
+
+The Discovery squad's output (memo) is **handed off purely** to the SDD squad — not auto-fed (per industry-validated Path A: Discovery → Delivery batch handoff requires human re-validation of Open Questions for Delivery before scoping the Spec).
+
+## Why these Phase counts (per squad)
+
+**SDD = 4 Phases.** The number comes from the SDD industry consensus (GitHub Spec Kit, Kiro, BMAD all converge on Specify → Plan → Tasks → Implementation). ai-squad adopts this division for two reasons:
 
 1. **Well-defined tasks serve humans and AI alike.** Both perform better when the work is sliced into discrete units before execution starts. A Spec answers WHAT/WHY; a Plan answers structural HOW; Tasks answer the work breakdown; Implementation does the work. Conflating these into fewer Phases creates ambiguity at exactly the point where ambiguity costs most.
 
 2. **Granular gates give the human meaningful control.** The human can reject/refine at three checkpoints before the autonomous Phase 4 starts. The cost of getting Phase 4 wrong (modified code, wrong direction) is high; three opportunities to course-correct upstream is cheap insurance.
 
-Going beyond 4 (e.g. adding a "Discovery" Phase 0 or a "Review" Phase 5) is rejected:
+**Discovery = 3 Phases.** The number comes from Marty Cagan's discovery framing (SVPG): Frame the opportunity → Investigate the Four Big Risks → Decide. Adopting this division for two reasons:
 
-- **Pre-Phase 1 (Discovery)** is responsibility of the human *before* invoking ai-squad. The framework assumes the human arrives at Phase 1 with a problem worth specifying.
-- **Post-Phase 4 (Review/Deploy)** is responsibility of the host project's own processes (CI, code review, deployment pipelines). The handoff is the framework's exit; what the human does next is theirs.
+1. **Each Phase produces an industry-canonical artifact.** Frame = Cagan Opportunity Assessment Q1-Q9 (Inspired Ch. 35). Investigate = synthesis of Cagan's Four Big Risks (value/usability/feasibility/viability), one analyst per risk in parallel. Decide = Q10 of the Opportunity Assessment + RAPID Recommender pattern (Bain).
+
+2. **The squad is time-decoupled by design.** Discovery may run months before Delivery (the SDD squad). Path A — deliberate batch handoff — requires the Decide Phase to surface freshness signals (Open Questions for Delivery) so the SDD squad knows what may have decayed.
+
+**No "Pre-Phase 0" inside any squad.** Cross-squad chaining (Discovery's output feeding into SDD's input) is handled at the **squad boundary**, not as a Phase. The human reads the Discovery memo and recomposes the SDD pitch — explicit handoff, not auto-feed.
+
+**No "Post-Phase N" (Deploy / Review)** inside any squad. The host project's CI/CD owns deployment; the handoff is the squad's exit.
 
 ## The boundary criterion
 
@@ -49,7 +74,9 @@ This is the same `human-in-the-loop` criterion that defines [Skill vs Subagent](
 
 It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builder`, `orchestrator`) span the 4 Phases (one per Phase) and that the 5 Subagents all live in Phase 4 — they are consequences of the same principle.
 
-## Skills per Phase
+## Roles per Phase, per squad
+
+**SDD squad** (4 Skills + 5 Subagents = 9 Roles):
 
 | Role | Materialization | Phase | Why this materialization |
 |------|-----------------|-------|--------------------------|
@@ -61,9 +88,19 @@ It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builde
 | `code-reviewer` | Subagent | 4 | Neither |
 | `logic-reviewer` | Subagent | 4 | Neither |
 | `qa` | Subagent | 4 | Neither |
-| `blocker-specialist` | Subagent | 4 (escalation) | Neither |
+| `blocker-specialist` | Subagent | 4 (escalation) | Neither — reused cross-squad on `status: blocked` |
 
-4 Skills (one per Phase) + 5 Subagents (all in Phase 4 / escalation). Total: 9 canonical Roles.
+**Discovery squad** (3 Skills + 2 Subagents = 5 Roles):
+
+| Role | Materialization | Phase | Why this materialization |
+|------|-----------------|-------|--------------------------|
+| `discovery-lead` | Skill | 1 (Frame) | Human in-the-loop |
+| `discovery-orchestrator` | Skill | 2 (Investigate) | Dispatches Subagents (sequential mapper → parallel risk-analyst fan-out) |
+| `codebase-mapper` | Subagent | 2 | Neither in-the-loop nor dispatcher |
+| `risk-analyst` | Subagent | 2 | Neither — multi-instance fan-out (1 per Cagan Big Risk) |
+| `discovery-synthesizer` | Skill | 3 (Decide) | Human in-the-loop as RAPID Decider |
+
+Total across both squads: **14 canonical Roles** (7 Skills + 7 Subagents). `blocker-specialist` is shared cross-squad (defined under SDD, reusable by Discovery's `discovery-orchestrator`).
 
 ## Artifacts per Phase — runtime, gitignored
 
@@ -207,7 +244,7 @@ Cleanup is not automatic. The human controls when to discard the runtime trace.
 ## Anti-patterns
 
 1. **Inventing "Phase 1.5" for Spec refinement.** Refinement is a *loop within Phase 1* (human + spec-writer iterating until the Spec is approved). It is not a new Phase.
-2. **Inventing "Pre-Phase 1" (Discovery) or "Post-Phase 4" (Deploy).** Discovery is the human's job before invoking ai-squad; deployment is the host project's CI/CD.
+2. **Inventing "Pre-Phase 1" Discovery inside the SDD squad.** Discovery is a *separate squad* (`discovery`) with its own 3 Phases — not a Phase 0 of SDD. Cross-squad handoff is explicit (human reads Discovery memo, recomposes SDD pitch), not auto-feed. **"Post-Phase N" (Deploy)** is the host project's CI/CD, not a Phase of any squad.
 3. **Calling Phase 4 sub-stages "phases".** Inside Phase 4 the orchestrator runs a Pipeline (concept #9) with stages like `dev`, `review`, `qa`. Those are *Pipeline stages*, not Phases.
 4. **Auto-transitioning between Phases.** Every transition needs explicit human action.
 5. **Skipping Phases silently.** When `planned_phases` excludes a Phase, the next Skill explicitly says so in its guided next-step message. The decision to skip must be visible.

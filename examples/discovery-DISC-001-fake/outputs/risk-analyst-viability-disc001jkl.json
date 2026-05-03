@@ -1,0 +1,14 @@
+{
+  "spec_id": "DISC-001",
+  "dispatch_id": "risk-analyst-viability-disc001jkl",
+  "role": "risk-analyst",
+  "status": "done",
+  "risk_category": "viability",
+  "verdict": "N/A",
+  "rationale": "Internal tooling with no revenue model — viability risk does not apply per Cagan's product-vs-internal distinction. Frame Q7 explicitly marks Go-to-Market as N/A; Frame Q8 lagging metric (SLA breach rate) is operational, not commercial.",
+  "summary": "viability: N/A",
+  "evidence": [
+    { "id": "vi-1", "kind": "absence", "ref": "memo.md Q7 marked N/A — internal tooling" }
+  ],
+  "assumptions": []
+}
