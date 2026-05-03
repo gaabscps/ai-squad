@@ -1,0 +1,5 @@
+model: sonnet
+tools: [read, write]
+context_budget: medium
+max_tokens: 8000
+mode: interactive       # this role requires human presence

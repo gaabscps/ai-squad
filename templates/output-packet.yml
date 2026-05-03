@@ -1,0 +1,16 @@
+# Output Packet — produced by each agent, consumed by orchestrator
+
+spec_id: "FEAT-XXX"
+role: "dev"
+status: "done"          # done | blocked | needs-review | escalate
+
+summary: ""             # one line, machine-readable
+
+files_changed:
+  -
+
+findings: []            # used by tech-lead
+
+blockers: []            # used when status = blocked
+
+next_role: "tech-lead"  # suggested next step

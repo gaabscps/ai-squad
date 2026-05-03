@@ -1,0 +1,33 @@
+# Session State — managed by orchestrator
+
+task_id: "FEAT-XXX"
+spec_ref: "./specs/FEAT-XXX.md"
+started_at: ""
+phase: "spec"           # spec | design | dev | review | done | blocked
+
+budget:
+  dev_loops: 0
+  dev_loops_max: 3
+  review_loops: 0
+  review_loops_max: 2
+  blocker_calls: 0
+  blocker_calls_max: 1
+
+escalate_conditions:
+  - "dev_loops >= dev_loops_max"
+  - "review_loops >= review_loops_max AND findings still open"
+  - "blocker_calls >= blocker_calls_max AND still blocked"
+
+trail:
+  - phase: "spec"
+    status: ""
+    summary: ""
+  - phase: "design"
+    status: ""
+    summary: ""
+  - phase: "dev"
+    status: ""
+    summary: ""
+  - phase: "review"
+    status: ""
+    summary: ""
