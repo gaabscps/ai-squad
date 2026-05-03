@@ -15,30 +15,63 @@ parent_plan: PLAN-FEAT-XXX
 
 > **Conventions:**
 > - `T-XXX` — monotonic task ID
-> - `[P]` — parallelizable (orchestrator may fan-out)
-> - `[US-XXX]` — references a user story from the Spec
-> - `Files:` — becomes `scope_files` in the Work Packet (write-disjoint scope)
-> - `AC covered:` — becomes `ac_scope` in the Work Packet
-> - `Depends on:` — declares ordering constraints between tasks
+> - `[P]` — parallelizable; orchestrator may fan-out. Two rules **both** required:
+>   (a) `Files:` set disjoint from every other `[P]` task in the same phase, AND
+>   (b) No `Depends on:` pointing to an incomplete predecessor.
+> - `[US-XXX]` — references a user story from the Spec (omit for Setup/Foundational tasks)
+> - `Files:` — **exact file paths** (no globs); becomes `scope_files` in the Work Packet
+> - `AC covered:` — every AC from the Spec MUST appear in ≥1 task's list; becomes `ac_scope` in the Work Packet
+> - `Depends on:` — declares ordering; predecessor must be `done` before this task starts
 > - `Estimated complexity:` — small | medium | large (informational; orchestrator may use for `effort` override)
+>
+> **Sizing guidance (INVEST + Spec Kit):** task = smallest independently testable slice that touches a coherent file set (~1 commit-worth — not 1 file, not 1 module). Target: **5-8 tasks per User Story, ~15-30 total per feature**. >40 tasks suggests splitting the feature.
 
 ---
 
-## T-001 [P] [US-001] <short imperative title>
-**Files:** <path>, <path>
-**AC covered:** <FEAT-XXX/AC-XXX>, <FEAT-XXX/AC-XXX>
-**Estimated complexity:** medium
+## Setup (optional — pre-story shared scaffolding)
 
-## T-002 [P] [US-001] <short imperative title>
-**Files:** <path>
-**AC covered:** <FEAT-XXX/AC-XXX>
+## T-001 [P] <short imperative title>
+**Files:** <exact path>, <exact path>
+**AC covered:** —
 **Estimated complexity:** small
 
-## T-003 [US-002] <short imperative title>
-**Files:** <path>, <path>
-**Depends on:** T-001
-**AC covered:** <FEAT-XXX/AC-XXX>
+---
+
+## Foundational (optional — cross-story prereqs that block stories)
+
+## T-002 <short imperative title>
+**Files:** <exact path>
+**AC covered:** <AC-XXX>
+**Estimated complexity:** medium
+
+---
+
+## User Story 1 (P1): <story title>
+
+## T-003 [P] [US-001] <short imperative title>
+**Files:** <exact path>, <exact path>
+**AC covered:** <AC-XXX>, <AC-XXX>
+**Estimated complexity:** medium
+
+## T-004 [P] [US-001] <short imperative title>
+**Files:** <exact path>
+**AC covered:** <AC-XXX>
+**Estimated complexity:** small
+
+## T-005 [US-001] <short imperative title>
+**Files:** <exact path>, <exact path>
+**Depends on:** T-003, T-004
+**AC covered:** <AC-XXX>
 **Estimated complexity:** large
+
+---
+
+## User Story 2 (P2): <story title>
+
+## T-006 [US-002] <short imperative title>
+**Files:** <exact path>
+**AC covered:** <AC-XXX>
+**Estimated complexity:** medium
 
 ---
 
