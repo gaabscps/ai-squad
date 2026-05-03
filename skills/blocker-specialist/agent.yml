@@ -1,6 +1,0 @@
-model: opus
-tools: [read, grep, bash]
-context_budget: medium
-max_tokens: 8000
-mode: autonomous
-escalate_to_human: true

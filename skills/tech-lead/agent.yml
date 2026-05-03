@@ -1,5 +1,0 @@
-model: sonnet
-tools: [read, grep]
-context_budget: low
-max_tokens: 8000
-mode: autonomous

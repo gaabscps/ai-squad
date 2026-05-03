@@ -1,33 +1,95 @@
-# Session State — managed by orchestrator
+# Session State — managed by the Phase Skills (1-3) and the orchestrator (Phase 4)
+# Lives at .agent-session/<task_id>/session.yml in the consumer project (gitignored).
+# Removed entirely by /ship FEAT-XXX after the human accepts the handoff.
+#
+# Atomic writes: every update follows tmp + rename pattern (POSIX atomic).
+# Schema and full lifecycle in docs/concepts/session.md.
 
+# Identification
 task_id: "FEAT-XXX"
-spec_ref: "./specs/FEAT-XXX.md"
+schema_version: 1                                # forward-compat anchor; not used at MVP
+
+# Artifact references (paths relative to consumer project root)
+spec_ref: "./.agent-session/FEAT-XXX/spec.md"
+plan_ref: "./.agent-session/FEAT-XXX/plan.md"   # absent if Phase 2 not in planned_phases
+tasks_ref: "./.agent-session/FEAT-XXX/tasks.md" # absent if Phase 3 not in planned_phases
+
+# Time tracking
 started_at: ""
-phase: "spec"           # spec | design | dev | review | done | blocked
+last_activity_at: ""                             # updated on every write
+completed_at: ""                                 # set on terminal state (done | paused | escalated)
 
-budget:
-  dev_loops: 0
-  dev_loops_max: 3
-  review_loops: 0
-  review_loops_max: 2
-  blocker_calls: 0
-  blocker_calls_max: 1
+# Current state
+current_phase: "specify"                         # specify | plan | tasks | implementation | paused | done | escalated
+current_owner: "spec-writer"                     # which Role currently has write authority
 
-escalate_conditions:
-  - "dev_loops >= dev_loops_max"
-  - "review_loops >= review_loops_max AND findings still open"
-  - "blocker_calls >= blocker_calls_max AND still blocked"
+# Planned phases — selected by human at /spec-writer entry via AskUserQuestion (or via --plan flag)
+# Default is all 4 checked. Skipping any Phase ends the Session in `paused` state after the last planned Phase.
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
 
-trail:
-  - phase: "spec"
-    status: ""
-    summary: ""
-  - phase: "design"
-    status: ""
-    summary: ""
-  - phase: "dev"
-    status: ""
-    summary: ""
-  - phase: "review"
-    status: ""
-    summary: ""
+# Phase 4 only — Pipeline-level state
+pipeline_started_at: ""
+pipeline_completed_at: ""
+
+# Per-task state map (Phase 4 only — populated when Pipeline starts)
+# Each task from tasks.md gets its own entry. Tasks are async:
+# one task escalating does not block parallel tasks.
+task_states: {}
+  # Example structure (orchestrator populates one per task in tasks.md):
+  # T-001:
+  #   state: "pending"               # pending | running | blocked | resolved | done | pending_human | failed
+  #   review_loops: 0
+  #   qa_loops: 0
+  #   blocker_calls: 0
+  #   last_dispatch_id: ""
+  #   last_diff_hash: ""             # for progress detection
+  #   last_findings_hash: ""         # for progress detection
+  #   blocker_summary: ""            # populated when state = pending_human
+  #   started_at: ""
+  #   completed_at: ""
+
+# Per-task budget caps (industry-validated defaults; override per dispatch via Work Packet's max_loops)
+budget_defaults:
+  review_loops_max: 3                            # Reflexion canonical (Shinn et al., NeurIPS 2023)
+  qa_loops_max: 2                                # conservative — qa is broader scope
+  blocker_calls_max: 2                           # Anthropic Claude Code "3 denials → human" pattern
+
+# Escalation rate metric for THIS run (computed at handoff time)
+# Surfaced both in mid-Pipeline blocker handoffs and in final handoff.
+# Healthy range: 10-15% (Galileo industry guidance).
+escalation_metrics:
+  total_tasks: 0
+  done_tasks: 0
+  pending_human_tasks: 0
+  escalation_rate: 0.0
+
+# Phase history (one entry per Phase, populated as Phases complete OR are skipped)
+phase_history:
+  - phase: "specify"
+    started_at: ""
+    completed_at: ""
+    artifact_status: ""                          # draft | approved
+    skipped: false
+    skip_reason: ""                              # populated when skipped: true
+  - phase: "plan"
+    started_at: ""
+    completed_at: ""
+    artifact_status: ""
+    skipped: false
+    skip_reason: ""
+  - phase: "tasks"
+    started_at: ""
+    completed_at: ""
+    artifact_status: ""
+    skipped: false
+    skip_reason: ""
+  - phase: "implementation"
+    started_at: ""
+    completed_at: ""
+    pipeline_summary: ""
+    skipped: false
+    skip_reason: ""

@@ -1,28 +1,40 @@
 #!/bin/bash
-# Installs ai-squad skills to ~/.claude/skills/
+# Installs ai-squad skills (skills/) and subagents (agents/) into ~/.claude/
 
-SKILLS_SRC="$(cd "$(dirname "$0")/.." && pwd)/skills"
+set -e
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SKILLS_SRC="$REPO_ROOT/skills"
+AGENTS_SRC="$REPO_ROOT/agents"
 SKILLS_DST="$HOME/.claude/skills"
+AGENTS_DST="$HOME/.claude/agents"
 
 echo "ai-squad deploy"
-echo "  from: $SKILLS_SRC"
-echo "  to:   $SKILLS_DST"
+echo "  skills:  $SKILLS_SRC -> $SKILLS_DST"
+echo "  agents:  $AGENTS_SRC -> $AGENTS_DST"
 echo ""
 
-for role_dir in "$SKILLS_SRC"/*/; do
-  role=$(basename "$role_dir")
-  dst="$SKILLS_DST/$role"
+mkdir -p "$SKILLS_DST" "$AGENTS_DST"
 
-  if [ -d "$dst" ]; then
-    echo "  [update] $role"
-  else
-    echo "  [install] $role"
-    mkdir -p "$dst"
+for skill_dir in "$SKILLS_SRC"/*/; do
+  [ -d "$skill_dir" ] || continue
+  skill=$(basename "$skill_dir")
+  dst="$SKILLS_DST/$skill"
+  if [ -d "$dst" ]; then echo "  [update skill]   $skill"
+  else                   echo "  [install skill]  $skill"; mkdir -p "$dst"
   fi
+  cp "$skill_dir/skill.md" "$dst/skill.md"
+done
 
-  cp "$role_dir/skill.md" "$dst/skill.md"
-  [ -f "$role_dir/agent.yml" ] && cp "$role_dir/agent.yml" "$dst/agent.yml"
+for agent_file in "$AGENTS_SRC"/*.md; do
+  [ -f "$agent_file" ] || continue
+  agent=$(basename "$agent_file" .md)
+  dst="$AGENTS_DST/$agent.md"
+  if [ -f "$dst" ]; then echo "  [update agent]   $agent"
+  else                   echo "  [install agent]  $agent"
+  fi
+  cp "$agent_file" "$dst"
 done
 
 echo ""
-echo "Done. Skills available in Claude Code."
+echo "Done. ai-squad available in Claude Code."

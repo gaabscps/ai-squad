@@ -1,6 +1,0 @@
-model: sonnet
-tools: [read, edit, write, bash, grep]
-context_budget: medium
-max_tokens: 16000
-mode: autonomous
-escalate_after_loops: 3

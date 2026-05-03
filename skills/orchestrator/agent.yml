@@ -1,5 +1,0 @@
-model: sonnet
-tools: [read, write, bash]
-context_budget: low
-max_tokens: 4000
-mode: autonomous

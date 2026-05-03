@@ -1,0 +1,34 @@
+{
+  "spec_id": "FEAT-XXX",
+  "dispatch_id": "dev-7b3c1a",
+  "spec_ref": "./.agent-session/FEAT-XXX/spec.md",
+
+  "to_role": "dev",
+  "pipeline_stage": "dev",
+
+  "objective": "Implement the password reset expiry check covering AC-001 and AC-003. Add the corresponding tests.",
+
+  "ac_scope": ["FEAT-XXX/AC-001", "FEAT-XXX/AC-003"],
+
+  "scope_files": ["src/auth/**", "tests/auth/**"],
+
+  "input_refs": [
+    { "path": "./design/FEAT-XXX-decisions.md", "reason": "design decisions to implement against" }
+  ],
+
+  "constraints": [
+    "Do not modify src/legacy/auth.ts; that module is being deprecated in a separate Spec."
+  ],
+
+  "project_context": {
+    "stack": "TypeScript + Node 20 + Express",
+    "standards_ref": "./CLAUDE.md",
+    "other": "Repo uses yarn (not npm); tests run via 'yarn test'."
+  },
+
+  "model": "sonnet",
+  "effort": "high",
+  "max_loops": 3,
+
+  "previous_findings": []
+}
