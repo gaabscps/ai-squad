@@ -47,8 +47,9 @@ task_states: {}
   #   qa_loops: 0
   #   blocker_calls: 0
   #   last_dispatch_id: ""
-  #   last_diff_hash: ""             # for progress detection
-  #   last_findings_hash: ""         # for progress detection
+  #   last_diff_hash: ""             # for progress detection (files_changed + line ranges)
+  #   last_findings_hash: ""         # for progress detection (findings count)
+  #   last_finding_set_hash: ""      # for progress detection (sorted (file,line,ac_ref) tuples)
   #   blocker_summary: ""            # populated when state = pending_human
   #   started_at: ""
   #   completed_at: ""

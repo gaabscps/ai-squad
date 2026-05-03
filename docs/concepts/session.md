@@ -207,8 +207,9 @@ task_states:
     qa_loops: 0
     blocker_calls: 2
     last_dispatch_id: "blocker-specialist-7c2e1a"
-    last_diff_hash: ""
-    last_findings_hash: ""
+    last_diff_hash: ""                             # progress detection: files_changed + line ranges
+    last_findings_hash: ""                         # progress detection: findings count
+    last_finding_set_hash: ""                      # progress detection: sorted (file,line,ac_ref) tuples
     blocker_summary: "Spec FEAT-042/AC-003 contradicts Plan section X"
     started_at: "2026-05-02T11:00:00Z"
     completed_at: ""
