@@ -136,8 +136,8 @@ The Subagent body's "Input contract" specifies which fields are required for tha
 ```
 
 **Three shape variants (closing line varies):**
-- **Uniform success** (all tasks done): `"Implementation done. When ready, run /ship FEAT-NNN to clean up the session."`
-- **Mixed status** (some pending_human): `"Partial completion. <N> done, <M> awaiting human decision. After resolving the blockers and editing artifacts, choose: /orchestrator FEAT-NNN --resume (default — preserves done tasks) | /orchestrator FEAT-NNN --restart (only if prior work is invalidated)."`
+- **Uniform success** (all tasks done): `"Implementation done. Changes are unstaged in the working tree — review with git diff / git status, then commit when ready. Run /ship FEAT-NNN to clean up the session."`
+- **Mixed status** (some pending_human): `"Partial completion. <N> done, <M> awaiting human decision. Changes are unstaged — review before committing. After resolving the blockers: /orchestrator FEAT-NNN --resume (default) | /orchestrator FEAT-NNN --restart (if prior work is invalidated)."`
 - **Full escalate** (all pending_human): `"Pipeline escalated. All tasks blocked. See decision memos at .agent-session/<task_id>/decisions/ and resolve before /orchestrator FEAT-NNN --resume."`
 
 ## Failure modes

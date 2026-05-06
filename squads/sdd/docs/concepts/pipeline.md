@@ -220,9 +220,6 @@ The orchestrator emits a single human-readable Markdown message at end of Phase 
 ## Changes
 [paths created/modified, grouped by area]
 
-## Commits
-- <sha> — <short message>
-
 ## Acceptance criteria coverage
 - ✅ FEAT-042/AC-001: validated by <evidence pointer>
 - ✅ FEAT-042/AC-002: validated by <evidence pointer>

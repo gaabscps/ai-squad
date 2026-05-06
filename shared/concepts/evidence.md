@@ -149,7 +149,6 @@ Example chain for one acceptance criterion (`FEAT-042/AC-003`):
 dev's Output Packet:
   evidence:
     - { kind: "file", path: "src/auth/reset.ts", lines: "44-58", reason: "expiry check" }
-    - { kind: "commit", sha: "abc1234", message: "feat: add token expiry check" }
     - { kind: "test", name: "POST /reset returns 410 when token expired", status: "passed", ac_ref: "FEAT-042/AC-003" }
 
 logic-reviewer's Output Packet:

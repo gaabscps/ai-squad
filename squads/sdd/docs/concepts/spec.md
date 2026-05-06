@@ -11,7 +11,7 @@ A **Spec** is the contract between the human and the squad — a single Markdown
 > - **Gherkin** (Given/When/Then): BDD scenario notation. Used in some SDD frameworks for narrative scenarios; not used by ai-squad (EARS subsumes its use case more compactly for our purposes).
 > - **Independent Test:** Spec Kit's term — every user story must be shippable and testable in isolation from the others, so the Pipeline can ship a single P1 story without P2/P3 being implemented.
 > - **Vagueness amplification:** the documented effect of ambiguous Specs on AI agents — they fill gaps differently than humans intended, and the error compounds across the Pipeline. Tessl: "the cost of ambiguity is measured in thousands of lines of plausible-looking, subtly wrong output."
-> - **Traceability matrix:** a mapping `Spec ID → Task → Test → Commit`. ai-squad does not maintain a separate matrix file — IDs in the Spec (`US-XXX`, `AC-XXX`, etc.) are referenced directly by Work Packets and Output Packets, giving forward traceability without a sidecar.
+> - **Traceability matrix:** a mapping `Spec ID → Task → Test`. ai-squad does not maintain a separate matrix file — IDs in the Spec (`US-XXX`, `AC-XXX`, etc.) are referenced directly by Work Packets and Output Packets, giving forward traceability without a sidecar.
 
 ## Why a single file (and what lives next to it)
 

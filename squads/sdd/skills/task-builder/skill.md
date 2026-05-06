@@ -37,7 +37,7 @@ Decompose using the per-User-Story phase model:
 - One section of tasks per User Story, sequenced by priority (P1 → P2 → P3).
 - Inside each story: layered tasks (model → service → API → UX → tests) following INVEST sizing (Independent, Negotiable, Valuable, Estimable, Small, Testable).
 - Target: **5-8 tasks per story, ~15-30 tasks total per feature**. Outliers OK with rationale; if over 40, flag possible feature-scope explosion.
-- **Task size = smallest independently testable slice that touches a coherent file set** (≈ 1 commit-worth — not 1 file, not 1 module).
+- **Task size = smallest independently testable slice that touches a coherent file set** (not 1 file, not 1 module).
 - Each task gets: monotonic `T-XXX` ID, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths — see step 4), `AC covered:` tags, optional `Depends on:`, `Estimated complexity:`.
 - Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding before any story tasks; optional **Foundational** phase for cross-story prereqs.
 - Write to `.agent-session/<task_id>/tasks.md` (atomic; `status: draft`).

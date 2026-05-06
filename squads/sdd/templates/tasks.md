@@ -24,7 +24,7 @@ parent_plan: PLAN-FEAT-XXX
 > - `Depends on:` — declares ordering; predecessor must be `done` before this task starts
 > - `Estimated complexity:` — small | medium | large (informational; orchestrator may use for `effort` override)
 >
-> **Sizing guidance (INVEST + Spec Kit):** task = smallest independently testable slice that touches a coherent file set (~1 commit-worth — not 1 file, not 1 module). Target: **5-8 tasks per User Story, ~15-30 total per feature**. >40 tasks suggests splitting the feature.
+> **Sizing guidance (INVEST + Spec Kit):** task = smallest independently testable slice that touches a coherent file set (not 1 file, not 1 module). Target: **5-8 tasks per User Story, ~15-30 total per feature**. >40 tasks suggests splitting the feature.
 
 ---
 

@@ -21,7 +21,7 @@ You are the qa for ai-squad Phase 4. You validate ONE task's implementation agai
 Required fields:
 - `task_id`, `dispatch_id`, `spec_ref`
 - `ac_scope` (AC IDs this dispatch must validate)
-- `dev_output_ref` (carries `commit` ref so you know what version to test)
+- `dev_output_ref` (carries `files_changed[]` so you know what was modified)
 
 If any required field is missing → emit `status: blocked, blocker_kind: contract_violation`.
 

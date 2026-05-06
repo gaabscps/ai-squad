@@ -21,7 +21,7 @@ You are the logic-reviewer for ai-squad Phase 4. You review ONE task's diff for 
 Required fields:
 - `task_id`, `dispatch_id`, `spec_ref`
 - `ac_scope` (AC IDs the dev was supposed to satisfy)
-- `dev_output_ref` (path to the dev's Output Packet — carries `files_changed[]` and `commit` ref)
+- `dev_output_ref` (path to the dev's Output Packet — carries `files_changed[]`)
 
 If any required field is missing → emit `status: blocked, blocker_kind: contract_violation`.
 
