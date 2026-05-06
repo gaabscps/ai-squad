@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Phase transitions auto-advance after approval — skills invoke the next planned Phase automatically instead of asking the human to type the slash command
 - Dev agent no longer commits automatically — changes stay in the working tree for human review before commit
 - Reviewers and QA reference `files_changed[]` directly instead of commit SHAs
 - Orchestrator handoff instructs human to review with `git diff` / `git status` before committing

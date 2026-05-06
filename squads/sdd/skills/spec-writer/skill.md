@@ -91,10 +91,11 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.specify` populated at approval; `current_phase` advances at approval.
 
-## Handoff (dynamic, based on planned_phases)
-- If `plan` planned next: `"Spec approved. Next: run /designer to start Phase 2 (Plan)."`
-- If `plan` skipped, `tasks` planned: `"Spec approved. Plan was not planned. Next: /task-builder."`
-- If `plan` and `tasks` skipped, `implementation` planned: `"Spec approved. Plan and Tasks were not planned. Next: /orchestrator."`
+## Handoff (auto-advance when next Phase is planned)
+After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
+- If `plan` planned next: print `"Spec approved. Advancing to Phase 2 (Plan)..."` → invoke `/designer`.
+- If `plan` skipped, `tasks` planned: print `"Spec approved. Plan was not planned. Advancing to Phase 3 (Tasks)..."` → invoke `/task-builder`.
+- If `plan` and `tasks` skipped, `implementation` planned: print `"Spec approved. Plan and Tasks were not planned. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
 - If only `specify` planned: `"Spec approved. No further Phases were planned for this Session — Session is now paused. To extend later, edit planned_phases in session.yml. To clean up: /ship FEAT-NNN."`
 
 ## Failure modes

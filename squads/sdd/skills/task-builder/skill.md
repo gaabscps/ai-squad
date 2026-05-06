@@ -94,8 +94,9 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 - Atomic write: tmp + rename, on every accepted change AND on final approval.
 - Each task has: `T-XXX` ID, optional `[P]` marker, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths), `AC covered:`, optional `Depends on:`, `Estimated complexity:`.
 
-## Handoff (dynamic, based on planned_phases)
-- If `implementation` planned next: `"Tasks approved. Next: run /orchestrator to start Phase 4 (autonomous Implementation)."`
+## Handoff (auto-advance when next Phase is planned)
+After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
+- If `implementation` planned next: print `"Tasks approved. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
 - If `implementation` not planned: `"Tasks approved. Implementation was not planned for this Session — Session is now paused. To execute later: /orchestrator FEAT-NNN --resume. To clean up without executing: /ship FEAT-NNN."`
 
 ## Failure modes

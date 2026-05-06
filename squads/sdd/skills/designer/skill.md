@@ -87,9 +87,10 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Required sections at approval: Architecture, Data model, API surface, UX (if applicable), Risks (5 categories), AC Coverage Map. Notes optional but holds MADR alternatives.
 
-## Handoff (dynamic, based on planned_phases)
-- If `tasks` planned next: `"Plan approved. Next: run /task-builder to start Phase 3 (Tasks)."`
-- If `tasks` skipped but `implementation` planned: `"Plan approved. Tasks was not planned. Next: /orchestrator."`
+## Handoff (auto-advance when next Phase is planned)
+After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
+- If `tasks` planned next: print `"Plan approved. Advancing to Phase 3 (Tasks)..."` → invoke `/task-builder`.
+- If `tasks` skipped but `implementation` planned: print `"Plan approved. Tasks was not planned. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
 - If neither planned: `"Plan approved. No further Phases were planned for this Session — Session is now paused. To extend later, edit planned_phases in session.yml. To clean up: /ship FEAT-NNN."`
 
 ## Failure modes

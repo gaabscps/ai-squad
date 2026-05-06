@@ -147,21 +147,21 @@ Default: all 4 checked. The human can uncheck any non-Specify Phase to skip it. 
 
 **Modifying mid-Session:** if plans change, the human edits `planned_phases` in `session.yml` directly. The framework respects the new selection on the next Skill invocation. See [`session.md`](session.md) for full details.
 
-## Transition gates — two acts each, with guided next step
+## Transition gates — approval auto-advances
 
-Each gate is **two human acts**: (1) approve the Phase's artifact by changing its `status` to `approved`, (2) invoke the next Phase's Skill via slash command. The framework does not auto-transition.
+Each gate is **one human act**: approve the Phase's artifact. The Skill then **auto-invokes the next planned Phase** — the approval IS the gate; a second manual invocation is unnecessary friction.
 
-The "guided next step" message at the end of each Phase **depends on `planned_phases`** — the Skill suggests only the next *planned* Phase, or signals that the Session will pause:
+When the next Phase is NOT in `planned_phases`, the Skill signals `paused` instead of auto-advancing.
 
 | Transition | If next Phase is planned | If next Phase is NOT planned |
 |------------|---------------------------|-------------------------------|
-| Phase 1 → 2 | `"Spec approved. Next: run /designer to start Phase 2 (Plan)."` | `"Spec approved. Plan was not planned for this Session. Next: /task-builder OR /orchestrator (whichever was planned)."` |
-| Phase 2 → 3 | `"Plan approved. Next: run /task-builder to start Phase 3 (Tasks)."` | `"Plan approved. Tasks not planned. Next: /orchestrator (if planned) OR Session paused."` |
-| Phase 3 → 4 | `"Tasks approved. Next: run /orchestrator to start Phase 4 (Implementation)."` | `"Tasks approved. Implementation was not planned. Session is now paused. To execute later: /orchestrator FEAT-XXX --resume."` |
-| Phase 4 → end | (orchestrator internal) | `"Implementation done. When ready, run /ship FEAT-042 to clean up the session."` |
-| Post-LGTM | `/ship FEAT-XXX` | `"Session FEAT-042 cleaned. To start a new feature: /spec-writer."` |
+| Phase 1 → 2 | `"Spec approved. Advancing to Phase 2 (Plan)..."` → auto-invoke `/designer` | Skip to next planned Phase, or pause if none |
+| Phase 2 → 3 | `"Plan approved. Advancing to Phase 3 (Tasks)..."` → auto-invoke `/task-builder` | Skip to next planned Phase, or pause if none |
+| Phase 3 → 4 | `"Tasks approved. Advancing to Phase 4 (Implementation)..."` → auto-invoke `/orchestrator` | `"Session paused. To execute later: /orchestrator FEAT-XXX --resume."` |
+| Phase 4 → end | (orchestrator internal) | `"Implementation done. Review changes, commit when ready. /ship FEAT-XXX to clean up."` |
+| Post-LGTM | `/ship FEAT-XXX` | `"Session cleaned. To start a new feature: /spec-writer."` |
 
-Each Skill's body must surface the appropriate guided message — see the Skill's own `skill.md` for exact wording.
+Each Skill's body contains the exact auto-advance logic — see the Skill's own `skill.md`.
 
 ## State machine
 
@@ -246,10 +246,10 @@ Cleanup is not automatic. The human controls when to discard the runtime trace.
 1. **Inventing "Phase 1.5" for Spec refinement.** Refinement is a *loop within Phase 1* (human + spec-writer iterating until the Spec is approved). It is not a new Phase.
 2. **Inventing "Pre-Phase 1" Discovery inside the SDD squad.** Discovery is a *separate squad* (`discovery`) with its own 3 Phases — not a Phase 0 of SDD. Cross-squad handoff is explicit (human reads Discovery memo, recomposes SDD pitch), not auto-feed. **"Post-Phase N" (Deploy)** is the host project's CI/CD, not a Phase of any squad.
 3. **Calling Phase 4 sub-stages "phases".** Inside Phase 4 the orchestrator runs a Pipeline (concept #9) with stages like `dev`, `review`, `qa`. Those are *Pipeline stages*, not Phases.
-4. **Auto-transitioning between Phases.** Every transition needs explicit human action.
+4. **Auto-transitioning between Phases WITHOUT approval.** Every transition needs explicit human approval via `AskUserQuestion`. After approval, auto-advance is expected — do not require a second manual invocation.
 5. **Skipping Phases silently.** When `planned_phases` excludes a Phase, the next Skill explicitly says so in its guided next-step message. The decision to skip must be visible.
 6. **Modifying an `approved` artifact without reverting status to `draft`.** Subsequent Phases consume the obsolete version.
-7. **Not surfacing the guided next step at end of Phase.** Each Skill must instruct the human what to run next OR signal `paused`.
+7. **Not auto-advancing after approval.** Each Skill must auto-invoke the next planned Phase after approval OR signal `paused` if no further Phases are planned.
 8. **Human interfering in Phase 4.** The autonomous Phase assumes "human absent". Editing code that `dev` is modifying mid-Pipeline causes write conflicts.
 9. **Running a Skill for a Phase not in `planned_phases`.** Each Skill verifies on entry; bypassing this defeats the planning UI.
 10. **Hard-coding `planned_phases` defaults to less than all 4.** The default is full discipline; humans opt-out per-Session, not at the framework level.
@@ -258,7 +258,7 @@ Cleanup is not automatic. The human controls when to discard the runtime trace.
 
 - **4 Phases over 2:** the original ai-squad design had 2 Phases (interactive vs autonomous). Three Phases of work were collapsed into "Implementation". The 4-Phase model came from explicit user feedback that *human-validated tasks* are useful for both AI and humans, and that the industry has converged on this division.
 - **Runtime artifacts gitignored over versioned:** versioning Spec/Plan/Tasks in the consumer's git would duplicate information the consumer already tracks in Jira/ClickUp/GitHub PR descriptions.
-- **Two-act gates over single-act:** approving an artifact and starting the next Phase are different decisions.
+- **Approval-triggered auto-advance over two-act gates:** originally the framework required two manual acts (approve + invoke). In practice this was unnecessary friction — the approval IS the decision to proceed. Auto-advance after approval; pause only when the next Phase is not in `planned_phases`.
 - **Planned_phases at entry over per-Phase opt-out:** asking once upfront is less friction; one decision, the human knows the whole plan. Asking at every boundary becomes nagging. Editing the array mid-Session covers cases where plans change.
 - **Interactive checkbox + flag override:** UI for first-time clarity, flags for repeat / scripted use.
 - **Paused as terminal-but-resumable:** matches real workflows ("plan now, execute later"). Without it, half-runs would have no clean state.
