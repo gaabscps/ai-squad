@@ -1,15 +1,20 @@
 #!/bin/bash
-# Installs ai-squad skills (squads/<squad>/skills/) and subagents
-# (squads/<squad>/agents/) into ~/.claude/.
+# Installs ai-squad skills (squads/<squad>/skills/), subagents
+# (squads/<squad>/agents/), and hooks (squads/<squad>/hooks/) into ~/.claude/.
 #
 # Usage:
 #   ./tools/deploy.sh             Deploy ALL squads under squads/
 #   ./tools/deploy.sh sdd         Deploy only the named squad(s)
 #   ./tools/deploy.sh sdd discovery
 #
-# Skills land flat under ~/.claude/skills/<skill>/ and Subagents under
-# ~/.claude/agents/<agent>.md — Claude Code does not have a per-squad namespace,
-# so naming inside each squad must stay globally unique.
+# Skills land flat under ~/.claude/skills/<skill>/, Subagents under
+# ~/.claude/agents/<agent>.md, and hook scripts under ~/.claude/hooks/<name>.py.
+# Claude Code does not have a per-squad namespace, so naming inside each squad
+# must stay globally unique.
+#
+# Hook scripts are referenced from component frontmatter as
+# `python3 $HOME/.claude/hooks/<name>.py` — global install, no per-project setup.
+# Requirement: Python 3.8+ on PATH.
 
 set -e
 
@@ -17,6 +22,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SQUADS_ROOT="$REPO_ROOT/squads"
 SKILLS_DST="$HOME/.claude/skills"
 AGENTS_DST="$HOME/.claude/agents"
+HOOKS_DST="$HOME/.claude/hooks"
 
 # Length budget — Subagent body becomes the system prompt and is paid every
 # dispatch, so the cap is tight. Skill body loads on demand, so the cap is looser
@@ -50,13 +56,21 @@ else
   done
 fi
 
+# Verify Python 3 is available — hook scripts are pure-stdlib Python 3.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 not found on PATH. ai-squad hooks require Python 3.8+." >&2
+  echo "  Install via: brew install python3 (macOS) or your distro's package manager." >&2
+  exit 1
+fi
+
 echo "ai-squad deploy"
 echo "  squads:  ${SQUADS[*]}"
 echo "  skills:  -> $SKILLS_DST  (cap: $SKILL_LINE_CAP lines)"
 echo "  agents:  -> $AGENTS_DST  (cap: $AGENT_LINE_CAP lines)"
+echo "  hooks:   -> $HOOKS_DST   (Python 3 stdlib; chmod +x preserved)"
 echo ""
 
-mkdir -p "$SKILLS_DST" "$AGENTS_DST"
+mkdir -p "$SKILLS_DST" "$AGENTS_DST" "$HOOKS_DST"
 
 for squad in "${SQUADS[@]}"; do
   echo "[squad: $squad]"
@@ -85,6 +99,19 @@ for squad in "${SQUADS[@]}"; do
       fi
       check_length "$agent_file" "$AGENT_LINE_CAP" "$agent.md"
       cp "$agent_file" "$dst"
+    done
+  fi
+
+  if [ -d "$squad_root/hooks" ]; then
+    for hook_file in "$squad_root/hooks"/*.py; do
+      [ -f "$hook_file" ] || continue
+      hook=$(basename "$hook_file")
+      dst="$HOOKS_DST/$hook"
+      if [ -f "$dst" ]; then echo "  [update hook]    $hook"
+      else                   echo "  [install hook]   $hook"
+      fi
+      cp "$hook_file" "$dst"
+      chmod +x "$dst"
     done
   fi
 done

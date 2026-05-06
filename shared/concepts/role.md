@@ -8,9 +8,9 @@ A **Role** is the unit of *responsibility* in a squad — `dev`, `qa`, `designer
 
 Roles are **organized per squad** — each squad declares its own closed set. Cross-squad reuse is allowed when the responsibility is genuinely shared (e.g. `blocker-specialist` is defined in SDD but reusable by Discovery's `discovery-orchestrator`).
 
-ai-squad currently ships **14 canonical Roles across 2 squads** (9 SDD + 5 Discovery). The set is closed at the framework level. Projects that need a new responsibility must fork the framework, add it to an existing squad, or define a new squad. Adding extensibility later is easy; closing an open API later is painful — we default closed.
+ai-squad currently ships **15 canonical Roles across 2 squads** (10 SDD + 5 Discovery). The set is closed at the framework level. Projects that need a new responsibility must fork the framework, add it to an existing squad, or define a new squad. Adding extensibility later is easy; closing an open API later is painful — we default closed.
 
-## SDD squad — 9 canonical Roles
+## SDD squad — 10 canonical Roles
 
 | Role | Materializes as | Phase | Responsibility |
 |------|-----------------|-------|----------------|
@@ -23,6 +23,7 @@ ai-squad currently ships **14 canonical Roles across 2 squads** (9 SDD + 5 Disco
 | `logic-reviewer` | Subagent | 4 | Reviews implementation against the Spec for behavioral gaps. Read-only. |
 | `qa` | Subagent | 4 | Validates the implemented feature against the Spec's acceptance criteria. |
 | `blocker-specialist` | Subagent | 4 (escalation) | Escalation handler. Invoked only on `status: blocked` or reviewer disagreement. **Reusable cross-squad** — Discovery's `discovery-orchestrator` invokes it on Phase 2 cascades. |
+| `audit-agent` | Subagent | 4 (pre-handoff gate) | Singleton reconciliation gate. Reads dispatch manifest + outputs/ to verify orchestrator did not bypass Subagent dispatch. Read-only. |
 
 ## Discovery squad — 5 canonical Roles
 
@@ -34,7 +35,7 @@ ai-squad currently ships **14 canonical Roles across 2 squads** (9 SDD + 5 Disco
 | `risk-analyst` | Subagent | 2 | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability). Returns verdict + risk_severity + rationale + structured evidence + assumptions. Timebox > retry — emits `inconclusive` rather than looping. |
 | `discovery-synthesizer` | Skill | 3 — Decide | Generates Options table (kill always row 1) + Recommendation (Cagan Q10) via decision rules R1-R5; conducts RAPID-style Show-all + Recommend approval gate; writes Decision + Open Questions for Delivery. |
 
-**Total: 14 canonical Roles** across 2 squads (7 Skills + 7 Subagents). `blocker-specialist` is the only Role formally shared cross-squad — defined under SDD, reusable from Discovery's escalation paths.
+**Total: 15 canonical Roles** across 2 squads (7 Skills + 8 Subagents). `blocker-specialist` is the only Role formally shared cross-squad — defined under SDD, reusable from Discovery's escalation paths.
 
 ## Why a closed set
 
@@ -49,7 +50,7 @@ Industry context: CrewAI ships an open Role model and the dominant failure mode 
 
 Every Role lives in **exactly one file**. Frontmatter is the contract with the platform; body is the prompt.
 
-**Subagent example** (5 of the 9 Roles — full frontmatter):
+**Subagent example** (6 of the 10 SDD Roles — full frontmatter):
 
 ```markdown
 ---
@@ -66,7 +67,7 @@ fan_out: true                                # ai-squad: this Role can be instan
 [Body: the role's instructions, contracts it consumes/produces, anti-patterns]
 ```
 
-**Skill example** (4 of the 9 Roles — slim frontmatter; Skills inherit `model`/`effort` from the human's main session):
+**Skill example** (4 of the 10 SDD Roles — slim frontmatter; Skills inherit `model`/`effort` from the human's main session):
 
 ```markdown
 ---
@@ -105,6 +106,7 @@ See [`skill-vs-subagent.md`](skill-vs-subagent.md) for why frontmatter differs.
 | `logic-reviewer` | sdd | Subagent | true | Same — disjoint diffs reviewed independently. |
 | `qa` | sdd | Subagent | true | Acceptance criteria can be split across independent surfaces. |
 | `blocker-specialist` | sdd (cross-squad) | Subagent | false | Singular escalation handler per blocker. |
+| `audit-agent` | sdd | Subagent | false | Singleton pre-handoff reconciliation gate. One audit per pipeline run. |
 | `codebase-mapper` | discovery | Subagent | false | Sequential bootstrap — feeds risk-analyst fan-out. One mapper per Investigate. |
 | `risk-analyst` | discovery | Subagent | true | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability). Always 4 instances per Investigate. |
 | `spec-writer` / `designer` / `task-builder` / `orchestrator` (sdd) and `discovery-lead` / `discovery-orchestrator` / `discovery-synthesizer` (discovery) | — | Skill | n/a | Skills run in the main session; fan-out is structurally inapplicable. |

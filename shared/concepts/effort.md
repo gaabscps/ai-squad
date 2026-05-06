@@ -47,6 +47,7 @@ This is the framework's opinionated default. Justifications below.
 | `logic-reviewer` | Subagent | 4 | **opus** | high | Detecting edge cases, behavioral gaps, race conditions, broken invariants requires strong reasoning — this is the Subagent where model upgrade pays the most. Effort stays at `high` (not `xhigh`) to preserve quota; `opus + high` is already a significant upgrade. |
 | `qa` | Subagent | 4 | sonnet | medium | Executing scenarios and verifying pass/fail is procedural. |
 | `blocker-specialist` | Subagent | 4 (escalation) | opus | xhigh | High-stakes arbitration; last line before the human. Both levers maxed because dispatch frequency is low (escalation only). |
+| `audit-agent` | Subagent | 4 (pre-handoff) | **haiku** | medium | Mechanical reconciliation of dispatch manifest vs. outputs/. No creative reasoning. Haiku saves quota. **Medium** (not low) because false-negative defeats the entire audit layer — the model must read carefully and not skip checks. Singleton per pipeline run, so cost per run is negligible. |
 
 ## Why not Opus everywhere
 

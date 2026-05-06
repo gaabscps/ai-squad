@@ -6,12 +6,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`audit-agent` Subagent** (haiku, read-only with Bash for git inspection, singleton) — last gate before pipeline handoff. Reconciles dispatch manifest vs. actual outputs to detect orchestrator-bypass (issue #1). 6 mechanical checks: manifest completeness, dispatch-to-output 1:1, role/task_id consistency, pipeline-stage coverage, AC closure, source-file ownership. Pattern lineage: GitHub required status checks + Verifiability-First Audit Agents (arXiv 2512.17259) + transactional Outbox.
+- **Dispatch manifest** at `.agent-session/<task_id>/dispatch-manifest.json` — orchestrator declares expected pipeline before any Task dispatch and appends to `actual_dispatches[]` after each. Mechanical audit trail (JSON for stdlib parseability by hooks).
+- **Audit-failure handoff** shape — fourth handoff variant emitted when audit-agent flags bypass; refuses normal handoff and surfaces findings.
+- **Mechanical enforcement layer (Claude Code hooks)** — pure-stdlib Python 3 scripts wired via Skill/Subagent frontmatter, closing the prompt-discipline → mechanical-enforcement gap:
+  - `guard-session-scope.py` — orchestrator can edit only inside `.agent-session/<task_id>/`
+  - `block-git-write.py` — orchestrator cannot run git write commands (commit, add, reset, push, etc.)
+  - `verify-audit-dispatch.py` — orchestrator session cannot end without `audit-agent` in `actual_dispatches[]`
+  - `verify-output-packet.py` — every Phase 4 Subagent must write `outputs/<dispatch_id>.json` before completing
+  - Distribution: `./tools/deploy.sh` copies hooks to `~/.claude/hooks/` (global, same model as skills/agents). Frontmatter references `python3 $HOME/.claude/hooks/<name>.py`; `$HOME` expanded by shell. No per-project setup. Requires Python 3.8+ on PATH (verified by deploy.sh).
+- **`tools/deploy.sh` updated** — verifies Python 3 availability, copies `squads/<squad>/hooks/*.py` to `~/.claude/hooks/`, preserves `chmod +x`.
+
 ### Changed
 
 - Phase transitions auto-advance after approval — skills invoke the next planned Phase automatically instead of asking the human to type the slash command
 - Dev agent no longer commits automatically — changes stay in the working tree for human review before commit
 - Reviewers and QA reference `files_changed[]` directly instead of commit SHAs
 - Orchestrator handoff instructs human to review with `git diff` / `git status` before committing
+- Orchestrator: hard rule "Never edit consumer-repo source files; writes restricted to `.agent-session/`"
+- Role count: 9 → 10 (added `audit-agent`); Subagent count: 5 → 6
+- Output Packet schema: `audit-agent` added to role enum; `bypass_detected` documented as `blocker_kind`
 
 ### Removed
 

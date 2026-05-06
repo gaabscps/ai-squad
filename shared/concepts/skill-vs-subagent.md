@@ -22,21 +22,22 @@ Otherwise, it is a **Subagent**.
 
 The criterion is binary. There is no half-Skill / half-Subagent. If a new Role's classification is ambiguous, default to **Subagent** (more isolated, less surprise; easier to lift to Skill later than the reverse).
 
-### Truth table for the 9 canonical Roles
+### Truth table for the 10 canonical Roles
 
 | Role | Phase | Needs human in-the-loop? | Needs to dispatch Subagents? | → Materialization |
 |------|-------|--------------------------|------------------------------|-------------------|
 | `spec-writer` | 1 | Yes (asks scoping questions, refines Spec) | No | **Skill** |
 | `designer` | 2 | Yes (refines design decisions, validates Plan) | No | **Skill** |
 | `task-builder` | 3 | Yes (reviews task decomposition, AC mapping) | No | **Skill** |
-| `orchestrator` | 4 | No (only the final handoff, which is one-shot) | Yes (dev, reviewers, qa, blocker-specialist…) | **Skill** |
+| `orchestrator` | 4 | No (only the final handoff, which is one-shot) | Yes (dev, reviewers, qa, blocker-specialist, audit-agent) | **Skill** |
 | `dev` | 4 | No | No | **Subagent** |
 | `code-reviewer` | 4 | No | No | **Subagent** |
 | `logic-reviewer` | 4 | No | No | **Subagent** |
 | `qa` | 4 | No | No | **Subagent** |
 | `blocker-specialist` | 4 (escalation) | No (returns `status: escalate`; the orchestrator handles the human handoff) | No | **Subagent** |
+| `audit-agent` | 4 (pre-handoff gate) | No | No | **Subagent** |
 
-4 Skills + 5 Subagents = 9 canonical Roles. Each Skill is a Skill for at least one of the two criteria; each Subagent is a Subagent because it satisfies neither.
+4 Skills + 6 Subagents = 10 canonical Roles. Each Skill is a Skill for at least one of the two criteria; each Subagent is a Subagent because it satisfies neither.
 
 Note on `orchestrator`: the final handoff message to the human is **not** "human-in-the-loop". It is one-shot output. The criterion's "in-the-loop" means N rounds of interactive question/answer, which is what the 3 Phase 1–3 Skills do.
 
@@ -49,7 +50,7 @@ Two simpler criteria were considered and rejected:
 - **Pure interactivity criterion** ("Skill iff needs human in-the-loop"): fails for the orchestrator, which has no in-the-loop interaction but cannot be a Subagent because Subagents cannot dispatch other Subagents (platform constraint, see below).
 - **Pure dispatch criterion** ("Skill iff dispatches Subagents"): fails for `spec-writer`, `designer`, and `task-builder`, which dispatch no one but cannot be Subagents because Subagents cannot interact with the human (platform constraint).
 
-The combined OR criterion is the smallest rule that covers all 9 Roles without forcing exceptions.
+The combined OR criterion is the smallest rule that covers all 10 Roles without forcing exceptions.
 
 ## Platform constraints (non-negotiable)
 
@@ -89,7 +90,7 @@ Case 2 does not violate the binary criterion. The two operations are at differen
 - *Materialization* of a Role = which file under `skills/` or `agents/` defines it.
 - *Capability loading* = what tools/skills a Subagent can use inside its execution context.
 
-The MVP of ai-squad does not use case 2 — none of the 5 Subagents loads any Skill from this repo as a capability. The note above is informational, to prevent future confusion when projects extend the squad.
+The MVP of ai-squad does not use case 2 — none of the 6 Subagents loads any Skill from this repo as a capability. The note above is informational, to prevent future confusion when projects extend the squad.
 
 ## Decision flowchart for a new Role
 

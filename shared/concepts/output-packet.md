@@ -42,10 +42,20 @@ Closed enum of 4 values. The orchestrator routes purely on this field — never 
 |----------|----------------------------|------------------------------|
 | `done` | Work complete, evidence proves it, no reservations. | Advance to next Role in the Pipeline. |
 | `needs_review` | Work complete but `findings[]` carry issues that should be addressed before advancing. | Route back to the prior Role (typically reviewer → dev), increment loop counter. If loop cap reached, escalate. |
-| `blocked` | Cannot proceed; `blockers[]` populated with the reason. | Dispatch `blocker-specialist` with the failing Output Packet referenced. |
-| `escalate` | Even `blocker-specialist` cannot resolve, or loop caps exhausted. Sole emitter in practice: `blocker-specialist`. | Stop the Pipeline; generate human-readable handoff with the escalation context. |
+| `blocked` | Cannot proceed; `blockers[]` populated with the reason. | Dispatch `blocker-specialist` with the failing Output Packet referenced. **Exception:** `audit-agent` returning `blocked` with `blocker_kind: bypass_detected` does NOT cascade to `blocker-specialist` — see "audit-agent exception" below. |
+| `escalate` | Even `blocker-specialist` cannot resolve, or loop caps exhausted. Primary emitters: `blocker-specialist` and `audit-agent` (when audit cannot run, e.g., manifest unreadable). | Stop the Pipeline; generate human-readable handoff with the escalation context. |
 
 `needs_review` is distinct from `blocked`: the first means "I did the work but flagged issues"; the second means "I can't do the work."
+
+### audit-agent exception (issue #1 mitigation)
+
+`audit-agent` is the singleton pre-handoff gate, not a per-task worker. Its `status` flows differently from the rest of the Pipeline:
+
+- `done` — all 6 reconciliation checks pass; orchestrator emits the normal handoff.
+- `blocked` with `blocker_kind: bypass_detected` — the orchestrator does NOT dispatch `blocker-specialist`. Instead, it sets `current_phase: escalated` and emits a **refusal handoff** listing the audit-agent's findings. Bypass is a Pipeline-integrity failure, not a task-level blocker.
+- `escalate` — the audit could not run (e.g., manifest unreadable, outputs/ missing). Same refusal handoff is emitted with the audit-agent's `blockers[]` surfaced.
+
+**Canonical `blocker_kind` values:** `contract_violation`, `missing_test_infra`, `missing_test_for_ac`, `opaque_repo`, `insufficient_data`, `timeout`, `bypass_detected` (audit-agent only). The enum is loosely maintained — Subagents may add new values when documenting them in their own body.
 
 ## findings[] schema
 

@@ -4,7 +4,7 @@
 
 ## Definition
 
-A **Spec** is the contract between the human and the squad — a single Markdown file at `.agent-session/<task_id>/spec.md` (gitignored on the consumer project) that answers WHAT must be built and WHY, never HOW. It is produced by the `spec-writer` Skill in Phase 1 and consumed (read-only) by Phases 2–4 (designer, task-builder, orchestrator, all 5 Subagents). Once `status: approved`, it is the source of truth; agents do not deviate from it without escalating.
+A **Spec** is the contract between the human and the squad — a single Markdown file at `.agent-session/<task_id>/spec.md` (gitignored on the consumer project) that answers WHAT must be built and WHY, never HOW. It is produced by the `spec-writer` Skill in Phase 1 and consumed (read-only) by Phases 2–4 (designer, task-builder, orchestrator, all 6 Subagents). Once `status: approved`, it is the source of truth; agents do not deviate from it without escalating.
 
 > *Terms used in this doc:*
 > - **EARS** (Easy Approach to Requirements Syntax): a notation invented by Alistair Mavin for unambiguous requirements. Four patterns: `WHEN <trigger> THE SYSTEM SHALL <action>` (event), `WHILE <state> THE SYSTEM SHALL <action>` (state), `IF <unwanted> THEN THE SYSTEM SHALL <mitigation>` (protection), `THE SYSTEM SHALL <continuous behavior>` (ubiquitous). Adopted by Kiro; the emerging standard for Specs consumed by AI agents.

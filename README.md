@@ -56,6 +56,8 @@ ai-squad gives you both layers:
 
 ## Install
 
+**Requirements:** Claude Code + Python 3.8+ on `PATH` (used by hook scripts that enforce pipeline integrity).
+
 ```bash
 git clone https://github.com/<your-handle>/ai-squad.git
 cd ai-squad
@@ -64,7 +66,7 @@ cd ai-squad
 # or: ./tools/deploy.sh discovery    # Discovery only
 ```
 
-That's it — the slash commands are now available in every Claude Code session, in any project.
+That's it — the slash commands are now available in every Claude Code session, in any project. Skills, Subagents, and enforcement hooks all install globally to `~/.claude/`.
 
 ## Pick the right squad
 
@@ -141,7 +143,7 @@ To verify the pipeline contracts hold:
 
 <br/>
 
-ai-squad is 14 canonical Roles split across 2 squads. Each Role is one file (Skill = conversational with you; Subagent = autonomous worker dispatched by an orchestrator).
+ai-squad is 15 canonical Roles split across 2 squads. Each Role is one file (Skill = conversational with you; Subagent = autonomous worker dispatched by an orchestrator).
 
 **🎯 Discovery squad — 5 Roles:**
 
@@ -153,7 +155,7 @@ ai-squad is 14 canonical Roles split across 2 squads. Each Role is one file (Ski
 | **risk-analyst** | 2 | Multi-instance — one dispatch per Cagan Big Risk (value/usability/feasibility/viability) |
 | **discovery-synthesizer** | 3 — Decide | Generating options + recommendation; conducting the approval gate |
 
-**🚢 SDD squad — 9 Roles:**
+**🚢 SDD squad — 10 Roles:**
 
 | Role | Phase | What it owns |
 |------|-------|--------------|
@@ -161,11 +163,12 @@ ai-squad is 14 canonical Roles split across 2 squads. Each Role is one file (Ski
 | **designer** | 2 — Plan | Turning the Spec into a Plan (architecture, data, API, UX, risks) |
 | **task-builder** | 3 — Tasks | Turning the Plan into granular Tasks |
 | **orchestrator** | 4 — Build | Reading everything, dispatching workers in parallel, emitting one handoff |
-| **dev** | 4 | Implementing one task; test-first; one commit per task |
+| **dev** | 4 | Implementing one task; test-first; changes stay unstaged for human review |
 | **code-reviewer** | 4 | Patterns, style, naming, architectural fit |
 | **logic-reviewer** | 4 | Edge cases, race conditions, missing flows |
 | **qa** | 4 | Validating each acceptance criterion is actually satisfied |
 | **blocker-specialist** | 4 (escalation) | Resolving blockers via decision memo, or escalating to you. Reusable cross-squad |
+| **audit-agent** | 4 (pre-handoff gate) | Reconciling the dispatch manifest against actual outputs; refuses handoff if pipeline was bypassed |
 
 </details>
 

@@ -9,16 +9,16 @@ The canonical vocabulary. Every other doc and `skill.md`/`agent.md` in this repo
 ## Core
 
 **Role** `[ours]`
-The unit of responsibility in the squad. **9 canonical Roles**: `spec-writer`, `designer`, `task-builder`, `orchestrator` (4 Skills, one per Phase), and `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist` (5 Subagents, all in Phase 4). Closed set; not extensible by host projects. One Role = one file. Full structure in [`shared/concepts/role.md`](concepts/role.md).
+The unit of responsibility in the squad. **10 canonical Roles**: `spec-writer`, `designer`, `task-builder`, `orchestrator` (4 Skills, one per Phase), and `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent` (6 Subagents, all in Phase 4). Closed set; not extensible by host projects. One Role = one file. Full structure in [`shared/concepts/role.md`](concepts/role.md).
 
 **Skill** `[platform]`
 A `.md` file under `skills/{name}/skill.md` with YAML frontmatter. Runs in the **main session** (sees the human, can dispatch subagents). In ai-squad, the 4 Skills are `spec-writer` (Phase 1), `designer` (Phase 2), `task-builder` (Phase 3), and `orchestrator` (Phase 4). Invoked by the human via slash command (`/spec-writer`, `/designer`, `/task-builder`, `/orchestrator`). Slim frontmatter (`name`, `description`); `model`/`effort` inherited from the human's session.
 
 **Subagent** `[platform]`
-A `.md` file under `agents/{name}.md` with YAML frontmatter. Runs in an **isolated context** (does not see the parent's conversation; cannot spawn its own subagents). Invoked by the parent via the `Agent` tool, returns only a final summary. In ai-squad, the 5 Subagents are `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist` — all live in Phase 4. Rich frontmatter (`name`, `description`, `model`, `tools`, `effort`, `fan_out`).
+A `.md` file under `agents/{name}.md` with YAML frontmatter. Runs in an **isolated context** (does not see the parent's conversation; cannot spawn its own subagents). Invoked by the parent via the `Agent` tool, returns only a final summary. In ai-squad, the 6 Subagents are `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent` — all live in Phase 4. Rich frontmatter (`name`, `description`, `model`, `tools`, `effort`, `fan_out`).
 
 **Effort** `[platform]`
-Reasoning budget per agent: `low | medium | high | xhigh | max`. Set in a Subagent's frontmatter (Skills inherit from the human's session). `xhigh` is Opus 4.7 only. ai-squad calibration: `code-reviewer` / `qa` = sonnet + medium; `dev` = sonnet + high; `logic-reviewer` = **opus** + high; `blocker-specialist` = opus + xhigh; the 4 Skills inherit. Override per dispatch via Work Packet's `effort` field. Full reasoning in [`shared/concepts/effort.md`](concepts/effort.md).
+Reasoning budget per agent: `low | medium | high | xhigh | max`. Set in a Subagent's frontmatter (Skills inherit from the human's session). `xhigh` is Opus 4.7 only. ai-squad calibration: `code-reviewer` / `qa` = sonnet + medium; `dev` = sonnet + high; `logic-reviewer` = **opus** + high; `blocker-specialist` = opus + xhigh; `audit-agent` = haiku + medium (mechanical reconciliation, low quota); the 4 Skills inherit. Override per dispatch via Work Packet's `effort` field. Full reasoning in [`shared/concepts/effort.md`](concepts/effort.md).
 
 ---
 
@@ -50,7 +50,7 @@ Output Packet `status` is one of: `done | needs_review | blocked | escalate`. No
 ## Flow
 
 **Phase** `[ours]`
-The squad has exactly **4 Phases**: **Specify → Plan → Tasks → Implementation**. The first 3 are AI-driven with the human in-the-loop (one Skill conducts each); the 4th is fully autonomous (orchestrator dispatches the 5 Subagents). Each Phase has an explicit transition gate: human marks the Phase's artifact as `status: approved` AND invokes the next Skill via slash command. Phase 4 ends with a one-shot handoff. Full structure in [`shared/concepts/phase.md`](concepts/phase.md).
+The squad has exactly **4 Phases**: **Specify → Plan → Tasks → Implementation**. The first 3 are AI-driven with the human in-the-loop (one Skill conducts each); the 4th is fully autonomous (orchestrator dispatches the 6 Subagents). Each Phase has an explicit transition gate: human approves the artifact (`status: approved`) and the Skill auto-advances to the next planned Phase. Phase 4 ends with a one-shot handoff (gated by audit-agent). Full structure in [`shared/concepts/phase.md`](concepts/phase.md).
 
 **Pipeline** `[ours]`
 The deterministic workflow graph the orchestrator executes inside Phase 4 only. Canonical sequence:

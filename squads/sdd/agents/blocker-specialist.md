@@ -6,6 +6,12 @@ tools: Read, Grep, Bash
 effort: xhigh
 fan_out: false
 permissionMode: bypassPermissions
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "python3 $HOME/.claude/hooks/verify-output-packet.py"
+          timeout: 5
 ---
 
 # Blocker Specialist

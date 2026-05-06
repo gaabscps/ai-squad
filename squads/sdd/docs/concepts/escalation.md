@@ -65,6 +65,37 @@ The Pipeline "ends" only when ALL tasks reach a terminal state
 
 If `blocker-specialist` is invoked twice for the same task (two different blockers, or same blocker twice) and the second invocation hits `blocker_calls_max` (default: 2), the orchestrator marks the task `pending_human` immediately on the next blocker — no third specialist invocation.
 
+## The audit-gate exception (pipeline-integrity, not per-task)
+
+The 4 canonical triggers above are **per-task** — one task escalating leaves others running. The `audit-agent` introduces a **fifth, pipeline-level escalation path** that is structurally different:
+
+| Aspect | 4 canonical triggers | audit-gate failure |
+|--------|---------------------|--------------------|
+| Scope | Per-task (one task pauses) | Pipeline-level (entire run halts) |
+| Cascade | → `blocker-specialist` → if unresolved → human | Direct to refusal handoff (no specialist round) |
+| Detector | Orchestrator on Output Packet read | `audit-agent` on dispatch manifest reconciliation |
+| Trigger value | `status: blocked` from worker Subagent | `status: blocked, blocker_kind: bypass_detected` from audit-agent |
+| Counter | Per-task `blocker_calls` | None — single audit per pipeline run |
+
+**Why no specialist round.** A bypass means the orchestrator did not dispatch the expected Subagents (or fabricated outputs). Sending this to `blocker-specialist` would route a pipeline-integrity failure through a per-task arbitrator — wrong layer. The correct response is to halt and surface the audit-agent's findings to the human directly, who decides whether to `--restart` or investigate.
+
+**Where this lives in the orchestrator's flow.** Step 8 of the orchestrator (see `squads/sdd/skills/orchestrator/skill.md`). The audit-agent runs once, after every task reaches a terminal state and before the handoff is emitted. If the audit-agent returns `status: blocked` (`blocker_kind: bypass_detected`) or `escalate` (audit could not run), the orchestrator skips the normal 3-shape handoff and emits the **audit-failure handoff** instead.
+
+**Pattern lineage.** GitHub required status checks (a merge is refused unless named checks have posted results) + transactional Outbox (declared intent reconciled against actual events) + Verifiability-First Audit Agents (arXiv 2512.17259, 2026).
+
+### Mechanical enforcement layer (Claude Code hooks)
+
+The audit-agent itself is a Subagent — descriptive markdown. The orchestrator could in principle skip dispatching it. To close that hole, ai-squad ships **Stop** and **PreToolUse** hooks declared in the components' own frontmatter (project-level `settings.json` hooks do NOT fire in subagent context — Claude Code [issue #34692](https://github.com/anthropics/claude-code/issues/34692)):
+
+| Hook | Wired to | Enforces |
+|------|----------|----------|
+| `guard-session-scope.py` | orchestrator Skill `PreToolUse` (Edit/Write/MultiEdit) | Orchestrator may edit only inside `.agent-session/<task_id>/`. Source-tree edits → denied. |
+| `block-git-write.py` | orchestrator Skill `PreToolUse` (Bash) | Orchestrator may not run git write commands. Read-only git allowed. |
+| `verify-audit-dispatch.py` | orchestrator Skill `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json` with `status: done`. |
+| `verify-output-packet.py` | each Phase 4 Subagent `Stop` (auto-`SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json`. |
+
+Together, the hooks make the audit-gate's preconditions mechanically true: the orchestrator can't edit source, can't skip the audit, and subagents can't fake completion. Full details and deployment in [`squads/sdd/hooks/README.md`](../../hooks/README.md).
+
 ## Why `blocker-specialist` always first
 
 Every trigger goes through the specialist before reaching the human. Considered alternatives:

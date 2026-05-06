@@ -6,6 +6,12 @@ tools: Read, Grep
 effort: high
 fan_out: true
 permissionMode: bypassPermissions
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "python3 $HOME/.claude/hooks/verify-output-packet.py"
+          timeout: 5
 ---
 
 # Logic Reviewer

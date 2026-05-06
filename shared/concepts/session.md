@@ -60,10 +60,10 @@ Exactly one Role has write authority at any time. Others read for context but ne
 | Phase 1 (specify) | `spec-writer` Skill | n/a (just-created) |
 | Phase 2 (plan) | `designer` Skill | spec-writer's content carried over |
 | Phase 3 (tasks) | `task-builder` Skill | spec-writer + designer content |
-| Phase 4 (implementation) | `orchestrator` Skill | All 5 Subagents read; **none writes** |
+| Phase 4 (implementation) | `orchestrator` Skill | All 6 Subagents read; **none writes** |
 | Cleanup | `/ship` Skill | Final read before `rm -rf` |
 
-**Hard rule:** Subagents (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`) **never** write to `session.yml`. They emit Output Packets; the orchestrator reads those packets and updates the Session accordingly. This preserves Subagent isolation and concentrates state mutation in one place per Phase.
+**Hard rule:** Subagents (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) **never** write to `session.yml`. They emit Output Packets; the orchestrator reads those packets and updates the Session accordingly. This preserves Subagent isolation and concentrates state mutation in one place per Phase.
 
 ## Recovery flow
 

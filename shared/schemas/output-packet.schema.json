@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ai-squad/shared/schemas/output-packet.schema.json",
   "title": "ai-squad Output Packet",
-  "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, commit SHA resolves, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
+  "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist, audit-agent. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
   "type": "object",
   "required": ["spec_id", "dispatch_id", "role", "status", "evidence"],
   "additionalProperties": false,
@@ -19,7 +19,7 @@
     "role": {
       "type": "string",
       "enum": [
-        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist",
+        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist", "audit-agent",
         "codebase-mapper", "risk-analyst"
       ],
       "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch"
@@ -30,7 +30,7 @@
     },
     "blocker_kind": {
       "type": "string",
-      "description": "Required when status is blocked or escalate; enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, opaque_repo, insufficient_data, timeout, etc.)"
+      "description": "Required when status is blocked or escalate; enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, opaque_repo, insufficient_data, timeout, bypass_detected, etc.)"
     },
     "missing_for": {
       "type": "array",
@@ -89,6 +89,19 @@
             "type": "string",
             "enum": ["edge_case", "missing_flow", "partial_failure", "race", "invariant"],
             "description": "logic-reviewer findings ONLY"
+          },
+          "audit_finding_kind": {
+            "type": "string",
+            "enum": [
+              "missing_expected_dispatch",
+              "missing_output_packet",
+              "orphan_output_packet",
+              "role_mismatch",
+              "pipeline_stage_skipped",
+              "ac_not_validated",
+              "orchestrator_edited_source"
+            ],
+            "description": "audit-agent findings ONLY — reconciliation gap categories from the 6 canonical checks (see agents/audit-agent.md)"
           }
         }
       }
@@ -186,7 +199,7 @@
     "next_role": {
       "type": "string",
       "enum": [
-        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist",
+        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist", "audit-agent",
         "codebase-mapper", "risk-analyst"
       ],
       "description": "Optional hint; orchestrator decides actual routing"

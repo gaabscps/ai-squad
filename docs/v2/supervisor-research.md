@@ -57,7 +57,7 @@ Skills are invoked by the human (via slash command) or by `context: fork` into a
 
 ### T3 — Skills CAN dispatch Subagents (current pattern)
 
-This is what we already do (orchestrator Skill → 5 Subagents). No constraint observed at our usage levels. Limits: ~200k context per Subagent, ~10min timeout per task, no published cap on parallel dispatches.
+This is what we already do (orchestrator Skill → 6 Subagents). No constraint observed at our usage levels. Limits: ~200k context per Subagent, ~10min timeout per task, no published cap on parallel dispatches.
 
 ### T4 — Multi-level "agent of agents" is only possible via Agent Teams (experimental)
 

@@ -1,13 +1,32 @@
 ---
 name: orchestrator
 description: Phase 4 entry point. Reads approved Spec + Plan + Tasks (any may be absent if not in planned_phases), manages session state, dispatches Subagents (dev → code-reviewer ‖ logic-reviewer → qa, with fan-out per task), enforces per-task loop caps, emits a single human-readable handoff at the end. Routes to blocker-specialist on escalation. Supports --resume from paused or escalated state.
+hooks:
+  PreToolUse:
+    - matcher: "Edit|Write|MultiEdit"
+      hooks:
+        - type: command
+          command: "python3 $HOME/.claude/hooks/guard-session-scope.py"
+          timeout: 5
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "python3 $HOME/.claude/hooks/block-git-write.py"
+          timeout: 5
+  Stop:
+    - hooks:
+        - type: command
+          command: "python3 $HOME/.claude/hooks/verify-audit-dispatch.py"
+          timeout: 5
 ---
 
 # Orchestrator — Phase 4 (Implementation)
 
-The Skill that runs the autonomous Implementation Pipeline. Dispatches the 5 Subagents (dev, code-reviewer, logic-reviewer, qa, blocker-specialist) via Claude Code's `Task` tool, enforces caps, and emits one handoff. Runs without the human in-the-loop until handoff.
+The Skill that runs the autonomous Implementation Pipeline. Dispatches the 6 Subagents (dev, code-reviewer, logic-reviewer, qa, blocker-specialist, audit-agent) via Claude Code's `Task` tool, enforces caps, and emits one handoff (gated by audit-agent). Runs without the human in-the-loop until handoff.
 
 **Sole writer invariant:** in Phase 4, the orchestrator is the only Skill that writes `session.yml`. Subagents return Output Packets; the orchestrator reads them, merges state, and atomically rewrites `session.yml` (tmp + rename). This eliminates concurrent-write races without file locks (Buck2's single-coordinator pattern).
+
+**Non-edit invariant (issue #1 mitigation):** the orchestrator MUST NOT edit any consumer-repo source file. Its only writes are to `.agent-session/<task_id>/` (manifest, inputs, session.yml). All source edits flow through `dev` Subagent dispatches. The `audit-agent` (step 8 below) verifies this mechanically before handoff.
 
 ## When to invoke
 - `/orchestrator FEAT-NNN` — fresh start of Phase 4.
@@ -34,6 +53,39 @@ The Skill that runs the autonomous Implementation Pipeline. Dispatches the 5 Sub
 2. Read approved Spec/Plan/Tasks (auto-derive if Plan/Tasks were skipped per `planned_phases`).
 3. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
 4. Set `pipeline_started_at` (or leave intact on `--resume`).
+
+### 1b. Write the dispatch manifest (Outbox + GitHub required-checks pattern)
+Before any `Task` dispatch, atomically write `.agent-session/<task_id>/dispatch-manifest.json` (JSON, not YAML — hook scripts parse this with Python stdlib `json` module, no yaml dependency):
+
+```json
+{
+  "schema_version": 1,
+  "task_id": "FEAT-NNN",
+  "plan_generated_at": "<iso8601>",
+  "expected_pipeline": [
+    {"task_id": "T-001", "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"]},
+    {"task_id": "T-002", "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"]}
+  ],
+  "actual_dispatches": []
+}
+```
+
+After every `Task` tool dispatch, append to `actual_dispatches[]`:
+```json
+{
+  "dispatch_id": "<uuid>",
+  "task_id": "T-XXX",
+  "role": "dev | code-reviewer | logic-reviewer | qa | blocker-specialist | audit-agent",
+  "started_at": "<iso8601>",
+  "completed_at": "<iso8601>",
+  "output_packet_ref": "outputs/<dispatch_id>.json",
+  "status": "<Output Packet status>"
+}
+```
+
+Atomic write pattern (tmp + rename) on every append. Manifest is the **mechanical audit trail** the audit-agent reconciles in step 8.
+
+On `--resume`: read existing manifest, do NOT re-write `expected_pipeline`; continue appending to `actual_dispatches[]`.
 
 ### 2. Build the per-task pipeline graph
 For each `T-XXX`:
@@ -78,10 +130,32 @@ On any cascade trigger (`status: blocked`, reviewer conflict, loop cap, progress
 
 After `blocker_calls_max=2` for a task → orchestrator marks task `pending_human` regardless.
 
-### 7. Pipeline-end handoff
+### 7. Pipeline-end pre-checks
 When ready queue empty AND no task in-flight (every task is `done` or `pending_human`):
 - Compute `escalation_metrics.escalation_rate = pending_human_tasks / total_tasks` (healthy: 10-15% per Galileo).
-- Set `pipeline_completed_at`; set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
+- Set `pipeline_completed_at`.
+
+### 8. Audit gate (mandatory reconciliation — issue #1 mitigation)
+**Before** computing `current_phase` or emitting handoff, dispatch `audit-agent` (singleton, no fan-out) with this Work Packet:
+```yaml
+task_id: FEAT-NNN
+dispatch_id: <uuid>
+manifest_ref: .agent-session/FEAT-NNN/dispatch-manifest.json
+outputs_dir_ref: .agent-session/FEAT-NNN/outputs/
+tasks_ref: .agent-session/FEAT-NNN/tasks.md
+spec_ref: .agent-session/FEAT-NNN/spec.md
+```
+Append the audit-agent's own dispatch to `actual_dispatches[]`. The audit-agent runs the 6 reconciliation checks (see `agents/audit-agent.md`).
+
+Branch on the audit-agent's Output Packet:
+- **`status: done`** (all checks pass) → proceed to step 9 (handoff).
+- **`status: blocked, blocker_kind: bypass_detected`** → DO NOT emit normal handoff. Set `current_phase: escalated`. Emit a **refusal handoff** (see "Audit-failure handoff" below) listing every finding. Save to `.agent-session/<task_id>/handoff.md`. Stop.
+- **`status: escalate`** (audit could not run — manifest unreadable, etc.) → set `current_phase: escalated`; emit refusal handoff with audit-agent's blockers. Stop.
+
+The audit-agent's verdict is binding. The orchestrator MUST NOT emit a "uniform success" handoff if the audit returned `blocked` or `escalate`.
+
+### 9. Pipeline-end handoff (only if step 8 passed)
+- Set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
 - Emit handoff message (see "Handoff" section); also save to `.agent-session/<task_id>/handoff.md`.
 
 ## Dispatch contract (Work Packet embedded in `Task` prompt)
@@ -135,10 +209,34 @@ The Subagent body's "Input contract" specifies which fields are required for tha
 - (or `(none — ready to ship)` for uniform success)
 ```
 
-**Three shape variants (closing line varies):**
-- **Uniform success** (all tasks done): `"Implementation done. Changes are unstaged in the working tree — review with git diff / git status, then commit when ready. Run /ship FEAT-NNN to clean up the session."`
-- **Mixed status** (some pending_human): `"Partial completion. <N> done, <M> awaiting human decision. Changes are unstaged — review before committing. After resolving the blockers: /orchestrator FEAT-NNN --resume (default) | /orchestrator FEAT-NNN --restart (if prior work is invalidated)."`
+**Four shape variants (closing line varies):**
+- **Uniform success** (all tasks done, audit clean): `"Implementation done. Changes are unstaged in the working tree — review with git diff / git status, then commit when ready. Run /ship FEAT-NNN to clean up the session."`
+- **Mixed status** (some pending_human, audit clean): `"Partial completion. <N> done, <M> awaiting human decision. Changes are unstaged — review before committing. After resolving the blockers: /orchestrator FEAT-NNN --resume (default) | /orchestrator FEAT-NNN --restart (if prior work is invalidated)."`
 - **Full escalate** (all pending_human): `"Pipeline escalated. All tasks blocked. See decision memos at .agent-session/<task_id>/decisions/ and resolve before /orchestrator FEAT-NNN --resume."`
+- **Audit-failure handoff** (step 8 returned `blocked` or `escalate` — issue #1 mitigation): emit a refusal handoff, NOT one of the three above. Skeleton:
+  ```
+  ## Pipeline integrity audit FAILED — handoff refused
+
+  The audit-agent detected that the dispatch manifest does not reconcile with the actual pipeline execution. This usually means the orchestrator bypassed Subagent dispatch and did the work directly (or fabricated outputs).
+
+  ## Audit findings
+  | gap_kind                    | severity | ref                                |
+  |-----------------------------|----------|------------------------------------|
+  | <one row per finding from audit-agent's Output Packet>            |
+
+  ## What to do
+  1. Inspect `.agent-session/FEAT-NNN/dispatch-manifest.json` and `outputs/` directly.
+  2. If findings reflect a real bypass: discard the working-tree changes (`git restore .`) and re-run `/orchestrator FEAT-NNN --restart`.
+  3. If findings are false positives: file an issue with the audit-agent's Output Packet attached (`.agent-session/FEAT-NNN/outputs/<audit-dispatch-id>.json`).
+  ```
+
+## Hard rules
+- Never: edit any file in the consumer-repo source tree. The orchestrator's writes are restricted to `.agent-session/<task_id>/` (manifest, inputs/, session.yml, handoff.md). All source edits flow through `dev` Subagent dispatches.
+- Never: skip step 8 (audit gate). The audit-agent's verdict is binding before any handoff.
+- Never: emit a "uniform success" or "mixed status" handoff if the audit-agent returned `blocked` or `escalate`. Emit the audit-failure handoff instead.
+- Never: append to `actual_dispatches[]` without a corresponding real `Task` tool dispatch. Manifest entries must be backed by real subagent invocations.
+- Always: write the dispatch manifest in step 1b BEFORE any `Task` dispatch. Manifest-first; dispatch-second.
+- Always: run the audit gate even on uniform-success runs. The cost is one cheap haiku dispatch; the protection is non-negotiable.
 
 ## Failure modes
 - **Orchestrator process killed mid-dispatch:** in-flight Subagent's Output Packet may not be merged into `session.yml`. On `--resume`, orchestrator re-reads `outputs/` directory; any Output Packet without a corresponding `task_states` update is replayed (state-merge is idempotent on `dispatch_id`).
@@ -147,6 +245,10 @@ The Subagent body's "Input contract" specifies which fields are required for tha
 - **Fan-out `scope_files` collision** (caught at task-builder time but defense-in-depth here): if 2 `[P]` dispatches reach the same file in flight, second dispatch's `dev` should detect diff conflict and emit `blocked`; orchestrator serializes the retry.
 - **Cap hit on a task with `--resume`:** cap counters preserved across resume — they do not reset. Hard cap is hard.
 - **Concurrent `/orchestrator` on same `FEAT-NNN`:** undefined behavior. Sole-writer invariant assumes one orchestrator process per Session. Lockfile is TODO Phase 5 — relies on human discipline for MVP.
+- **Audit-agent itself bypassed:** mechanically blocked. The orchestrator's frontmatter declares a `Stop` hook (`verify-audit-dispatch.py`) that reads `dispatch-manifest.json` and refuses to allow the orchestrator session to end without an `audit-agent` entry in `actual_dispatches[]` with `status: done`. The hook honors `stop_hook_active` to avoid infinite loops. See `squads/sdd/hooks/verify-audit-dispatch.py`.
+- **Orchestrator edits source files directly:** mechanically blocked. The orchestrator's frontmatter declares a `PreToolUse` hook (`guard-session-scope.py`) that denies any `Edit`/`Write`/`MultiEdit` whose path is outside `.agent-session/<task_id>/`. A second `PreToolUse` hook (`block-git-write.py`) denies `Bash` calls running git write commands.
+- **Subagent claims `done` without emitting Output Packet:** mechanically blocked. Each Phase 4 Subagent's frontmatter declares a `Stop` hook (`verify-output-packet.py`) that extracts the `dispatch_id` from the transcript and refuses to allow the subagent to finish unless `outputs/<dispatch_id>.json` exists and passes minimum schema checks (required fields + valid status).
+- **False-positive audit (clean run flagged as bypass):** recoverable — human reviews `.agent-session/<task_id>/outputs/<audit-dispatch-id>.json`, files the issue, re-runs after fix. Audit-agent is biased toward `blocked` because false-negative defeats the entire layer.
 
 ## Why a Skill (not a Subagent)
 Subagents in Claude Code cannot spawn other Subagents (platform constraint). The orchestrator must run in the main session to dispatch the workers via the `Task` tool. Also satisfies "dispatches Subagents" criterion (see `shared/concepts/skill-vs-subagent.md`).

@@ -31,7 +31,7 @@ The squad-specific Phase enum lives in `session.yml.current_phase` and is interp
 | 1 | **Specify** | `spec-writer` | `.agent-session/FEAT-NNN/spec.md` | In-the-loop (refines Spec interactively) | `status: approved` on `spec.md` + next Skill invocation |
 | 2 | **Plan** | `designer` | `.agent-session/FEAT-NNN/plan.md` | In-the-loop (validates design decisions) | `status: approved` on `plan.md` + next Skill invocation |
 | 3 | **Tasks** | `task-builder` | `.agent-session/FEAT-NNN/tasks.md` | In-the-loop (reviews task decomposition) | `status: approved` on `tasks.md` + next Skill invocation |
-| 4 | **Implementation** | `orchestrator` (dispatches 5 Subagents) | Repo files + Output Packets + handoff | **Absent** until handoff | (orchestrator emits handoff; pipeline ends) |
+| 4 | **Implementation** | `orchestrator` (dispatches 6 Subagents) | Repo files + Output Packets + handoff | **Absent** until handoff | (orchestrator emits handoff after audit-agent reconciliation passes; pipeline ends) |
 | post | (cleanup) | `/ship FEAT-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<task_id>/` |
 
 ## Discovery squad — 3 Phases
@@ -72,11 +72,11 @@ This is the same `human-in-the-loop` criterion that defines [Skill vs Subagent](
 - **Materialization layer** (Skill vs Subagent): "*This Role* needs the human in-the-loop?"
 - **Flow layer** (which Phase): "*This stage of work* needs the human in-the-loop?"
 
-It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builder`, `orchestrator`) span the 4 Phases (one per Phase) and that the 5 Subagents all live in Phase 4 — they are consequences of the same principle.
+It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builder`, `orchestrator`) span the 4 Phases (one per Phase) and that the 6 Subagents all live in Phase 4 — they are consequences of the same principle.
 
 ## Roles per Phase, per squad
 
-**SDD squad** (4 Skills + 5 Subagents = 9 Roles):
+**SDD squad** (4 Skills + 6 Subagents = 10 Roles):
 
 | Role | Materialization | Phase | Why this materialization |
 |------|-----------------|-------|--------------------------|
@@ -89,6 +89,7 @@ It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builde
 | `logic-reviewer` | Subagent | 4 | Neither |
 | `qa` | Subagent | 4 | Neither |
 | `blocker-specialist` | Subagent | 4 (escalation) | Neither — reused cross-squad on `status: blocked` |
+| `audit-agent` | Subagent | 4 (pre-handoff gate) | Neither — singleton reconciliation of dispatch manifest vs. actual outputs |
 
 **Discovery squad** (3 Skills + 2 Subagents = 5 Roles):
 
@@ -100,7 +101,7 @@ It is not coincidence that the 4 Skills (`spec-writer`, `designer`, `task-builde
 | `risk-analyst` | Subagent | 2 | Neither — multi-instance fan-out (1 per Cagan Big Risk) |
 | `discovery-synthesizer` | Skill | 3 (Decide) | Human in-the-loop as RAPID Decider |
 
-Total across both squads: **14 canonical Roles** (7 Skills + 7 Subagents). `blocker-specialist` is shared cross-squad (defined under SDD, reusable by Discovery's `discovery-orchestrator`).
+Total across both squads: **15 canonical Roles** (7 Skills + 8 Subagents). `blocker-specialist` is shared cross-squad (defined under SDD, reusable by Discovery's `discovery-orchestrator`).
 
 ## Artifacts per Phase — runtime, gitignored
 

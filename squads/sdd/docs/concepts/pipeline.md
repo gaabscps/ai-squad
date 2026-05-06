@@ -60,7 +60,9 @@ The orchestrator is the only dispatcher (Subagents cannot dispatch other Subagen
    └─ any AC blocked  → cascade via blocker-specialist for THIS task
 
 When all tasks are in terminal state (done | pending_human),
-emit final handoff (mixed status if any pending_human).
+dispatch audit-agent (singleton; reconciles dispatch manifest vs. outputs/),
+then — only if audit returns `status: done` — emit final handoff
+(mixed status if any pending_human; refusal handoff if audit fails).
 ```
 
 Cross-task: tasks marked `[P]` in `tasks.md` whose `Files:` are write-disjoint can have their dev dispatches run in parallel. The orchestrator maintains the per-task graph independently for each. See "Fan-out across tasks" below.
