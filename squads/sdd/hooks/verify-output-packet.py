@@ -25,7 +25,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 from hook_runtime import resolve_project_root
 
-REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "evidence"}
+REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "summary", "evidence"}
 VALID_STATUSES = {"done", "needs_review", "blocked", "escalate"}
 
 

@@ -6,6 +6,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Kiro deploy path** — `./tools/deploy-kiro.sh` converts every ai-squad skill (`squads/<squad>/skills/*/skill.md`) and subagent (`squads/<squad>/agents/*.md`) to a Kiro Custom Agent at `~/.kiro/agents/<name>.json` (via [`tools/kiro_convert_agent.py`](tools/kiro_convert_agent.py)) and syncs `hooks/*.py` to `~/.kiro/hooks/`. Hooks are wired per-agent inside each agent JSON (`preToolUse[]` + `stop[]`), mirroring the per-Skill/Subagent wiring used in Claude Code — so `guard-session-scope` only fires for the orchestrator. Does not touch `~/.claude/`, `~/.cursor/`, or `~/.kiro/skills/` (Kiro's native Skills primitive is left untouched because it can't carry hooks).
+- **`scripts/smoke-kiro-export.sh`** — validates that every agent `.md` converts to parseable JSON and every `skill.md` exports cleanly. Does not install to `~/.kiro/`.
+
+### Fixed
+
+- Docs: Cursor **does** support slash + skill name (and `@skill` / picker); removed incorrect “no slash in Cursor” wording in README and `cursor_export_skill.py` callout.
+- **Schema/hook drift on `summary`** — `shared/concepts/output-packet.md` always required `summary`, but `shared/schemas/output-packet.schema.json` and `squads/sdd/hooks/verify-output-packet.py` did not enforce it. Schema + hook now match the canonical doc.
+- **Severity enum drift** — schema previously listed `["blocker","major","minor","error","warning","info"]` while the doc described 4 reviewer levels. Aligned both around the 6-level closed enum (`info | warning | error | critical | major | blocker`) with `major`/`blocker` reserved for `audit-agent` reconciliation findings (already in use since 0.2.0).
+- **`ac_coverage` pattern drift** — schema now requires the prefixed form `^(FEAT|DISC)-\d{3,}/AC-\d{3,}$` (was `^AC-\d{3,}$`), matching the canonical example in `shared/concepts/output-packet.md` and Discovery's cross-squad usage. Updated `qa.md` Output contract to use `FEAT-XXX/AC-XXX` keys.
+- **Evidence enum trimmed to 6 kinds** — removed `kind: commit` (workflow does not produce commits at the dev step; humans review and commit after handoff). Updated `evidence.md`, `glossary.md`, `output-packet.md`, schema, and example template.
+
+### Notes (Kiro compatibility)
+
+- **Tool names** — `tools/kiro_convert_agent.py` emits Kiro's canonical names (`read`, `write`, `shell`, `grep`, `glob`); legacy aliases (`fs_read`, `fs_write`, `execute_bash`) are still accepted by Kiro CLI per the in-binary changelog ("Hook matchers now recognize tool aliases").
+- **Models** — `MODEL_MAP` uses official Kiro `model_id`s verified via `kiro-cli chat --list-models`: `auto` (default; chosen per task) for `sonnet`/`opus`, `claude-haiku-4.5` for `haiku`.
+- **`WebSearch` / `WebFetch`** — no built-in Kiro equivalent; converter drops them with a stderr warning. Install an MCP server that provides them and reference via `@<server>/<tool>` in the agent's `tools[]`.
+- **Slash command** — inside a Kiro chat, `/agent` opens a picker. Direct launch is `kiro-cli --agent <name>` from the shell.
+
 ## 0.2.0 — 2026-05-06
 
 ### Added

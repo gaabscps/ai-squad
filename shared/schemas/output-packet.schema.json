@@ -4,7 +4,7 @@
   "title": "ai-squad Output Packet",
   "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist, audit-agent. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
   "type": "object",
-  "required": ["spec_id", "dispatch_id", "role", "status", "evidence"],
+  "required": ["spec_id", "dispatch_id", "role", "status", "summary", "evidence"],
   "additionalProperties": false,
   "properties": {
     "spec_id": {
@@ -40,7 +40,7 @@
     "summary": {
       "type": "string",
       "maxLength": 200,
-      "description": "Optional one-line summary"
+      "description": "One-line summary, past tense, ≤ 120 chars (see output-packet.md summary format rules)"
     },
     "notes": {
       "type": "string",
@@ -58,10 +58,10 @@
           "kind": {
             "type": "string",
             "enum": [
-              "file", "command", "commit", "test", "log", "url", "absence",
+              "file", "command", "test", "log", "url", "absence",
               "user_signal", "competitor_observation", "metric_benchmark", "expert_judgment", "code_evidence"
             ],
-            "description": "SDD kinds: file | command | commit | test | log | url | absence. Discovery kinds: user_signal | competitor_observation | metric_benchmark | expert_judgment | code_evidence | absence (shared). Each kind defines its own additional fields via additionalProperties: true."
+            "description": "SDD kinds: file | command | test | log | url | absence. Discovery kinds: user_signal | competitor_observation | metric_benchmark | expert_judgment | code_evidence | absence (shared). Each kind defines its own additional fields via additionalProperties: true."
           }
         }
       }
@@ -77,7 +77,7 @@
           "id": { "type": "string" },
           "severity": {
             "type": "string",
-            "enum": ["blocker", "major", "minor", "error", "warning", "info"]
+            "enum": ["info", "warning", "error", "critical", "major", "blocker"]
           },
           "rationale": { "type": "string", "maxLength": 120 },
           "dimension": {
@@ -128,7 +128,7 @@
     "ac_coverage": {
       "type": "object",
       "patternProperties": {
-        "^AC-\\d{3,}$": {
+        "^(FEAT|DISC)-\\d{3,}/AC-\\d{3,}$": {
           "type": "array",
           "items": { "type": "string" }
         }

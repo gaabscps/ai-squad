@@ -44,8 +44,8 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 
 ## Output contract (Output Packet)
 - `status`: `done` (all ACs pass) | `needs_review` (some ACs fail) | `blocked` | `escalate`
-- `evidence[]`: `{kind: test, ref: "<command>", exit: <int>, ac_ref: "AC-XXX"}` — one per AC validated
-- `ac_coverage`: `{AC-XXX: [evidence_id], AC-YYY: [evidence_id]}` — required top-level field; every AC in `ac_scope` MUST appear as a key
+- `evidence[]`: `{kind: test, ref: "<command>", exit: <int>, ac_ref: "FEAT-XXX/AC-XXX"}` — one per AC validated
+- `ac_coverage`: `{"FEAT-XXX/AC-XXX": [evidence_id], "FEAT-XXX/AC-YYY": [evidence_id]}` — required top-level field; every AC in `ac_scope` MUST appear as a key (full prefixed form per [output-packet schema](../../../shared/schemas/output-packet.schema.json))
 - `notes`: ≤80 chars
 
 ## Hard rules

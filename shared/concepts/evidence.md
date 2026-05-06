@@ -4,12 +4,12 @@
 
 ## Definition
 
-**Evidence** is a typed pointer to verifiable proof of work, attached to every Output Packet a Subagent emits. Each item is one of 7 canonical `kind`s, follows a fixed schema for that kind, and addresses content that lives outside the packet (in the repo, in `.agent-session/`, or in an external system) — never inline.
+**Evidence** is a typed pointer to verifiable proof of work, attached to every Output Packet a Subagent emits. Each item is one of 6 canonical `kind`s, follows a fixed schema for that kind, and addresses content that lives outside the packet (in the repo, in `.agent-session/`, or in an external system) — never inline.
 
 Evidence is what separates "the agent says it's done" from "the agent has shown it's done in a way another agent or human can independently verify."
 
 > *Terms used in this doc:*
-> - **pointer:** a lightweight reference to something verifiable outside the payload — a file path with line range, a command with exit code, a commit SHA. Carries the address, never the content.
+> - **pointer:** a lightweight reference to something verifiable outside the payload — a file path with line range, a command with exit code, a test name with status. Carries the address, never the content.
 > - **anti-context-pollution:** a design pattern that avoids inflating prompts or output payloads with raw content that can be referenced by pointer. Consensus pattern documented in *Why Do Multi-Agent LLM Systems Fail?* (Cemri et al., 2025) — semantic distance between original intent and current context grows monotonically when agents pile content into payloads.
 > - **verifiable proof:** proof another agent or human can check deterministically — open the file, run the command, look up the commit. Not "trust me, I did it."
 > - **absence proof / negative evidence:** evidence that something is NOT present where it shouldn't be. Critical for validating EARS criteria of the form `IF <unwanted> THEN <mitigation>` and for confirming reviewers' "X was removed" claims.
@@ -22,7 +22,7 @@ Three properties make Evidence load-bearing:
 2. **It is the gate the `qa` Subagent runs against the Spec.** Every acceptance criterion (`AC-XXX`) in the Spec must produce at least one matching evidence in `qa`'s Output Packet. No matching evidence = `qa` returns `status: blocked`.
 3. **It enables the "subagent bypass" pattern documented by Anthropic Research:** Subagents write evidence directly to the filesystem; the orchestrator receives only ack + pointer. This bypass is what cuts coordination overhead while preserving full fidelity.
 
-## The 7 canonical kinds
+## The 6 canonical kinds
 
 Closed enum. Adding a kind is a minor version bump (non-breaking). Removing or changing semantics of a kind is breaking.
 
@@ -30,7 +30,6 @@ Closed enum. Adding a kind is a minor version bump (non-breaking). Removing or c
 |--------|---------|
 | `file` | A repo file that was created, modified, or read as reference for a finding. |
 | `command` | A shell command that was executed (build, test runner, lint, custom script). |
-| `commit` | A git commit produced as part of the dispatch. |
 | `test` | The result of one named test (passed/failed/skipped). |
 | `log` | A captured output stream (command stdout, runtime log). |
 | `url` | An external URL visited or created (PR, deploy, dashboard, screenshot host). |
@@ -38,7 +37,7 @@ Closed enum. Adding a kind is a minor version bump (non-breaking). Removing or c
 
 ### Schema per kind
 
-All evidences share `kind` (string, required, must be one of the 7). All evidences may carry an optional `id` field (string, format `EV-XXX`, monotonic per Output Packet) — generally optional, but **required** when the evidence is referenced by the Output Packet's `ac_coverage` field (see [`output-packet.md`](output-packet.md#ac_coverage-qa-specific)). The other fields are kind-specific.
+All evidences share `kind` (string, required, must be one of the 6). All evidences may carry an optional `id` field (string, format `EV-XXX`, monotonic per Output Packet) — generally optional, but **required** when the evidence is referenced by the Output Packet's `ac_coverage` field (see [`output-packet.md`](output-packet.md#ac_coverage-qa-specific)). The other fields are kind-specific.
 
 #### `file`
 ```json
@@ -53,13 +52,6 @@ All evidences share `kind` (string, required, must be one of the 7). All evidenc
 ```
 - **Required:** `cmd` (the exact command run); `exit_code` (integer).
 - **Optional:** `log_path` (where stdout+stderr was captured); `duration_ms`.
-
-#### `commit`
-```json
-{ "kind": "commit", "sha": "abc1234", "message": "feat: add password reset flow", "files_changed": ["src/auth/reset.ts", "src/auth/reset.test.ts"] }
-```
-- **Required:** `sha` (full or short SHA — short preferred for readability).
-- **Optional:** `message`; `files_changed` (array of paths).
 
 #### `test`
 ```json
@@ -97,7 +89,7 @@ Output Packets carry pointers, **never** raw content. No previews, no excerpts, 
 
 If a downstream consumer needs the actual content (the lines of the file, the body of the log), it uses the pointer to read it on demand. The cost of one targeted read > the cost of carrying that content through the entire Pipeline.
 
-The **only** field that may carry short prose is `reason` (on `file` evidence) or `message` (on `commit` evidence) — both capped at one short line by convention.
+The **only** field that may carry short prose is `reason` (on `file` evidence) — capped at one short line by convention.
 
 ## FS layout
 
@@ -105,7 +97,7 @@ Evidence pointers map to two locations, by kind:
 
 | Kind | Path target |
 |------|-------------|
-| `file`, `commit` | Repo files (relative to repo root). The repo is the artifact; evidence references it directly. |
+| `file` | Repo files (relative to repo root). The repo is the artifact; evidence references it directly. |
 | `command`, `log`, `test` (output_path) | `.agent-session/<task_id>/logs/<role>-<timestamp>.log` — gitignored, ephemeral within the session. |
 | `url` (snapshot_path) | `.agent-session/<task_id>/snapshots/<descriptive-name>.<ext>` — when the external URL might change. |
 | `absence` (location) | Either repo path or `.agent-session/`, depending on what was checked. |
@@ -179,7 +171,7 @@ The orchestrator routes back to `dev` with the logic-reviewer's finding and the 
 ## Anti-patterns
 
 1. **Textual evidence without pointers.** `"All tests pass"`, `"Implementation is correct"`, `"No regressions found"` — invalid. Reject the Output Packet.
-2. **`kind` outside the 7-element enum.** `"kind": "approval"`, `"kind": "design-decision"` — extend the framework or use an existing kind. Custom kinds break orchestrator and `qa` parsing.
+2. **`kind` outside the 6-element enum.** `"kind": "approval"`, `"kind": "design-decision"` — extend the framework or use an existing kind. Custom kinds break orchestrator and `qa` parsing.
 3. **Required fields missing.** A `command` evidence without `exit_code`; a `test` evidence without `status`; an `absence` without `expected_not_present` — invalid.
 4. **Subjective evidence.** `"screenshot looks good"`, `"feels fast enough"`. The screenshot itself is fine as `kind: file`; the subjective interpretation is not.
 5. **Inline content under a "preview" field.** No such field exists in any kind's schema. Adding it informally is the start of context-pollution drift.

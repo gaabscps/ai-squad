@@ -75,7 +75,7 @@ Items in `findings[]` represent issues the Subagent identified. Reviewers (`code
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | yes | Monotonic per dispatch (`FIND-001`, `FIND-002`, …). |
-| `severity` | enum | yes | `info | warning | error | critical`. See severity table below. |
+| `severity` | enum | yes | `info | warning | error | critical | major | blocker`. See severity table below. |
 | `message` | string | yes | One sentence stating the issue. |
 | `evidence_ref` | string | yes | Pointer to the evidence ID (in this same packet's `evidence[]`) that sustains the finding. |
 | `ac_ref` | string | no | `FEAT-XXX/AC-XXX` if the finding violates a specific Spec acceptance criterion. |
@@ -83,12 +83,16 @@ Items in `findings[]` represent issues the Subagent identified. Reviewers (`code
 
 ### Severity enum
 
-| `severity` | Meaning | Effect on orchestrator routing |
-|------------|---------|--------------------------------|
-| `info` | Informational note (e.g. "consider extracting helper"). | Carried into the next Work Packet as context; does not block. |
-| `warning` | Non-blocking issue worth flagging (e.g. "magic number"). | Same as `info`; surfaces in the human handoff. |
-| `error` | Issue that must be fixed before advancing. | Forces `status: needs_review` regardless of how the Subagent self-classified; routes back to prior Role. |
-| `critical` | Showstopper — even if `status: needs_review`, treat as effectively blocking. | Routes to `blocker-specialist` if it persists across one loop. |
+6-level closed enum. Reviewers (`code-reviewer`, `logic-reviewer`, `qa`) use the first 4 levels; `audit-agent` uses `major` and `blocker` for reconciliation findings.
+
+| `severity` | Meaning | Typical emitters | Effect on orchestrator routing |
+|------------|---------|------------------|--------------------------------|
+| `info` | Informational note (e.g. "consider extracting helper"). | reviewers | Carried into the next Work Packet as context; does not block. |
+| `warning` | Non-blocking issue worth flagging (e.g. "magic number"). | reviewers | Same as `info`; surfaces in the human handoff. |
+| `error` | Issue that must be fixed before advancing. | reviewers, qa | Forces `status: needs_review` regardless of how the Subagent self-classified; routes back to prior Role. |
+| `critical` | Showstopper — even if `status: needs_review`, treat as effectively blocking. | reviewers | Routes to `blocker-specialist` if it persists across one loop. |
+| `major` | Significant audit reconciliation gap (e.g. orphan output packet). | audit-agent | Contributes to `bypass_detected`; surfaces in refusal handoff. |
+| `blocker` | Audit showstopper — pipeline integrity violation (e.g. missing dispatch, role mismatch). | audit-agent | Forces `status: blocked` with `blocker_kind: bypass_detected`; orchestrator emits refusal handoff. |
 
 ## blockers[] schema
 
@@ -184,7 +188,7 @@ Rejection conditions:
 - Missing required field (`spec_id`, `dispatch_id`, `role`, `status`, `summary`, `evidence`)
 - `status` outside the 4-element enum
 - `role` outside the 8 canonical Roles
-- Evidence with `kind` outside the 7-element enum
+- Evidence with `kind` outside the 6-element enum
 - Evidence schema violation (missing required field for the kind — see [`evidence.md`](evidence.md))
 - `evidence[]` exceeding 50 items
 - `status: blocked` with empty `blockers[]`

@@ -26,13 +26,6 @@
       "exit_code": 0,
       "log_path": ".agent-session/FEAT-001/logs/dev-T-001-abc123.log",
       "duration_ms": 1240
-    },
-    {
-      "id": "EV-004",
-      "kind": "commit",
-      "sha": "abc1234",
-      "message": "feat(health): add /health endpoint with status and timestamp",
-      "files_changed": ["src/routes/health.ts", "src/routes/health.test.ts"]
     }
   ],
   "files_changed": ["src/routes/health.ts", "src/routes/health.test.ts"],

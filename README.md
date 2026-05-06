@@ -1,8 +1,8 @@
 # ai-squad
 
-![version](https://img.shields.io/badge/version-v0.2-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange)
+![version](https://img.shields.io/badge/version-v0.2-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
 
-> An opinionated multi-squad pipeline for [Claude Code](https://claude.com/claude-code).
+> An opinionated multi-squad pipeline built for [Claude Code](https://claude.com/claude-code) — and portable to [Cursor](https://cursor.com) and [Kiro](https://kiro.dev) via dedicated deploy scripts.
 >
 > **Two squads ship today. You bring the problem signal or the pitch, ai-squad runs the right squad — pausing for your sign-off at every gate.**
 
@@ -56,12 +56,13 @@ ai-squad gives you both layers:
 
 ## Install (deployment)
 
-**Requirements:** Python 3.8+ on `PATH` (hook scripts). You use **either** [Claude Code](https://claude.com/claude-code) **or** [Cursor](https://cursor.com) (IDE / CLI) as the agent host — or both on the same machine (they install to different directories).
+**Requirements:** Python 3.8+ on `PATH` (hook scripts). You use **either** [Claude Code](https://claude.com/claude-code), [Cursor](https://cursor.com), or [Kiro](https://kiro.dev) as the agent host — or any combination on the same machine (they install to different directories).
 
 | Script | Host | What it does |
 |--------|------|----------------|
 | [`./tools/deploy.sh`](tools/deploy.sh) | **Claude Code** | Copies `squads/<squad>/skills/` → `~/.claude/skills/`, `agents/` → `~/.claude/agents/`, `hooks/*.py` → `~/.claude/hooks/`. Hooks are **wired in Skill/Subagent frontmatter** (orchestrator gets full PreToolUse + Stop; each subagent gets its Stop hook). |
 | [`./tools/deploy-cursor.sh`](tools/deploy-cursor.sh) | **Cursor** | Exports every `skill.md` / `agents/*.md` to `~/.cursor/skills/<role>/SKILL.md` (via [`tools/cursor_export_skill.py`](tools/cursor_export_skill.py)), **always** syncs `squads/sdd/hooks/*.py` → `~/.cursor/hooks/ai-squad/`, then **merges** [`squads/sdd/hooks/cursor-hooks.json`](squads/sdd/hooks/cursor-hooks.json) into `~/.cursor/hooks.json` (backup + dedupe by `command`). Does **not** touch `~/.claude/`. |
+| [`./tools/deploy-kiro.sh`](tools/deploy-kiro.sh) | **Kiro** | Converts every `skill.md` and `agents/*.md` → `~/.kiro/agents/<name>.json` (Kiro Custom Agent format, via [`tools/kiro_convert_agent.py`](tools/kiro_convert_agent.py)), syncs `hooks/*.py` → `~/.kiro/hooks/`. Skills become Custom Agents because Kiro's native Skills primitive can't carry hooks. Does **not** touch `~/.claude/`, `~/.cursor/`, or `~/.kiro/skills/`. |
 
 ```bash
 git clone https://github.com/<your-handle>/ai-squad.git
@@ -75,17 +76,54 @@ cd ai-squad
 # Cursor — Skills picker + global hooks.json (see Cursor subsection below)
 ./tools/deploy-cursor.sh
 # or: ./tools/deploy-cursor.sh sdd discovery
+
+# Kiro — Custom Agents + per-agent hooks (see Kiro subsection below)
+./tools/deploy-kiro.sh
+# or: ./tools/deploy-kiro.sh sdd
+# or: ./tools/deploy-kiro.sh sdd discovery
 ```
 
 **Claude Code after `deploy.sh`:** run `/spec-writer`, `/discovery-lead`, etc. in any project — components live in `~/.claude/`.
 
 **Cursor after `deploy-cursor.sh`:**
 
-- Open **Skills** and pick `spec-writer`, `orchestrator`, `dev`, … — there are **no** `/slash` commands; body of each workflow is the same repo, frontmatter is stripped/adapted.
+- Invoke the same workflows as in Claude Code with **`/spec-writer`**, **`/discovery-lead`**, **`/orchestrator`**, etc. (slash + skill name), **`@skill`**, or the **Skills** picker — see [Cursor Skills](https://cursor.com/docs/agent/chat/commands). Exported `SKILL.md` strips Claude-only frontmatter; the body matches the repo.
 - **Hooks:** same Python sources as Claude; Cursor merge lists **only** hooks that are safe **globally** (`block-git-write`, `verify-audit-dispatch`, `verify-output-packet`). **`guard-session-scope`** is **not** merged (would block every `Write`, including `dev`). See [`squads/sdd/hooks/README.md`](squads/sdd/hooks/README.md).
 - Env: `SKIP_CURSOR_HOOK_MERGE=1` skips merging `~/.cursor/hooks.json`. `CURSOR_SKILLS_DST` / `CURSOR_HOOKS_DST` override install paths. Manual merge: `python3 tools/merge_ai_squad_cursor_hooks.py`.
 
 Cursor also supports loading **Claude-format** hook configs from `~/.claude/settings.json` when **Third-party skills** is enabled — that path is optional and separate from `deploy-cursor.sh`; see [Cursor third-party hooks](https://cursor.com/docs/reference/third-party-hooks).
+
+**Kiro after `deploy-kiro.sh`:**
+
+- Launch any ai-squad agent with `kiro-cli --agent <name>` (e.g. `kiro-cli --agent spec-writer`, `kiro-cli --agent orchestrator`, `kiro-cli --agent discovery-lead`). Inside an existing chat session, run `/agent` to open the picker and switch.
+- **Tools:** the converter emits Kiro's canonical names (`read`, `write`, `shell`, `grep`, `glob`); legacy aliases like `fs_read` / `fs_write` / `execute_bash` are still accepted by Kiro CLI. `WebSearch` / `WebFetch` have no built-in equivalent — install an MCP server that provides them and reference via `@<server>/<tool>`.
+- **Hooks:** same Python sources as Claude Code — `hook_runtime.py` already handles Kiro's `cwd` payload (no `CLAUDE_PROJECT_DIR` needed). All four hooks (`block-git-write`, `verify-audit-dispatch`, `verify-output-packet`, `guard-session-scope`) are wired **per-agent** inside each `.json` (not globally), so `guard-session-scope` is safe — it only fires for the orchestrator agent.
+- **Models:** `sonnet`/`opus` agents map to `auto` (Kiro picks per task); `haiku` agents map to `claude-haiku-4.5`. Both are official Kiro `model_id`s (verified via `kiro-cli chat --list-models`). Edit the `MODEL_MAP` constant in [`tools/kiro_convert_agent.py`](tools/kiro_convert_agent.py) to pin specific versions when needed.
+- **Skills primitive:** ai-squad does **not** install into `~/.kiro/skills/`. Kiro's native Skills are context resources without hook support, while ai-squad entry-points need hooks — so they map to Kiro Custom Agents instead. Your own `~/.kiro/skills/` content is untouched.
+- Env: `KIRO_AGENTS_DST` / `KIRO_HOOKS_DST` override install paths.
+
+### Host compatibility
+
+Claude Code is the **source of truth**. Cursor and Kiro are translations via dedicated deploy scripts, with known trade-offs per host. Choose based on which guarantees you need.
+
+| Capability | Claude Code | Cursor | Kiro CLI/IDE |
+|---|---|---|---|
+| **Skill invocation** | `/spec-writer`, `/discovery-lead`, … | `/<name>`, `@<name>`, picker | `kiro-cli --agent <name>` (shell), `/agent` picker (in-chat) |
+| **Subagent dispatch** | `Task` tool, parallel fan-out | sequential (depends on build) | `delegate` tool, parallel |
+| **Hook scope** | per-Skill / per-Subagent (frontmatter) | global merge into `~/.cursor/hooks.json` | per-agent inside each `.json` |
+| **`block-git-write`** | ✅ orchestrator only | ✅ global | ✅ orchestrator only |
+| **`verify-audit-dispatch`** | ✅ orchestrator only | ✅ global (skip-if-no-Phase-4) | ✅ orchestrator only |
+| **`verify-output-packet`** | ✅ each Subagent | ✅ global | ✅ each agent |
+| **`guard-session-scope`** | ✅ orchestrator only | ❌ **omitted** (would block `dev`) | ✅ orchestrator only |
+| **`AskUserQuestion` tool** | native | numbered options / Yes-No in chat | native |
+| **`bypassPermissions`** | native frontmatter | use `--trust-all-tools` | `allowedTools: ["*"]` |
+| **`WebSearch` / `WebFetch`** | native | native | requires MCP server (`@<server>/<tool>`) |
+| **Model aliases** | `sonnet` / `opus` / `haiku` | inherited from Cursor | `auto` / `claude-sonnet-4.5` / `claude-haiku-4.5` |
+
+**Functional coverage**: Claude Code 100% · Cursor ~90% · Kiro ~95%
+**Mechanical coverage (hooks)**: Claude Code 4/4 · Cursor 3/4 · Kiro 4/4
+
+> Kiro's per-agent hook model lets `guard-session-scope` fire only for the orchestrator, closing the gap that forced Cursor to omit it globally. If you need full mechanical enforcement outside Claude Code, prefer Kiro.
 
 ## Pick the right squad
 
@@ -102,7 +140,13 @@ Cursor also supports loading **Claude-format** hook configs from `~/.claude/sett
 
 ## How each squad works
 
-Each squad has one slash command per Phase. You run them in order; each Skill tells you what to type next.
+Each squad has one entry point per Phase. Invocation differs per host — same skill body, same artifacts:
+
+- **Claude Code**: `/spec-writer`, `/discovery-lead`, …
+- **Cursor**: `/<name>`, `@<name>`, or the Skills picker
+- **Kiro**: `kiro-cli --agent <name>` from the shell, or `/agent` picker inside chat
+
+Then follow the skill steps in order.
 
 ### 🎯 Discovery — when you don't yet know if/what to build
 
@@ -305,8 +349,8 @@ squads/
 shared/                    Cross-squad assets (concepts, schemas, glossary, packets, session)
 examples/                  Worked examples (one per squad)
 docs/                      Inspirations, operational model
-scripts/                   smoke-walkthrough.sh
-tools/                     deploy.sh, deploy-cursor.sh, merge_ai_squad_cursor_hooks.py, cursor_export_skill.py
+scripts/                   smoke-walkthrough.sh, smoke-cursor-export.sh, smoke-kiro-export.sh
+tools/                     deploy.sh, deploy-cursor.sh, deploy-kiro.sh, merge_ai_squad_cursor_hooks.py, cursor_export_skill.py, kiro_convert_agent.py
 ```
 
 </details>
@@ -321,7 +365,7 @@ tools/                     deploy.sh, deploy-cursor.sh, merge_ai_squad_cursor_ho
 
 ## Contributing
 
-PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` should still PASS, `./scripts/smoke-cursor-export.sh` should PASS, and `./tools/deploy.sh` should report no length-budget warnings.
+PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` should still PASS, `./scripts/smoke-cursor-export.sh` should PASS, `./scripts/smoke-kiro-export.sh` should PASS, and `./tools/deploy.sh` should report no length-budget warnings.
 
 ---
 
