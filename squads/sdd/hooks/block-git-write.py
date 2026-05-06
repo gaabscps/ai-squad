@@ -14,6 +14,13 @@ Pure stdlib. Python 3.8+.
 import json
 import re
 import sys
+from pathlib import Path
+
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+from hook_runtime import shell_command, tool_input_dict
 
 GIT_WRITE_VERBS = {
     "add", "rm", "mv",
@@ -74,8 +81,8 @@ def main() -> int:
         print(f"block-git-write: malformed stdin ({exc})", file=sys.stderr)
         return 0
 
-    tool_input = payload.get("tool_input", {}) or {}
-    cmd = tool_input.get("command", "")
+    tool_input = tool_input_dict(payload)
+    cmd = shell_command(tool_input)
     if not cmd:
         return 0
 

@@ -1,6 +1,6 @@
 # ai-squad
 
-![version](https://img.shields.io/badge/version-v0.1-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange)
+![version](https://img.shields.io/badge/version-v0.2-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange)
 
 > An opinionated multi-squad pipeline for [Claude Code](https://claude.com/claude-code).
 >
@@ -54,19 +54,38 @@ ai-squad gives you both layers:
 🎯 **Discovery** — turn a fuzzy opportunity into a structured decision (build it / kill it / pivot / defer).
 🚢 **SDD** — turn a clear pitch into shipped code, with explicit gates and autonomous quality checks.
 
-## Install
+## Install (deployment)
 
-**Requirements:** Claude Code + Python 3.8+ on `PATH` (used by hook scripts that enforce pipeline integrity).
+**Requirements:** Python 3.8+ on `PATH` (hook scripts). You use **either** [Claude Code](https://claude.com/claude-code) **or** [Cursor](https://cursor.com) (IDE / CLI) as the agent host — or both on the same machine (they install to different directories).
+
+| Script | Host | What it does |
+|--------|------|----------------|
+| [`./tools/deploy.sh`](tools/deploy.sh) | **Claude Code** | Copies `squads/<squad>/skills/` → `~/.claude/skills/`, `agents/` → `~/.claude/agents/`, `hooks/*.py` → `~/.claude/hooks/`. Hooks are **wired in Skill/Subagent frontmatter** (orchestrator gets full PreToolUse + Stop; each subagent gets its Stop hook). |
+| [`./tools/deploy-cursor.sh`](tools/deploy-cursor.sh) | **Cursor** | Exports every `skill.md` / `agents/*.md` to `~/.cursor/skills/<role>/SKILL.md` (via [`tools/cursor_export_skill.py`](tools/cursor_export_skill.py)), **always** syncs `squads/sdd/hooks/*.py` → `~/.cursor/hooks/ai-squad/`, then **merges** [`squads/sdd/hooks/cursor-hooks.json`](squads/sdd/hooks/cursor-hooks.json) into `~/.cursor/hooks.json` (backup + dedupe by `command`). Does **not** touch `~/.claude/`. |
 
 ```bash
 git clone https://github.com/<your-handle>/ai-squad.git
 cd ai-squad
+
+# Claude Code — slash commands + subagents + per-component hooks
 ./tools/deploy.sh                    # all squads (default)
-# or: ./tools/deploy.sh sdd          # SDD only
-# or: ./tools/deploy.sh discovery    # Discovery only
+# or: ./tools/deploy.sh sdd
+# or: ./tools/deploy.sh discovery
+
+# Cursor — Skills picker + global hooks.json (see Cursor subsection below)
+./tools/deploy-cursor.sh
+# or: ./tools/deploy-cursor.sh sdd discovery
 ```
 
-That's it — the slash commands are now available in every Claude Code session, in any project. Skills, Subagents, and enforcement hooks all install globally to `~/.claude/`.
+**Claude Code after `deploy.sh`:** run `/spec-writer`, `/discovery-lead`, etc. in any project — components live in `~/.claude/`.
+
+**Cursor after `deploy-cursor.sh`:**
+
+- Open **Skills** and pick `spec-writer`, `orchestrator`, `dev`, … — there are **no** `/slash` commands; body of each workflow is the same repo, frontmatter is stripped/adapted.
+- **Hooks:** same Python sources as Claude; Cursor merge lists **only** hooks that are safe **globally** (`block-git-write`, `verify-audit-dispatch`, `verify-output-packet`). **`guard-session-scope`** is **not** merged (would block every `Write`, including `dev`). See [`squads/sdd/hooks/README.md`](squads/sdd/hooks/README.md).
+- Env: `SKIP_CURSOR_HOOK_MERGE=1` skips merging `~/.cursor/hooks.json`. `CURSOR_SKILLS_DST` / `CURSOR_HOOKS_DST` override install paths. Manual merge: `python3 tools/merge_ai_squad_cursor_hooks.py`.
+
+Cursor also supports loading **Claude-format** hook configs from `~/.claude/settings.json` when **Third-party skills** is enabled — that path is optional and separate from `deploy-cursor.sh`; see [Cursor third-party hooks](https://cursor.com/docs/reference/third-party-hooks).
 
 ## Pick the right squad
 
@@ -287,7 +306,7 @@ shared/                    Cross-squad assets (concepts, schemas, glossary, pack
 examples/                  Worked examples (one per squad)
 docs/                      Inspirations, operational model
 scripts/                   smoke-walkthrough.sh
-tools/                     deploy.sh
+tools/                     deploy.sh, deploy-cursor.sh, merge_ai_squad_cursor_hooks.py, cursor_export_skill.py
 ```
 
 </details>
@@ -302,7 +321,7 @@ tools/                     deploy.sh
 
 ## Contributing
 
-PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` should still PASS, and `./tools/deploy.sh` should report no length-budget warnings.
+PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` should still PASS, `./scripts/smoke-cursor-export.sh` should PASS, and `./tools/deploy.sh` should report no length-budget warnings.
 
 ---
 

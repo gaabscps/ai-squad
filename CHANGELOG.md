@@ -6,8 +6,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.2.0 — 2026-05-06
+
 ### Added
 
+- **Cursor orchestrator export** — `tools/cursor_export_skill.py` appends a Cursor-only hard-rules callout when `name` is `orchestrator` (no change to `squads/` skill source read by Claude).
+- **Cursor deploy path** — `./tools/deploy-cursor.sh` exports skills, always syncs `squads/sdd/hooks/*.py` to `~/.cursor/hooks/ai-squad/`, and merges `squads/sdd/hooks/cursor-hooks.json` into `~/.cursor/hooks.json` (see `tools/merge_ai_squad_cursor_hooks.py`). Optional `SKIP_CURSOR_HOOK_MERGE`.
+- **Dual-runtime hooks** — new [`hook_runtime.py`](squads/sdd/hooks/hook_runtime.py); all enforcement scripts resolve project root from `CLAUDE_PROJECT_DIR` or Cursor stdin (`workspace_roots` / `cwd`). `verify-audit-dispatch` skips when `session.yml` shows no Phase 4–style activity (safer global `stop` in Cursor). **`guard-session-scope`** is not merged into Cursor's `hooks.json` (would block `dev`); same Python source, Claude-only wiring via Skill frontmatter.
 - **`audit-agent` Subagent** (haiku, read-only with Bash for git inspection, singleton) — last gate before pipeline handoff. Reconciles dispatch manifest vs. actual outputs to detect orchestrator-bypass (issue #1). 6 mechanical checks: manifest completeness, dispatch-to-output 1:1, role/task_id consistency, pipeline-stage coverage, AC closure, source-file ownership. Pattern lineage: GitHub required status checks + Verifiability-First Audit Agents (arXiv 2512.17259) + transactional Outbox.
 - **Dispatch manifest** at `.agent-session/<task_id>/dispatch-manifest.json` — orchestrator declares expected pipeline before any Task dispatch and appends to `actual_dispatches[]` after each. Mechanical audit trail (JSON for stdlib parseability by hooks).
 - **Audit-failure handoff** shape — fourth handoff variant emitted when audit-agent flags bypass; refuses normal handoff and surfaces findings.

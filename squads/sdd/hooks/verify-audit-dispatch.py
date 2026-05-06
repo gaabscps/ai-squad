@@ -15,9 +15,14 @@ Honors `stop_hook_active` to avoid infinite blocking loops.
 Pure stdlib. Python 3.8+.
 """
 import json
-import os
 import sys
 from pathlib import Path
+
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+from hook_runtime import resolve_project_root, should_run_audit_manifest_verify
 
 
 def find_active_session(project_dir: Path) -> Path | None:
@@ -77,7 +82,7 @@ def main() -> int:
         # We're already inside a stop-block loop; let it through to avoid infinite recursion.
         return 0
 
-    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
+    project_dir = resolve_project_root(payload)
     session_dir = find_active_session(project_dir)
     if session_dir is None:
         return 0  # no Phase 4 session active; nothing to verify
@@ -85,6 +90,10 @@ def main() -> int:
     manifest_path = session_dir / "dispatch-manifest.json"
     if not manifest_path.exists():
         return 0  # Phase 4 didn't run; orchestrator session was a no-op or different mode
+
+    if not should_run_audit_manifest_verify(session_dir):
+        # Stale .agent-session while chatting about something else — do not block stop.
+        return 0
 
     ok, reason = audit_passed(manifest_path)
     if ok:

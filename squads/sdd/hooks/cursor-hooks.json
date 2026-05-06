@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "python3 ./hooks/ai-squad/block-git-write.py",
+        "matcher": "Shell",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "python3 ./hooks/ai-squad/verify-audit-dispatch.py",
+        "timeout": 5,
+        "loop_limit": 5
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "python3 ./hooks/ai-squad/verify-output-packet.py",
+        "timeout": 5,
+        "loop_limit": 5
+      }
+    ]
+  }
+}

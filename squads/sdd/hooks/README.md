@@ -16,14 +16,30 @@ Hooks declared in a component's own frontmatter (Skill or Subagent) DO fire
 during that component's lifecycle. ai-squad's enforcement therefore lives
 in the markdown components, exactly where the rules are.
 
-## The 4 scripts
+## The hook scripts
 
 | Script | Wired to | Event | What it enforces |
 |--------|----------|-------|------------------|
+| [`hook_runtime.py`](hook_runtime.py) | *(library)* | — | Shared `resolve_project_root()` (Claude `CLAUDE_PROJECT_DIR` vs Cursor `workspace_roots` / `cwd`), helpers, `should_run_audit_manifest_verify()` for global `stop` hooks. |
 | [`guard-session-scope.py`](guard-session-scope.py) | `skills/orchestrator` | `PreToolUse` (Edit\|Write\|MultiEdit) | Orchestrator can edit only inside `.agent-session/<task_id>/`. Any source-tree edit is denied. |
 | [`block-git-write.py`](block-git-write.py) | `skills/orchestrator` | `PreToolUse` (Bash) | Orchestrator cannot run git write commands (commit, add, reset, push, branch -d, etc.). Read-only commands (status, diff, log) are allowed. |
 | [`verify-audit-dispatch.py`](verify-audit-dispatch.py) | `skills/orchestrator` | `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json`'s `actual_dispatches[]` with `status: done`. |
 | [`verify-output-packet.py`](verify-output-packet.py) | every Phase 4 Subagent (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) | `Stop` (auto-becomes `SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json` (parsed dispatch_id from its prompt). Validates required fields + status enum. |
+
+## Cursor / Cursor CLI (same scripts, native `hooks.json`)
+
+[`./tools/deploy-cursor.sh`](../../../tools/deploy-cursor.sh) syncs these `.py` files to `~/.cursor/hooks/ai-squad/` and merges [`cursor-hooks.json`](cursor-hooks.json) into `~/.cursor/hooks.json`. Cursor's runtime accepts the **same stdout JSON** as Claude Code ([compatibility](https://cursor.com/docs/reference/third-party-hooks)).
+
+Shared logic lives in **[`hook_runtime.py`](hook_runtime.py)** (`resolve_project_root`, etc.): the hook reads `CLAUDE_PROJECT_DIR` **or** Cursor’s `workspace_roots` / `cwd` from stdin so path checks resolve to the consumer project.
+
+| Script | In `cursor-hooks.json` | Notes |
+|--------|------------------------|--------|
+| `block-git-write.py` | yes (`preToolUse` / Shell) | Safe globally — blocks git writes for orchestrator **and** dev (human commits after handoff). |
+| `verify-audit-dispatch.py` | yes (`stop`) | Skips verification unless `dispatch-manifest.json` exists **and** `session.yml` shows Phase 4–style state (avoids blocking unrelated chats). |
+| `verify-output-packet.py` | yes (`subagentStop`) | Same as Claude. |
+| `guard-session-scope.py` | **no** | Would deny every `Write` outside `.agent-session/`, including **`dev`** editing source. Keep this hook on **Claude Code** only (orchestrator Skill frontmatter / Third-party Claude config). |
+
+To merge hooks manually: `python3 tools/merge_ai_squad_cursor_hooks.py`. Use `SKIP_CURSOR_HOOK_MERGE=1` with `deploy-cursor.sh` to skip merging.
 
 ## Deployment
 
@@ -43,7 +59,7 @@ declarations live in component frontmatter.
 ## Requirements
 
 - Python 3.8 or newer (universal: macOS ≥10.15, all current Linux distros, Windows with `py -3`).
-- No third-party dependencies. Stdlib only (`json`, `os`, `pathlib`, `re`, `sys`).
+- No third-party dependencies. Stdlib only (`json`, `os`, `pathlib`, `re`, `sys`). Hook scripts import [`hook_runtime.py`](hook_runtime.py) from the same directory (`sys.path` bootstrap in each script).
 - Each script has a `timeout: 5` second budget — enforcement runs are fast (file read + JSON parse).
 
 ## Failure semantics
@@ -69,6 +85,10 @@ echo '{"tool_input":{"command":"git commit -m foo"}}' | \
 
 # Should ALLOW
 echo '{"tool_input":{"command":"git status"}}' | \
+  python3 squads/sdd/hooks/block-git-write.py
+
+# Cursor-style stdin (project root from workspace_roots)
+echo '{"tool_input":{"command":"git status"},"workspace_roots":["'$PWD'"]}' | \
   python3 squads/sdd/hooks/block-git-write.py
 ```
 

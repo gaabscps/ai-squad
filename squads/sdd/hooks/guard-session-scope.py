@@ -12,9 +12,14 @@ flow through `dev` Subagent dispatches only.
 Pure stdlib. Python 3.8+.
 """
 import json
-import os
 import sys
 from pathlib import Path
+
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+from hook_runtime import edit_target_path, resolve_project_root, tool_input_dict
 
 
 def main() -> int:
@@ -25,14 +30,14 @@ def main() -> int:
         print(f"guard-session-scope: malformed stdin ({exc})", file=sys.stderr)
         return 0
 
-    tool_input = payload.get("tool_input", {}) or {}
-    file_path = tool_input.get("file_path") or tool_input.get("path") or ""
+    tool_input = tool_input_dict(payload)
+    file_path = edit_target_path(tool_input)
 
     if not file_path:
         # No path field — let the call through; not our concern.
         return 0
 
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+    project_dir = resolve_project_root(payload)
     try:
         abs_path = Path(file_path).resolve()
         project_root = Path(project_dir).resolve()

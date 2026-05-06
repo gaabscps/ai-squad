@@ -15,10 +15,15 @@ per declared dispatch) mechanically reliable.
 Pure stdlib. Python 3.8+.
 """
 import json
-import os
 import re
 import sys
 from pathlib import Path
+
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+from hook_runtime import resolve_project_root
 
 REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "evidence"}
 VALID_STATUSES = {"done", "needs_review", "blocked", "escalate"}
@@ -92,7 +97,7 @@ def main() -> int:
         # (e.g., user-triggered direct call). Don't block.
         return 0
 
-    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
+    project_dir = resolve_project_root(payload)
     session_dir = find_active_session(project_dir)
     if session_dir is None:
         return 0
