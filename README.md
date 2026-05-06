@@ -1,6 +1,6 @@
 # ai-squad
 
-![version](https://img.shields.io/badge/version-v0.2-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
+![version](https://img.shields.io/badge/version-v0.3-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
 
 > An opinionated multi-squad pipeline built for [Claude Code](https://claude.com/claude-code) — and portable to [Cursor](https://cursor.com) and [Kiro](https://kiro.dev) via dedicated deploy scripts.
 >

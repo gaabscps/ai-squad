@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.3.0 — 2026-05-06
+
 ### Added
 
 - **Kiro deploy path** — `./tools/deploy-kiro.sh` converts every ai-squad skill (`squads/<squad>/skills/*/skill.md`) and subagent (`squads/<squad>/agents/*.md`) to a Kiro Custom Agent at `~/.kiro/agents/<name>.json` (via [`tools/kiro_convert_agent.py`](tools/kiro_convert_agent.py)) and syncs `hooks/*.py` to `~/.kiro/hooks/`. Hooks are wired per-agent inside each agent JSON (`preToolUse[]` + `stop[]`), mirroring the per-Skill/Subagent wiring used in Claude Code — so `guard-session-scope` only fires for the orchestrator. Does not touch `~/.claude/`, `~/.cursor/`, or `~/.kiro/skills/` (Kiro's native Skills primitive is left untouched because it can't carry hooks).
