@@ -11,6 +11,8 @@
  * it is regenerated on every publish. The directory is gitignored.
  */
 import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
+
+const PYCACHE_FILTER = (src) => !src.includes('__pycache__') && !src.endsWith('.pyc');
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,7 +50,7 @@ async function syncSquad(squad) {
     if (!(await exists(src))) continue;
     const dst = join(dstRoot, sub);
     await rm(dst, { recursive: true, force: true });
-    await cp(src, dst, { recursive: true });
+    await cp(src, dst, { recursive: true, filter: PYCACHE_FILTER });
     console.log(`  [sync] ${squad}/${sub}`);
   }
 }
