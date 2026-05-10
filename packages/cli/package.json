@@ -1,0 +1,42 @@
+{
+  "name": "@ai-squad/cli",
+  "version": "0.1.0",
+  "description": "ai-squad CLI — deploy SDD/Discovery squads (skills, agents, hooks) to Claude Code (~/.claude/) and Cursor.",
+  "keywords": [
+    "ai-squad",
+    "claude-code",
+    "agents",
+    "skills",
+    "subagents",
+    "hooks",
+    "sdd",
+    "discovery",
+    "spec-driven-development"
+  ],
+  "homepage": "https://github.com/gaabscps/ai-squad",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaabscps/ai-squad.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "author": "Gabriel Andrade",
+  "type": "module",
+  "bin": {
+    "ai-squad": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "components",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepack": "node scripts/sync-components.mjs",
+    "test": "node --test test/",
+    "sync": "node scripts/sync-components.mjs"
+  }
+}
