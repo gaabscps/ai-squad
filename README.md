@@ -1,6 +1,6 @@
 # ai-squad
 
-![version](https://img.shields.io/badge/version-v0.3-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
+![version](https://img.shields.io/badge/version-v0.4-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
 
 > An opinionated multi-squad pipeline built for [Claude Code](https://claude.com/claude-code) — and portable to [Cursor](https://cursor.com) and [Kiro](https://kiro.dev) via dedicated deploy scripts.
 >
@@ -54,9 +54,30 @@ ai-squad gives you both layers:
 🎯 **Discovery** — turn a fuzzy opportunity into a structured decision (build it / kill it / pivot / defer).
 🚢 **SDD** — turn a clear pitch into shipped code, with explicit gates and autonomous quality checks.
 
-## Install (deployment)
+## Install
 
-**Requirements:** Python 3.8+ on `PATH` (hook scripts). You use **either** [Claude Code](https://claude.com/claude-code), [Cursor](https://cursor.com), or [Kiro](https://kiro.dev) as the agent host — or any combination on the same machine (they install to different directories).
+**Requirements:** Node ≥ 18 (CLI), Python 3.8+ on `PATH` (hook scripts). You use **either** [Claude Code](https://claude.com/claude-code), [Cursor](https://cursor.com), or [Kiro](https://kiro.dev) as the agent host — or any combination on the same machine (they install to different directories).
+
+### npm (recommended)
+
+```bash
+npm i -g @ai-squad/cli @ai-squad/agentops
+
+ai-squad deploy                    # all squads → ~/.claude/   (Claude Code)
+# or: ai-squad deploy --squad sdd
+# or: ai-squad deploy --cursor     # also mirror hooks to ~/.cursor/
+```
+
+The `@ai-squad/cli` package bundles every squad (skills, agents, hooks) and installs them globally under `~/.claude/{skills,agents,hooks}/` — same layout as the legacy script, plus `chmod +x` on hook scripts. `@ai-squad/agentops` adds session-report observability:
+
+```bash
+# After running an SDD pipeline in any project
+npx @ai-squad/agentops report      # writes docs/agentops/index.html
+```
+
+### From source (contributors / Cursor / Kiro)
+
+The legacy bash deploy scripts remain the source-of-truth for Cursor and Kiro hosts (the npm CLI covers Claude Code today; Cursor mirror is also supported via `--cursor`).
 
 | Script | Host | What it does |
 |--------|------|----------------|
@@ -68,18 +89,12 @@ ai-squad gives you both layers:
 git clone https://github.com/<your-handle>/ai-squad.git
 cd ai-squad
 
-# Claude Code — slash commands + subagents + per-component hooks
-./tools/deploy.sh                    # all squads (default)
-# or: ./tools/deploy.sh sdd
-# or: ./tools/deploy.sh discovery
-
 # Cursor — Skills picker + global hooks.json (see Cursor subsection below)
 ./tools/deploy-cursor.sh
 # or: ./tools/deploy-cursor.sh sdd discovery
 
 # Kiro — Custom Agents + per-agent hooks (see Kiro subsection below)
 ./tools/deploy-kiro.sh
-# or: ./tools/deploy-kiro.sh sdd
 # or: ./tools/deploy-kiro.sh sdd discovery
 ```
 
@@ -344,11 +359,15 @@ squads/
     templates/             memo template
   sdd/                     🚢 SDD squad (Specify → Plan → Tasks → Implementation)
     skills/                4 conversational Skills
-    agents/                5 autonomous Subagents
+    agents/                6 autonomous Subagents (incl. audit-agent)
+    hooks/                 7 Python hooks (incl. stamp-session-id, capture-subagent-usage)
     templates/             spec / plan / tasks templates
+packages/                  npm-publishable packages
+  cli/                     @ai-squad/cli — `ai-squad deploy` CLI; bundles squads at publish
+  agentops/                @ai-squad/agentops — session reports (tokens, cost, AC closure, findings)
 shared/                    Cross-squad assets (concepts, schemas, glossary, packets, session)
 examples/                  Worked examples (one per squad)
-docs/                      Inspirations, operational model
+docs/                      Inspirations, operational model, design specs
 scripts/                   smoke-walkthrough.sh, smoke-cursor-export.sh, smoke-kiro-export.sh
 tools/                     deploy.sh, deploy-cursor.sh, deploy-kiro.sh, merge_ai_squad_cursor_hooks.py, cursor_export_skill.py, kiro_convert_agent.py
 ```
