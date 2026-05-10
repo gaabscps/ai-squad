@@ -1,6 +1,11 @@
 .DS_Store
 *.log
 .agent-session/
+!packages/agentops/__fixtures__/.agent-session/
+!packages/agentops/__fixtures__/.agent-session/**
+
+packages/agentops/dist/
+packages/agentops/*.tgz
 
 __pycache__/
 *.py[cod]

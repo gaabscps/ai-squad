@@ -15,11 +15,22 @@
         "loop_limit": 5
       }
     ],
+    "postToolUse": [
+      {
+        "command": "python3 ./hooks/ai-squad/stamp-session-id.py",
+        "matcher": "Write|Edit",
+        "timeout": 5
+      }
+    ],
     "subagentStop": [
       {
         "command": "python3 ./hooks/ai-squad/verify-output-packet.py",
         "timeout": 5,
         "loop_limit": 5
+      },
+      {
+        "command": "python3 ./hooks/ai-squad/capture-subagent-usage.py",
+        "timeout": 5
       }
     ]
   }

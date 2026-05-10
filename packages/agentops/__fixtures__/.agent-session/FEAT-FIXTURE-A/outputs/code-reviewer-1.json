@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "code-reviewer-1",
+  "task_id": "FEAT-FIXTURE-A",
+  "batch_id": "BATCH-A",
+  "role": "code-reviewer",
+  "status": "done",
+  "findings": [
+    {
+      "severity": "minor",
+      "file": "src/feature.ts",
+      "line": 1,
+      "issue": "cosmetic: missing trailing newline"
+    }
+  ],
+  "summary": "Code review complete. One minor cosmetic finding; no blockers. Dev can address in follow-up."
+}

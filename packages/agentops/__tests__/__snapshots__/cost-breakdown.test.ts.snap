@@ -1,0 +1,81 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderCostBreakdown — full data matches snapshot for full cost data 1`] = `
+"## Cost breakdown
+
+_70/30 input/output split assumed; harness reports only total_tokens; 1 of 2 dispatches included in cost_
+
+- Estimated cost USD total: $6.6000
+- Cost per AC: $3.3000
+- Cost per dispatch (avg): $6.6000
+- Coverage: 1 of 2 dispatches included in cost calculation"
+`;
+
+exports[`renderCostBreakdown — no data matches snapshot for no usage data 1`] = `
+"## Cost breakdown
+
+_no usage data available_
+
+- Total tokens: n/a
+- Estimated cost USD: n/a (no usage data with known model)
+- Cost per AC: n/a
+- Cost per dispatch (avg): n/a
+- Wall-clock duration: n/a
+- Tool uses: n/a"
+`;
+
+exports[`renderCostBreakdownFull — by phase subsection matches snapshot for "By phase" section 1`] = `
+"## Cost breakdown
+
+_test note_
+
+- Total tokens: 1000000
+  - Estimated input (70%): 700000
+  - Estimated output (30%): 300000
+- Estimated cost USD total: $6.6000
+- Cost per AC: $3.3000
+- Cost per dispatch (avg): $3.3000
+- Wall-clock duration: 1m
+- Tool uses total: 15
+- Coverage: 2 of 2 dispatches included in cost calculation
+
+### Cost by phase
+
+| Phase | Cost USD | % of total |
+|-------|----------|------------|
+| implementation | $4.5000 | 68.2% |
+| specify | $2.1000 | 31.8% |
+
+_Mixed sessions split via wall-clock proportional estimate_"
+`;
+
+exports[`renderCostBreakdownFull — full data matches snapshot for full data with dispatches 1`] = `
+"## Cost breakdown
+
+_70/30 input/output split assumed; harness reports only total_tokens; 1 of 2 dispatches included in cost_
+
+- Total tokens: 1000000
+  - Estimated input (70%): 700000
+  - Estimated output (30%): 300000
+- Estimated cost USD total: $6.6000
+- Cost per AC: $3.3000
+- Cost per dispatch (avg): $6.6000
+- Wall-clock duration: 1m
+- Tool uses total: 15
+- Coverage: 1 of 2 dispatches included in cost calculation"
+`;
+
+exports[`renderCostBreakdownFull — no data matches snapshot for no usage data with dispatches (no usage field) 1`] = `
+"## Cost breakdown
+
+_no usage data available_
+
+- Total tokens: n/a
+  - Estimated input (70%): n/a
+  - Estimated output (30%): n/a
+- Estimated cost USD: n/a
+- Cost per AC: n/a
+- Cost per dispatch (avg): n/a
+- Wall-clock duration: n/a
+- Tool uses total: n/a"
+`;

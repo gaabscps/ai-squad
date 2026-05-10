@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "dev-1",
+  "task_id": "FEAT-FIXTURE-A",
+  "batch_id": "BATCH-A",
+  "role": "dev",
+  "status": "done",
+  "usage": {
+    "total_tokens": 1000,
+    "input_tokens": 600,
+    "output_tokens": 400
+  },
+  "files_changed": [
+    "src/feature.ts"
+  ],
+  "ac_evidence": {
+    "AC-001": "Feature invocation returns valid response — verified by unit test",
+    "AC-002": "Input validation logic implemented in feature.ts:12",
+    "AC-003": "Output formatter implemented in feature.ts:45",
+    "AC-004": "Error handler wraps all async calls in feature.ts:67",
+    "AC-005": "Aggregation logic in feature.ts:89"
+  },
+  "summary_for_reviewers": "All 5 ACs implemented. Preflight passed: lint, format:check, typecheck, test all exit 0."
+}

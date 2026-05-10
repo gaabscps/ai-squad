@@ -1,0 +1,174 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderFlowReport — Fixture A (happy path) matches snapshot (timestamp masked) 1`] = `
+"# Test feature — FEAT-FIXTURE-A
+
+> Feature: Test feature
+> Task ID: FEAT-FIXTURE-A
+> Phase: implementation
+> Generated at: <MASKED>
+
+## Insights
+
+- ℹ Escalation rate 0.0% is below the Galileo healthy band (< 10%) — low escalation, agents resolving autonomously. _(Galileo healthy band)_
+- ℹ Dev task success rate 100.0% is at or above 80% — healthy first-try rate.
+
+## Cost breakdown
+
+_no usage data available — dispatch count fallback: 4 dispatches_
+
+- Total tokens: n/a
+  - Estimated input (70%): n/a
+  - Estimated output (30%): n/a
+- Estimated cost USD: n/a
+- Cost per AC: n/a
+- Cost per dispatch (avg): n/a
+- Wall-clock duration: n/a
+- Tool uses total: n/a
+- Coverage: 0 of 4 dispatches included in cost calculation
+
+## Repo health snapshot
+
+Repo health: not measured (run \`npm run mutation && npm run type-coverage && npm run arch:check\` first)
+
+## Phase durations
+
+| Phase | Duration |
+| --- | --- |
+| specify | 15 min |
+| plan | 10 min |
+| tasks | 5 min |
+| implementation | 120 min |
+
+## Dispatches
+
+| Role | Dispatches |
+| --- | --- |
+| audit-agent | 1 |
+| blocker-specialist | 0 |
+| code-reviewer | 1 |
+| dev | 1 |
+| logic-reviewer | 0 |
+| pm-orchestrator | 0 |
+| qa | 1 |
+| **Total** | 4 |
+
+## Task success rate
+
+| Role | Task success rate |
+| --- | --- |
+| audit-agent | 100.0% |
+| blocker-specialist | n/a |
+| code-reviewer | 100.0% |
+| dev | 100.0% |
+| logic-reviewer | n/a |
+| pm-orchestrator | n/a |
+| qa | 100.0% |
+
+## Loop rate
+
+Loop rate: 0.0%
+
+## Escalation rate
+
+Escalation rate: 0.0% — below healthy band (< 10%)
+
+## AC closure
+
+Total: 5 | Pass: 5 | Partial: 0 | Fail: 0 | Missing: 0
+
+## Reviewer findings density
+
+| Severity | Count |
+| --- | --- |
+| critical | 0 |
+| major | 0 |
+| minor | 1 |
+
+## Token cost
+
+Total tokens: 1000 | Tokens/AC: 200
+"
+`;
+
+exports[`renderFlowReport — Fixture B (spec-only) matches snapshot (timestamp masked) 1`] = `
+"# Test feature — FEAT-FIXTURE-B
+
+> Feature: Test feature
+> Task ID: FEAT-FIXTURE-B
+> Phase: implementation
+> Generated at: <MASKED>
+
+## Insights
+
+No insights triggered.
+
+## Cost breakdown
+
+_no usage data available — dispatch count fallback: 0 dispatches_
+
+- Total tokens: n/a
+  - Estimated input (70%): n/a
+  - Estimated output (30%): n/a
+- Estimated cost USD: n/a
+- Cost per AC: n/a
+- Cost per dispatch (avg): n/a
+- Wall-clock duration: n/a
+- Tool uses total: n/a
+- Coverage: 0 of 0 dispatches included in cost calculation
+
+## Repo health snapshot
+
+Repo health: not measured (run \`npm run mutation && npm run type-coverage && npm run arch:check\` first)
+
+## Phase durations
+
+| Phase | Duration |
+| --- | --- |
+| specify | running |
+| plan | — |
+| tasks | — |
+| implementation | — |
+
+## Dispatches
+
+| Role | Dispatches |
+| --- | --- |
+| audit-agent | 0 |
+| blocker-specialist | 0 |
+| code-reviewer | 0 |
+| dev | 0 |
+| logic-reviewer | 0 |
+| pm-orchestrator | 0 |
+| qa | 0 |
+| **Total** | 0 |
+
+## Task success rate
+
+| Role | Task success rate |
+| --- | --- |
+| audit-agent | n/a |
+| blocker-specialist | n/a |
+| code-reviewer | n/a |
+| dev | n/a |
+| logic-reviewer | n/a |
+| pm-orchestrator | n/a |
+| qa | n/a |
+
+## Loop rate
+
+Loop rate: 0.0%
+
+## Escalation rate
+
+Escalation rate: 0.0% — below healthy band (< 10%)
+
+## AC closure
+
+Total: 3 | Pass: 0 | Partial: 0 | Fail: 0 | Missing: 3
+
+## Token cost
+
+Token cost not available — using dispatch count as cost proxy: 0 dispatches
+"
+`;

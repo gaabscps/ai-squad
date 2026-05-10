@@ -79,9 +79,21 @@ After every `Task` tool dispatch, append to `actual_dispatches[]`:
   "started_at": "<iso8601>",
   "completed_at": "<iso8601>",
   "output_packet_ref": "outputs/<dispatch_id>.json",
-  "status": "<Output Packet status>"
+  "status": "<Output Packet status>",
+  "loop": 1,
+  "pm_note": null
 }
 ```
+
+Field rules:
+- `loop`: integer ≥ 1 — value of `task_states[T-XXX].loops` at the time of recording (loop 1 = first attempt, loop 2 = first retry, etc.).
+- `pm_note`: non-null string ONLY for notable events; `null` otherwise. Recognized notes:
+  - Loop restart: `"Loop N restart — reviewer findings: <one-line summary>"`
+  - QA fail loop: `"QA fail loop N — failed ACs: <AC-XXX, AC-YYY>"`
+  - Escalation: `"Escalated to blocker-specialist — <trigger kind>"`
+  - Progress stall: `"Progress stall detected (fingerprint match)"`
+
+The `usage` field on each entry is populated automatically by the `capture-subagent-usage.py` Stop hook — the orchestrator does NOT write it. The hook correlates via `_session_id` injected into the output packet by `stamp-session-id.py` (PostToolUse).
 
 Atomic write pattern (tmp + rename) on every append. Manifest is the **mechanical audit trail** the audit-agent reconciles in step 8.
 

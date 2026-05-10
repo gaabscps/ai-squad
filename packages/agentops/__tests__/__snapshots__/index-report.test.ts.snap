@@ -1,0 +1,54 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderIndexReport — 2 flows (A + B) matches snapshot (timestamp masked) 1`] = `
+"# AgentOps observability — overview
+
+> Generated at: <MASKED>
+
+## Cross-flow snapshot
+
+| ID | Compl. | Feature | Phase | Status | Dispatches | ACs | Disp/AC | Esc % | $ USD | $/AC | Created |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ✓ FEAT-FIXTURE-A | ✓ | Fixture A — happy path complete | done | done | 4 | 5 | 0.80 | 0.0% | — | — | 2026-05-01 |
+| … FEAT-FIXTURE-B | ✓ | Fixture B — spec-only, no dispatches | specify | specify-only | 0 | 3 | — | — | — | — | 2026-05-02 |
+
+## Trends
+
+- (need ≥ 2 completed flows for trend analysis)
+"
+`;
+
+exports[`renderIndexReport — 3 flows with 2 completed → trends matches snapshot (timestamp masked) 1`] = `
+"# AgentOps observability — overview
+
+> Generated at: <MASKED>
+
+## Cross-flow snapshot
+
+| ID | Compl. | Feature | Phase | Status | Dispatches | ACs | Disp/AC | Esc % | $ USD | $/AC | Created |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ✓ FEAT-FIXTURE-A | ✓ | Fixture A — happy path complete | done | done | 4 | 5 | 0.80 | 0.0% | — | — | 2026-05-01 |
+| ✓ FEAT-FIXTURE-A2 | ✓ | Fixture A2 | done | done | 4 | 5 | 0.60 | 0.0% | — | — | 2026-05-01 |
+| … FEAT-FIXTURE-B | ✓ | Fixture B — spec-only, no dispatches | specify | specify-only | 0 | 3 | — | — | — | — | 2026-05-02 |
+
+## Trends
+
+- Dispatches/AC: FEAT-FIXTURE-A=0.80 → FEAT-FIXTURE-A2=0.60 (-25.0%)
+- Dev task success rate: FEAT-FIXTURE-A=100.0% → FEAT-FIXTURE-A2=75.0% (-25.0%)
+"
+`;
+
+exports[`renderIndexReport — empty (no flows) matches snapshot (timestamp masked) 1`] = `
+"# AgentOps observability — overview
+
+> Generated at: <MASKED>
+
+## Cross-flow snapshot
+
+(no flows yet)
+
+## Trends
+
+- (need ≥ 2 completed flows for trend analysis)
+"
+`;

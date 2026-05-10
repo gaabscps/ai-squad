@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-FIXTURE-C",
+  "expected_pipeline": [
+    {
+      "batch_id": "BATCH-A",
+      "required_roles": ["dev",]
+    }
+  ]
+}

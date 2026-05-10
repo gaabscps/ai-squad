@@ -1,0 +1,37 @@
+task_id: "FEAT-FIXTURE-B"
+squad: "sdd"
+feature_name: "Fixture B — spec-only, no dispatches"
+schema_version: 1
+
+spec_ref: "./.agent-session/FEAT-FIXTURE-B/spec.md"
+
+started_at: "2026-05-02T10:00:00Z"
+last_activity_at: "2026-05-02T10:20:00Z"
+
+current_phase: "specify"
+current_owner: "orchestrator"
+
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
+
+budget_defaults:
+  review_loops_max: 3
+  qa_loops_max: 2
+  blocker_calls_max: 2
+
+escalation_metrics:
+  total_tasks: 0
+  done_tasks: 0
+  pending_human_tasks: 0
+  escalation_rate: 0
+
+phase_history:
+  - phase: "specify"
+    started_at: "2026-05-02T10:00:00Z"
+    completed_at: null
+    artifact_status: "in_progress"
+    skipped: false
+    skip_reason: ""

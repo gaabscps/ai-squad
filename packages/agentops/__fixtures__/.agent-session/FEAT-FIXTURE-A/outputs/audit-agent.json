@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "audit-agent",
+  "task_id": "FEAT-FIXTURE-A",
+  "batch_id": "BATCH-A",
+  "role": "audit-agent",
+  "status": "done",
+  "audit_summary": "FEAT-FIXTURE-A passes audit. All 5 ACs verified. No scope violations. No cross-feature imports. All files within size limits.",
+  "violations": []
+}

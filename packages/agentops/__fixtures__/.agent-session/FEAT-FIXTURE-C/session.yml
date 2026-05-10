@@ -1,0 +1,55 @@
+task_id: "FEAT-FIXTURE-C"
+squad: "sdd"
+feature_name: "Fixture C — corrupted manifest"
+schema_version: 1
+
+spec_ref: "./.agent-session/FEAT-FIXTURE-C/spec.md"
+
+started_at: "2026-05-03T08:00:00Z"
+last_activity_at: "2026-05-03T08:45:00Z"
+
+current_phase: "implementation"
+current_owner: "orchestrator"
+
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
+
+budget_defaults:
+  review_loops_max: 3
+  qa_loops_max: 2
+  blocker_calls_max: 2
+
+escalation_metrics:
+  total_tasks: 1
+  done_tasks: 0
+  pending_human_tasks: 1
+  escalation_rate: 0
+
+phase_history:
+  - phase: "specify"
+    started_at: "2026-05-03T08:00:00Z"
+    completed_at: "2026-05-03T08:15:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "plan"
+    started_at: "2026-05-03T08:15:00Z"
+    completed_at: "2026-05-03T08:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "tasks"
+    started_at: "2026-05-03T08:30:00Z"
+    completed_at: "2026-05-03T08:40:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "implementation"
+    started_at: "2026-05-03T08:40:00Z"
+    completed_at: null
+    artifact_status: "in_progress"
+    skipped: false
+    skip_reason: ""

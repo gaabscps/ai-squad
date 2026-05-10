@@ -25,6 +25,8 @@ in the markdown components, exactly where the rules are.
 | [`block-git-write.py`](block-git-write.py) | `skills/orchestrator` | `PreToolUse` (Bash) | Orchestrator cannot run git write commands (commit, add, reset, push, branch -d, etc.). Read-only commands (status, diff, log) are allowed. |
 | [`verify-audit-dispatch.py`](verify-audit-dispatch.py) | `skills/orchestrator` | `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json`'s `actual_dispatches[]` with `status: done`. |
 | [`verify-output-packet.py`](verify-output-packet.py) | every Phase 4 Subagent (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) | `Stop` (auto-becomes `SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json` (parsed dispatch_id from its prompt). Validates required fields + status enum. |
+| [`stamp-session-id.py`](stamp-session-id.py) | every Phase 4 Subagent | `PostToolUse` (Write\|Edit) | When the subagent writes its Output Packet (path matches `*/outputs/d-*.json`), injects `_session_id` into the JSON so the Stop hook can correlate the transcript exactly. Idempotent. |
+| [`capture-subagent-usage.py`](capture-subagent-usage.py) | every Phase 4 Subagent | `Stop` (auto-becomes `SubagentStop`) | Reads the subagent's transcript JSONL, sums per-turn token usage + `tool_use` counts, and writes the result into the matching `actual_dispatches[]` entry in `dispatch-manifest.json` (matched via `_session_id`). `flock` on manifest write. Powers the agentops tokens / cost / duration columns. |
 
 ## Cursor / Cursor CLI (same scripts, native `hooks.json`)
 

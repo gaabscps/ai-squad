@@ -1,0 +1,13 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderPerAcDetail — Fixture A matches snapshot 1`] = `
+"## Per-AC closure detail
+
+| AC ID | Status | Validator | Evidence |
+| --- | --- | --- | --- |
+| AC-001 | pass | qa | Unit test verifies valid response returned |
+| AC-002 | pass | qa | Input validation test passes with valid and invalid inputs |
+| AC-003 | pass | qa | Output format matches expected schema in snapshot test |
+| AC-004 | pass | qa | Error handler test: throws, catches, returns graceful fallback |
+| AC-005 | pass | qa | Aggregation test: 3 items correctly summed |"
+`;

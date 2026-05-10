@@ -1,0 +1,12 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderTimeline — Fixture A matches snapshot 1`] = `
+"## Timeline
+
+| Phase | Started | Completed | Duration | Visual |
+| --- | --- | --- | --- | --- |
+| specify | 09:00:00 | 09:15:00 | 15m | █░░░░░░░░░ |
+| plan | 09:15:00 | 09:25:00 | 10m | █░░░░░░░░░ |
+| tasks | 09:25:00 | 09:30:00 | 5m | ░░░░░░░░░░ |
+| implementation | 09:30:00 | 11:30:00 | 120m | ██████████ |"
+`;

@@ -1,0 +1,499 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderIndexHtml snapshot matches (update with npm test -- -u if HTML changes intentionally) 1`] = `
+"<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentOps · CalendárioFR</title>
+  <style>
+:root {
+  --bg: #fff;
+  --bg-muted: #f7f7f9;
+  --fg: #1a1a1a;
+  --fg-muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --status-pass: #16a34a;
+  --status-warn: #ca8a04;
+  --status-fail: #dc2626;
+  /* Semantic aliases for story-card fact-sheet (FEAT-005 T-012) */
+  --color-surface: var(--bg-muted);
+  --color-border: var(--border);
+  --color-text-primary: var(--fg);
+  --color-text-secondary: var(--fg-muted);
+  --color-text-tertiary: #9ca3af;
+  --color-warn: var(--status-warn);
+  --color-warn-bg: rgba(255, 200, 0, 0.08);
+  /* Spacing scale */
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  /* Radius scale */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  /* Typography scale */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --bg-muted: #161b22;
+    --fg: #c9d1d9;
+    --fg-muted: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --status-pass: #3fb950;
+    --status-warn: #d29922;
+    --status-fail: #f85149;
+    /* Semantic aliases (same var() refs, resolve to dark-mode primitives above) */
+    --color-surface: var(--bg-muted);
+    --color-border: var(--border);
+    --color-text-primary: var(--fg);
+    --color-text-secondary: var(--fg-muted);
+    --color-text-tertiary: #6b7280;
+    --color-warn: var(--status-warn);
+    --color-warn-bg: rgba(255, 200, 0, 0.14);
+    /* Scale tokens — same in both modes */
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --text-xs: 11px;
+    --text-sm: 13px;
+    --text-base: 1rem;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+h1, h2, h3, h4 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+th {
+  background: var(--bg-muted);
+  font-weight: 600;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--bg-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.kpi-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.kpi-bar h1 {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  margin: 0;
+}
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+.story {
+  margin-bottom: 2rem;
+}
+.story-card { padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--color-border); }
+.story-card header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.story-card header h3 { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.story-card header h3 .dot { color: var(--color-text-tertiary); margin: 0 0.4em; }
+
+.story-card__stats { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.story-card__stat { display: inline-flex; gap: 0.3em; align-items: baseline; }
+.story-card__stat-label { color: var(--color-text-tertiary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+.story-card__stat-value { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+
+.story-card__pipeline { display: inline-flex; flex-wrap: wrap; gap: 0.4em; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+.story-card__summary { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.45; }
+.story-card__summary--empty { color: var(--color-text-tertiary); font-style: italic; }
+
+.story-card__retry { padding: var(--space-2) var(--space-3); background: var(--color-warn-bg); border-left: 3px solid var(--color-warn); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-primary); }
+
+.story-card__drilldowns { display: flex; flex-direction: column; gap: var(--space-2); }
+.story-card__drilldowns details { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.story-card__drilldowns details > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-secondary); user-select: none; }
+.story-card__drilldowns details > summary:hover { color: var(--color-text-primary); }
+.story-card__drilldowns details[open] > summary { margin-bottom: var(--space-2); color: var(--color-text-primary); }
+.story-card__drilldowns table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.story-card__drilldowns th { text-align: left; color: var(--color-text-tertiary); font-weight: 500; padding: 0.25em 0.5em 0.25em 0; border-bottom: 1px solid var(--color-border); }
+.story-card__drilldowns td { padding: 0.25em 0.5em 0.25em 0; }
+.story-card__drilldowns ul { margin: 0; padding-left: var(--space-3); font-size: var(--text-xs); }
+.story-card__drilldowns ul li { margin-bottom: 0.3em; }
+.story-card__pmnote { margin: 0; font-size: var(--text-xs); white-space: pre-wrap; color: var(--color-text-secondary); }
+
+@media (max-width: 767px) {
+  .story-card__stats { font-size: var(--text-xs); }
+  .story-card header { flex-direction: column; align-items: flex-start; }
+}
+.kpi-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.cost-section {
+  margin: 0 0 2rem;
+  padding: 1.25rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cost-section > h2 {
+  margin: 0;
+}
+.cost-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.cost-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.cost-card .cost-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.cost-card .cost-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.cost-card small {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.cost-models {
+  margin-top: 0.5rem;
+  font-size: 12px;
+}
+.cost-models td,
+.cost-models th {
+  font-variant-numeric: tabular-nums;
+}
+.cost-breakdown {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0;
+}
+.cost-breakdown > summary {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  list-style: none;
+}
+.cost-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+.cost-breakdown > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--fg-muted);
+  transition: transform 0.15s;
+}
+.cost-breakdown[open] > summary::before {
+  transform: rotate(90deg);
+}
+.cost-breakdown > .cost-models {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+}
+.cost-note {
+  margin: 0.75rem 0 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cost-empty {
+  margin: 0;
+  color: var(--fg-muted);
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.flow-card {
+  display: block;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: var(--fg);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.flow-card:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.flow-card header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 0.5rem;
+}
+.trends {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  align-items: center;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.badge-pass {
+  background: var(--status-pass);
+  color: white;
+}
+.badge-warn {
+  background: var(--status-warn);
+  color: white;
+}
+.badge-fail {
+  background: var(--status-fail);
+  color: white;
+}
+.badge-neutral {
+  background: var(--border);
+  color: var(--fg);
+}
+.compliance-notice {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 4px solid var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 10%, transparent);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.compliance-notice strong {
+  font-weight: 600;
+}
+.compliance-notice code {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.compliance-pre-standard {
+  border-left-color: var(--border);
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+}
+details > summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+details > summary::before {
+  content: "▶";
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+details[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+details > *:not(summary) {
+  padding: 0.75rem;
+}
+.drilldown {
+  margin-bottom: 2rem;
+}
+.raw-data {
+  margin-bottom: 2rem;
+}
+.md-embed {
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.md-embed h1, .md-embed h2, .md-embed h3 {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+  margin: 1rem 0 0.5rem;
+}
+.md-embed table {
+  margin: 0.5rem 0;
+}
+.md-embed pre {
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.md-embed code {
+  background: none;
+  padding: 0;
+}
+.repo-health-current {
+  margin-bottom: 2rem;
+}
+.repo-health-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}</style>
+</head>
+<body>
+    <header>
+      <h1>AgentOps · CalendárioFR</h1>
+      <div class="kpis"><span>3 flows</span><span style="color:var(--fg-muted)">9/9 ACs</span><span style="color:var(--fg-muted)">17h</span></div>
+    </header>
+    <main>
+      <section class="repo-health-current">
+        <h2>Repo health (current)</h2>
+        <div class="badge-grid"><span class="badge badge-pass">mut 70.7%</span> <span class="badge badge-pass">type 97.8%</span> <span class="badge badge-pass">arch ✓</span></div>
+      </section>
+      <section>
+        <h2>Flows</h2>
+        <div class="flow-grid">
+          <a class="flow-card" href="./FEAT-003.html">
+  <header>
+    <span class="badge badge-pass">✓</span>
+    <h3>Quality telemetry</h3>
+  </header>
+  <div class="flow-meta">
+    <span>—</span>
+    <span>4/4 ACs</span>
+    <span>6h</span>
+  </div>
+  <div class="trends"><span>cost <svg width="60" height="20" viewBox="0 0 60 20" aria-label="trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="0.0,20.0 30.0,20.0 60.0,20.0"/></svg></span><span>mut <svg width="60" height="20" viewBox="0 0 60 20" aria-label="trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="0.0,20.0 30.0,20.0 60.0,20.0"/></svg></span></div>
+</a>
+<a class="flow-card" href="./FEAT-002.html">
+  <header>
+    <span class="badge badge-pass">✓</span>
+    <h3>AgentOps render</h3>
+  </header>
+  <div class="flow-meta">
+    <span>—</span>
+    <span>3/3 ACs</span>
+    <span>6h</span>
+  </div>
+  <div class="trends"><span>cost <svg width="60" height="20" viewBox="0 0 60 20" aria-label="trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="0.0,20.0 60.0,20.0"/></svg></span><span>mut <svg width="60" height="20" viewBox="0 0 60 20" aria-label="trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="0.0,20.0 60.0,20.0"/></svg></span></div>
+</a>
+<a class="flow-card" href="./FEAT-001.html">
+  <header>
+    <span class="badge badge-pass">✓</span>
+    <h3>Foundation</h3>
+  </header>
+  <div class="flow-meta">
+    <span>—</span>
+    <span>2/2 ACs</span>
+    <span>5h</span>
+  </div>
+</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>"
+`;

@@ -1,0 +1,19 @@
+{
+  "mutationScore": 75.5,
+  "files": {
+    "scripts/agentops/parse.ts": {
+      "mutants": [
+        { "id": "1", "status": "Killed" },
+        { "id": "2", "status": "Killed" },
+        { "id": "3", "status": "Survived" },
+        { "id": "4", "status": "Killed" }
+      ]
+    },
+    "scripts/agentops/enrich.ts": {
+      "mutants": [
+        { "id": "5", "status": "Killed" },
+        { "id": "6", "status": "NoCoverage" }
+      ]
+    }
+  }
+}

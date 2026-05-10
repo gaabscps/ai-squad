@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "qa-1",
+  "task_id": "FEAT-FIXTURE-A",
+  "batch_id": "BATCH-A",
+  "role": "qa",
+  "status": "done",
+  "ac_coverage": [
+    { "ac": "AC-001", "status": "pass", "evidence": "Unit test verifies valid response returned" },
+    { "ac": "AC-002", "status": "pass", "evidence": "Input validation test passes with valid and invalid inputs" },
+    { "ac": "AC-003", "status": "pass", "evidence": "Output format matches expected schema in snapshot test" },
+    { "ac": "AC-004", "status": "pass", "evidence": "Error handler test: throws, catches, returns graceful fallback" },
+    { "ac": "AC-005", "status": "pass", "evidence": "Aggregation test: 3 items correctly summed" }
+  ],
+  "summary": "QA complete. 5/5 ACs pass. No partial or fail findings."
+}

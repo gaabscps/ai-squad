@@ -1,0 +1,35 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renderRepoHealthSnapshot — full data matches snapshot 1`] = `
+"## Repo health snapshot
+
+_Measured at: 2026-05-08_
+
+| Métrica | Valor | Threshold | Status |
+| --- | --- | --- | --- |
+| Mutation score | 75.5% | ≥ 70% | ✓ |
+| Type coverage | 97.7% | ≥ 95% | ✓ |
+| \`any\` count | 23 | — | — |
+| Dep violations (error) | 0 | = 0 | ✓ |
+| Dep violations (warn) | 1 | — | — |"
+`;
+
+exports[`renderRepoHealthSnapshot — null (not measured) matches snapshot 1`] = `
+"## Repo health snapshot
+
+Repo health: not measured (run \`npm run mutation && npm run type-coverage && npm run arch:check\` first)"
+`;
+
+exports[`renderRepoHealthSnapshot — partial data matches snapshot when mutation is null 1`] = `
+"## Repo health snapshot
+
+_Measured at: 2026-05-08_
+
+| Métrica | Valor | Threshold | Status |
+| --- | --- | --- | --- |
+| Mutation score | — | ≥ 70% | — |
+| Type coverage | 97.7% | ≥ 95% | ✓ |
+| \`any\` count | 23 | — | — |
+| Dep violations (error) | 0 | = 0 | ✓ |
+| Dep violations (warn) | 1 | — | — |"
+`;
