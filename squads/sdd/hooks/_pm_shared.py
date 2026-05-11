@@ -33,6 +33,23 @@ _FALLBACK_EXCLUDES: tuple[str, ...] = (
     ".git",
 )
 
+# ---------------------------------------------------------------------------
+# Canonical exempt paths — files/directories whose content intentionally
+# contains debt-marker tokens as part of their specification or documentation.
+# These are skipped during debt-marker scanning to avoid self-referential
+# false positives (e.g. the hook script itself documenting the marker list).
+#
+# Values are relative path prefixes from the project root (as returned by
+# Path.relative_to(root)).  A file is exempt when its relative path starts
+# with any of these prefix strings.
+# ---------------------------------------------------------------------------
+_DEBT_MARKER_EXEMPT_PATHS: tuple[str, ...] = (
+    "squads/sdd/skills/pm/",
+    "squads/sdd/hooks/verify-pm-handoff-clean.py",
+    "squads/sdd/hooks/_pm_shared.py",
+    "shared/concepts/pm-bypass.md",
+)
+
 
 def enumerate_working_tree_files(root: Path) -> list[Path]:
     """Return all relevant source files under *root*.
@@ -80,15 +97,30 @@ def enumerate_working_tree_files(root: Path) -> list[Path]:
 
 
 def _is_excluded(p: Path, root: Path) -> bool:
-    """Return True if any component of *p* relative to *root* is an excluded name.
+    """Return True if *p* should be skipped — excluded prefix or outside root.
 
-    Checks ALL path components (not only the top-level one) so that nested
-    occurrences like ``packages/agentops/node_modules/`` are also excluded.
+    Two exclusion conditions:
+      1. Symlink resolves outside *root* — e.g. a symlink pointing to /etc.
+         Detected by resolving *p* and checking ``is_relative_to(root)``.
+         Paths outside the working tree are always skipped (AC-004).
+      2. Any component of *p* relative to *root* matches an excluded name
+         (e.g. ``node_modules``, ``.agent-session``).  Checked across ALL
+         path parts so nested occurrences like
+         ``packages/agentops/node_modules/`` are also caught.
     """
     try:
-        rel = p.relative_to(root)
+        resolved = p.resolve()
+        # Symlink (or any path) that resolves outside the working tree is skipped.
+        resolved.relative_to(root)
     except ValueError:
-        return False
+        # resolve() succeeded but the result is not under root → skip.
+        return True
+
+    try:
+        rel = resolved.relative_to(root)
+    except ValueError:
+        return True
+
     for part in rel.parts:
         if part in _FALLBACK_EXCLUDES:
             return True
@@ -124,9 +156,48 @@ def _rglob_files(root: Path) -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
+def _is_binary(file_path: Path) -> bool:
+    """Return True when *file_path* appears to be a binary file.
+
+    Reads the first 8 KB and checks for a null byte (``\\x00``).  Binary
+    files (images, PDFs, compiled artifacts) may contain the byte sequence
+    for ASCII "TODO"/"FIXME" coincidentally.  Skipping them avoids
+    false-positive debt-marker blocks (AC-001 binary false-positive fix).
+    """
+    _SNIFF_BYTES = 8192
+    try:
+        with file_path.open("rb") as fh:
+            chunk = fh.read(_SNIFF_BYTES)
+        return b"\x00" in chunk
+    except (OSError, IOError):
+        # Unreadable → not binary (caller handles OSError on the text open).
+        return False
+
+
+def _is_exempt(file_path: Path, root: Path) -> bool:
+    """Return True if *file_path* is one of the canonical exempt sources.
+
+    Exempt files contain debt-marker tokens intentionally (e.g. as spec
+    documentation).  Matching is done against ``_DEBT_MARKER_EXEMPT_PATHS``
+    prefix strings relative to *root*.
+
+    Both *file_path* and *root* are resolved before comparison to handle
+    macOS symlinked tmp directories (``/var → /private/var``).
+    """
+    try:
+        rel = str(file_path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return False
+    for prefix in _DEBT_MARKER_EXEMPT_PATHS:
+        if rel == prefix or rel.startswith(prefix):
+            return True
+    return False
+
+
 def grep_debt_markers(
     files: list[Path],
     patterns: list[str],
+    root: Path | None = None,
 ) -> list[dict]:
     """Scan *files* for debt markers matching any pattern in *patterns*.
 
@@ -134,6 +205,16 @@ def grep_debt_markers(
     memory-safe on large files.  Each pattern is compiled as a ``re.Pattern``
     with word-boundary anchors baked into the pattern string itself (callers
     are expected to pass patterns like ``r"\\b(TODO|FIXME|...)\\b"``).
+
+    Binary files are detected via null-byte sniff (first 8 KB) and skipped
+    to prevent false positives from binary payloads that happen to contain
+    debt-marker byte sequences.
+
+    When *root* is provided, files matching ``_DEBT_MARKER_EXEMPT_PATHS`` are
+    skipped (canonical sources that document the marker list itself).
+
+    Uses ``re.finditer`` so that a line with multiple distinct markers emits
+    one evidence entry per match (NFR-003: every match with file:line).
 
     Returns a list of dicts::
 
@@ -151,17 +232,32 @@ def grep_debt_markers(
     matches: list[dict] = []
 
     for file_path in files:
+        # Skip canonical exempt sources (dogfood invariant).
+        if root is not None and _is_exempt(file_path, root):
+            continue
+
+        # Skip binary files to avoid false positives from coincidental bytes.
+        if _is_binary(file_path):
+            continue
+
         try:
             with file_path.open("r", encoding="utf-8", errors="replace") as fh:
                 for lineno, raw_line in enumerate(fh, start=1):
                     stripped = raw_line.rstrip("\n").strip()
+                    seen_spans: list[tuple[int, int]] = []
                     for pat in compiled:
-                        m = pat.search(stripped)
-                        if m:
-                            # When the pattern uses multiple capture groups (e.g.
-                            # alternates for @skip and mock-only that can't use \b),
-                            # pick the first non-None group so we always get the
-                            # bare marker text (e.g. "@skip", not the full match).
+                        for m in pat.finditer(stripped):
+                            # Skip overlapping spans (two patterns matching the
+                            # same text range) to avoid duplicating a single hit.
+                            if any(
+                                m.start() < end and m.end() > start
+                                for start, end in seen_spans
+                            ):
+                                continue
+                            seen_spans.append((m.start(), m.end()))
+                            # Pick the first non-None capture group so we always
+                            # get the bare marker text (e.g. "@skip", not the
+                            # full match including lookaround context).
                             groups = [g for g in m.groups() if g is not None]
                             marker = groups[0] if groups else m.group(0)
                             matches.append(
@@ -172,7 +268,6 @@ def grep_debt_markers(
                                     "snippet": stripped,
                                 }
                             )
-                            break  # report each line once even if multiple patterns match
         except (OSError, IOError):
             # Missing or unreadable file — skip silently
             continue

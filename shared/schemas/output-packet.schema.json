@@ -102,9 +102,12 @@
               "orchestrator_edited_source",
               "pm_session_not_captured",
               "usage_not_captured",
-              "usage_capture_failed"
+              "usage_capture_failed",
+              "warnings_file_corrupt",
+              "pm_gate_violations",
+              "pm_cost_cap_exceeded"
             ],
-            "description": "audit-agent findings ONLY — reconciliation gap categories from the 9 canonical checks (see agents/audit-agent.md)"
+            "description": "audit-agent findings ONLY — reconciliation gap categories from the 11 canonical checks (see agents/audit-agent.md). PM-mode kinds (pm_gate_violations, pm_cost_cap_exceeded) emitted only when pm_sessions[] is populated."
           }
         }
       }

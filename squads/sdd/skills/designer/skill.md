@@ -56,8 +56,90 @@ For each `[NEEDS CLARIFICATION]` (cap of 3, same convention as spec-writer):
 
 ### 6. AC coverage gate (designer-specific hard gate)
 Before approval: every AC in the Spec MUST be covered by at least one Plan section (per inline tags + final matrix). If gaps exist:
-- Print the uncovered ACs.
-- Refuse to proceed to approval until the human either (a) adds a Plan decision that covers them, or (b) explicitly moves them to `## Decisions deferred to Implementation` with a one-line reason.
+
+**PM-mode branch (when `session.yml.auto_approved_by == "pm"`):** insert a `[NEEDS CLARIFICATION]` marker into `plan.md` (atomic tmp + rename) naming every uncovered AC before exiting this step. Example marker: `[NEEDS CLARIFICATION] AC coverage gap: AC-007, AC-012 not covered by any Plan decision. Add a decision or move to Decisions deferred to Implementation with a one-line reason.` Then proceed to Step 6.5 — the bypass step will detect the marker and refuse autonomous approval.
+
+**Interactive branch (normal run):** print the uncovered ACs. Refuse to proceed to approval until the human either (a) adds a Plan decision that covers them, or (b) explicitly moves them to `## Decisions deferred to Implementation` with a one-line reason.
+
+### 6.5. PM-mode approval gate check (bypass — runs before Step 7)
+
+> Canonical source of truth: `shared/concepts/pm-bypass.md` — the logic below is the verbatim insertion mandated for `designer`.
+
+```
+1. Read session.yml.auto_approved_by.
+2. IF auto_approved_by != "pm"  (strict equality, case-sensitive, must be string)
+      → Proceed to the normal interactive AskUserQuestion approval gate (Step 7). Stop here.
+
+3. Scan the artifact for any [NEEDS CLARIFICATION] markers.
+   IF one or more markers remain:
+      → REFUSE bypass. Do NOT approve.
+      → Attempt to append to session.yml.notes (atomic tmp + rename):
+           - kind: pm_escalation
+             timestamp: <ISO8601-now>
+             phase: "plan"
+             artifact_path: ".agent-session/<task_id>/plan.md"
+             open_questions: [<one entry per NEEDS CLARIFICATION block>]
+        If the append fails, retry exactly once. If the second attempt
+        also fails, raise (do NOT swallow the error silently) — the
+        PM persona must be informed that the escalation record could
+        not be persisted.
+      → Surface to PM persona: "Approval blocked — open questions must be resolved before autonomous approval."
+      → Exit the bypass step; leave artifact status unchanged.
+
+4. No markers remain. Approve the artifact in this exact order:
+
+   Ordering invariant: evidence MUST land in session.yml before the
+   artifact is marked approved. This ensures that if the artifact write
+   fails, the audit trail is still present and no ghost-approval exists.
+
+   a. Check for re-entry / partial-write repair:
+      - IF session.yml already contains phase_history.plan.approved_by == "pm"
+        AND plan.md frontmatter status == "approved":
+          REFUSE (raise). A phase that has already been PM-approved AND
+          whose artifact is already marked approved MUST NOT be re-approved
+          silently; the PM session should not re-run an already-approved phase.
+      - IF session.yml already contains phase_history.plan.approved_by == "pm"
+        AND plan.md frontmatter status != "approved":
+          Partial-write repair path. A previous run crashed after writing
+          session.yml (step 4.b) but before writing plan.md (step 4.c).
+          Do NOT raise. Skip step 4.b (session.yml already has the evidence).
+          Proceed directly to step 4.c to complete the idempotent artifact
+          write, then continue to step 4.d.
+      - IF session.yml does NOT contain phase_history.plan.approved_by:
+          Continue to step 4.b (normal path).
+
+   b. Perform a single atomic read-modify-write on session.yml (one
+      tmp + rename) that writes ALL of the following keys together:
+        - phase_history.plan.approved_by: "pm"
+        - notes: append the pm_decision entry below
+        - current_phase: advance to the next phase per planned_phases
+      If session.yml.notes is absent, initialize it as an empty list
+      before appending. This single atomic mutation guarantees that
+      phase_history, the pm_decision evidence, and current_phase are
+      always consistent — there is no partial-write window where one
+      exists without the other, which would trigger a false AC-017
+      audit violation.
+
+   c. Write status: approved to the artifact's frontmatter (plan.md).
+
+   d. Skip the AskUserQuestion approval gate entirely (do not execute Step 7).
+   e. Continue to the Handoff step.
+```
+
+**`pm_decision` entry shape** (appended to `session.yml.notes`):
+
+```yaml
+- kind: pm_decision
+  timestamp: "2026-05-11T05:42:00Z"   # ISO8601, UTC
+  phase: "plan"
+  artifact_path: ".agent-session/<task_id>/plan.md"
+  gate_applied: "auto_approved_by=pm"
+```
+
+**Phase-specific notes for designer:**
+- `[NEEDS CLARIFICATION]` marker ownership: designer MUST insert the marker into `plan.md` in Step 6 (AC coverage gate) — BEFORE reaching Step 6.5. The scan in step 3 above is the audit check — not the producer of the marker. AC coverage gaps are detected and marked in Step 6; the bypass step only verifies absence.
+- `phase` value in `pm_decision`: `"plan"`.
+- `artifact_path`: `.agent-session/<task_id>/plan.md`.
 
 ### 7. Final approval gate (Hybrid: checklist + AskUserQuestion — Kiro/Spec Kit pattern)
 1. Print visual checklist summary:

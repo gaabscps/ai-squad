@@ -26,7 +26,7 @@ The following pseudocode step is inserted into each Phase Skill's "Run procedure
       → REFUSE bypass. Do NOT approve.
       → Attempt to append to session.yml.notes (atomic tmp + rename):
            - kind: pm_escalation
-             timestamp: <ISO8601-now>
+             timestamp: "<ISO8601-now>"
              phase: <phase-name>
              artifact_path: <path-to-artifact>
              open_questions: [<one entry per NEEDS CLARIFICATION block>]
@@ -43,20 +43,40 @@ The following pseudocode step is inserted into each Phase Skill's "Run procedure
    artifact is marked approved. This ensures that if the artifact write
    fails, the audit trail is still present and no ghost-approval exists.
 
-   a. Check for re-entry: if session.yml already contains
-      phase_history.<phase>.approved_by, REFUSE (raise). A phase that
-      has already been PM-approved MUST NOT be re-approved silently;
-      the PM session should not re-run an already-approved phase.
+   a. Check for re-entry / partial-write repair:
+      - IF session.yml already contains phase_history.<phase>.approved_by == "pm"
+        AND the artifact's frontmatter status == "approved":
+          REFUSE (raise). A phase that has already been PM-approved AND
+          whose artifact is already marked approved MUST NOT be re-approved
+          silently; the PM session should not re-run an already-approved phase.
+      - IF session.yml already contains phase_history.<phase>.approved_by == "pm"
+        AND the artifact's frontmatter status != "approved":
+          **Partial-write repair path.** A previous run crashed after writing
+          session.yml (step 4.b) but before writing the artifact (step 4.c).
+          Do NOT raise. Skip steps 4.b and 4.b'' (session.yml already has the
+          evidence). Proceed directly to step 4.c to complete the idempotent
+          artifact write, then continue to step 4.d.
+      - IF session.yml does NOT contain phase_history.<phase>.approved_by:
+          Continue to step 4.b (normal path).
 
    b. Perform a single atomic read-modify-write on session.yml (one
-      tmp + rename) that writes BOTH of the following keys together:
+      tmp + rename) that writes ALL of the following keys together:
         - phase_history.<phase>.approved_by: "pm"
         - notes: append the pm_decision entry below
+        - current_phase: advance to the next phase per session.yml.planned_phases
       If session.yml.notes is absent, initialize it as an empty list
       before appending. This single atomic mutation guarantees that
-      phase_history and the pm_decision evidence are always consistent
-      — there is no partial-write window where one exists without the
-      other, which would trigger a false AC-017 audit violation.
+      phase_history, the pm_decision evidence, and current_phase are
+      always consistent — there is no partial-write window where one
+      exists without the others, which would trigger a false AC-017
+      audit violation.
+
+      **current_phase advancement rule (step 4.b''):** read
+      session.yml.planned_phases (ordered list); find the entry
+      matching the current phase; set current_phase to the next entry
+      in that list. If the current phase is the last planned phase,
+      set current_phase to "done". This mirrors the advancement logic
+      in the normal interactive approval path (Step 7).
 
    c. Write status: approved to the artifact's frontmatter.
 
@@ -68,9 +88,9 @@ The following pseudocode step is inserted into each Phase Skill's "Run procedure
 
 ```yaml
 - kind: pm_decision
-  timestamp: "2026-05-11T05:42:00Z"   # ISO8601, UTC
+  timestamp: "<ISO8601-timestamp>"     # ISO8601, UTC
   phase: "specify"                     # literal: "specify" | "plan" | "tasks"
-  artifact_path: ".agent-session/FEAT-004/spec.md"
+  artifact_path: ".agent-session/FEAT-XXX/spec.md"
   gate_applied: "auto_approved_by=pm"
 ```
 
@@ -86,21 +106,22 @@ The `audit-agent` reconciliation check (`pm_gate_violations`, AC-017) matches `p
 - `phase` value in `pm_decision`: `"specify"`.
 - `artifact_path`: the spec.md file under `.agent-session/<task_id>/spec.md`.
 
-### designer (Step 7 — replacing the approval gate)
+### designer (Step 6.5 — before Step 7)
 
-- The bypass step replaces/wraps the existing approval gate at Step 7.
-- The `[NEEDS CLARIFICATION]` escalation (AC-012) in the design context covers **AC coverage gaps** as well: if the Plan does not trace coverage for every AC in the Spec, the designer MUST insert a `[NEEDS CLARIFICATION]` marker before reaching the bypass step. This prevents the PM from auto-approving a Plan with known coverage holes.
-- **Marker ownership:** designer MUST insert the `[NEEDS CLARIFICATION]` marker into plan.md BEFORE invoking the bypass step. The bypass step's scan is the audit, not the producer. Designer is responsible for detecting AC coverage gaps and inserting the marker prior to Step 7; the bypass step only verifies absence.
+- The bypass step is inserted as Step 6.5 between the AC coverage gate (Step 6) and the final approval gate (Step 7).
+- The `[NEEDS CLARIFICATION]` escalation (AC-012) in the design context covers **AC coverage gaps** as well: if the Plan does not trace coverage for every AC in the Spec, the designer MUST insert a `[NEEDS CLARIFICATION]` marker into `plan.md` in **Step 6** (AC coverage gate, PM-mode branch) BEFORE reaching Step 6.5. This prevents the PM from auto-approving a Plan with known coverage holes.
+- **Marker ownership:** designer MUST insert the `[NEEDS CLARIFICATION]` marker into `plan.md` in Step 6 — BEFORE invoking the bypass step. The bypass step's scan in Step 3 is the audit check — not the producer of the marker. Step 6 is responsible for detecting AC coverage gaps and inserting the marker atomically (tmp + rename); Step 6.5 only verifies absence.
 - `phase` value in `pm_decision`: `"plan"`.
 - `artifact_path`: the plan.md file under `.agent-session/<task_id>/plan.md`.
 
-### task-builder (Step 9 — replacing the approval gate)
+### task-builder (Step 9 — bypass — runs before Step 10)
 
 - The bypass step replaces/wraps the existing approval gate at Step 9.
 - The `[NEEDS CLARIFICATION]` escalation (AC-012) in the task-builder context covers two additional refusal triggers:
-  1. **`[P]`-violation:** if a proposed parallel-safe (`[P]`) task would share write scope with another `[P]` task in the same wave, the task-builder MUST insert a `[NEEDS CLARIFICATION]` marker rather than emitting a potentially unsafe tasks.md.
-  2. **AC-coverage gap:** if any Spec AC is uncovered by the task list, same treatment as designer.
-- **Marker ownership:** task-builder MUST insert the `[NEEDS CLARIFICATION]` marker into tasks.md BEFORE invoking the bypass step for either trigger above. The bypass step's scan is the audit, not the producer. Task-builder is responsible for detecting `[P]`-violations and AC-coverage gaps and inserting markers prior to Step 9.
+  1. **`[P]`-violation (Step 3 PM-mode branch):** if a proposed parallel-safe (`[P]`) task would share write scope with another `[P]` task in the same wave, task-builder MUST insert a `[NEEDS CLARIFICATION] [P]-violation: <task-id> shares write scope with <conflicting-task-id>` marker into `tasks.md` (atomic write). In interactive mode the default is to remove the `[P]`; in PM-mode silently removing it masks the violation from the bypass scan. The marker producer is Step 3 of task-builder — NOT the bypass step.
+  2. **AC-coverage gap (Step 8 PM-mode branch):** if any Spec AC is uncovered by the task list, task-builder MUST insert a `[NEEDS CLARIFICATION] AC-coverage gap: <AC-XXX> uncovered` marker per uncovered AC (atomic write). In interactive mode the default is to loop back to Step 7 (interactive refinement); in PM-mode Step 7 is not available, so the loop would hang. The marker producer is Step 8 of task-builder — NOT the bypass step. This mirrors the designer pattern (T-013).
+- **Clarification cap:** in interactive mode, `[NEEDS CLARIFICATION]` markers are capped at 3 (Step 6). In PM-mode there is NO cap — every unresolved ambiguity MUST get its own marker so the bypass scan in Step 9 detects all violations. Demoting excess violations to a `## Decisions deferred` section in PM-mode would hide them from the audit check.
+- **Marker ownership summary:** task-builder (Steps 3, 6, 8) is the PRODUCER of all `[NEEDS CLARIFICATION]` markers. Step 9 (bypass) is the CONSUMER (scanner). The bypass step's scan is the audit — it does not produce markers. If task-builder reaches Step 9 without having inserted required markers, the bypass step will incorrectly approve a deficient artifact.
 - `phase` value in `pm_decision`: `"tasks"`.
 - `artifact_path`: the tasks.md file under `.agent-session/<task_id>/tasks.md`.
 
