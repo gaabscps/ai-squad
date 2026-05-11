@@ -52,9 +52,11 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)
+Write the Output Packet to `.agent-session/<task_id>/outputs/<dispatch_id>-qa-*.json` (the `-qa-` segment is mandatory; the suffix is free-form for traceability).
+
 - `status`: `done` (all ACs pass) | `needs_review` (some ACs fail) | `blocked` | `escalate`
 - `evidence[]`: `{kind: test, ref: "<command>", exit: <int>, ac_ref: "FEAT-XXX/AC-XXX"}` — one per AC validated
-- `ac_coverage`: `{"FEAT-XXX/AC-XXX": [evidence_id], "FEAT-XXX/AC-YYY": [evidence_id]}` — required top-level field; every AC in `ac_scope` MUST appear as a key (full prefixed form per [output-packet schema](../../../shared/schemas/output-packet.schema.json))
+- `ac_coverage`: **MANDATORY** top-level field — object keyed by `"FEAT-NNN/AC-NNN"` or `"DISC-NNN/AC-NNN"` (both prefixes valid per schema `^(FEAT|DISC)-\d{3,}/AC-\d{3,}$`) mapping to an array of evidence IDs (see `shared/schemas/output-packet.schema.json:128-138`); every AC in `ac_scope` MUST appear as a key. Each value array MUST be non-empty — every AC key must have at least one evidence id. Empty object, missing key, or empty value array is an error — the verify-output-packet.py hook (post-Stop) enforces this (previously unchecked, which allowed FEAT-009/010/011 to silently produce empty reports). Example: `{"FEAT-002/AC-001": ["e-001", "e-003"], "FEAT-002/AC-002": ["e-002"]}`.
 - `notes`: ≤80 chars
 
 ## Hard rules

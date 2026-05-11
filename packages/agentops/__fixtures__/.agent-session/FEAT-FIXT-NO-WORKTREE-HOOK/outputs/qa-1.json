@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "qa-1",
+  "task_id": "FEAT-FIXT-NO-WORKTREE-HOOK",
+  "batch_id": "BATCH-A",
+  "role": "qa",
+  "status": "done",
+  "ac_coverage": [
+    { "ac": "AC-001", "status": "pass", "evidence": "End-to-end test confirms feature deploys correctly" },
+    { "ac": "AC-002", "status": "pass", "evidence": "Cost tracking test verifies accurate token recording" }
+  ],
+  "summary": "QA complete. 2/2 ACs pass."
+}

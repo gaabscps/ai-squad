@@ -4,6 +4,7 @@
  */
 
 import type { Compliance, Insight, Metrics } from '../../types';
+import type { PmSessionWarning } from './existing-sections';
 
 function complianceBanner(compliance: Compliance): string | null {
   if (compliance === 'pre-standard') {
@@ -15,12 +16,21 @@ function complianceBanner(compliance: Compliance): string | null {
   return null;
 }
 
+/**
+ * Renders the report header: H1, optional compliance banner, optional PM session
+ * capture warning (AC-007), status block, and Insights section.
+ *
+ * @param pmWarnings - When non-empty, a `⚠ PM session capture warning: <reason>` line
+ *   is emitted immediately after the H1 (and any compliance banner), surfacing the
+ *   warning at the top of the report as required by AC-007.
+ */
 export function renderHeader(
   metrics: Metrics,
   insights: Insight[],
   generatedAt: string,
   featureName: string,
   currentPhase: string,
+  pmWarnings?: PmSessionWarning[],
 ): string {
   const sections: string[] = [];
 
@@ -31,6 +41,11 @@ export function renderHeader(
   const banner = complianceBanner(metrics.compliance);
   if (banner !== null) {
     sections.push(banner);
+  }
+
+  // AC-007: PM session capture warning — surfaces at top of report header
+  if (Array.isArray(pmWarnings) && pmWarnings.length > 0) {
+    sections.push(`⚠ PM session capture warning: ${pmWarnings[0]!.reason}`);
   }
 
   // Status block

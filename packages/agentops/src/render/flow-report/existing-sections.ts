@@ -114,10 +114,68 @@ export function renderReviewerFindings(findings: Metrics['reviewerFindings']): s
   return `## Reviewer findings density\n\n${table}`;
 }
 
-export function renderTokenCost(tokenCost: Metrics['tokenCost'], totalDispatches: number): string {
-  if (tokenCost.total !== null) {
-    const perAcStr = tokenCost.perAc !== null ? ` | Tokens/AC: ${tokenCost.perAc.toFixed(0)}` : '';
-    return `## Token cost\n\nTotal tokens: ${tokenCost.total}${perAcStr}`;
+/** Shape of a PM session warning entry written by capture-pm-session.ts (AC-007). */
+export interface PmSessionWarning {
+  reason: string;
+  timestamp: string;
+  session_id: string;
+}
+
+/**
+ * Renders the Token cost section with three distinct paths:
+ *
+ * (a) `pmSessions` populated AND `pmWarnings` empty → real "Total tokens / Tokens per AC" line.
+ * (b) `pmWarnings` non-empty → prepend a warning header; render cost line if sessions exist,
+ *     otherwise fall back to dispatch-count proxy.
+ * (c) `pmSessions` empty AND `pmWarnings` empty → dispatch-count proxy PLUS a brief hint line
+ *     so future Stop-hook regressions are immediately visible.
+ *
+ * When called without `pmSessions`/`pmWarnings` (existing call sites), falls back to the
+ * legacy two-branch logic determined by `tokenCost.total`.
+ */
+export function renderTokenCost(
+  tokenCost: Metrics['tokenCost'],
+  totalDispatches: number,
+  pmSessions?: unknown[],
+  pmWarnings?: PmSessionWarning[],
+): string {
+  const hasSessions = Array.isArray(pmSessions) && pmSessions.length > 0;
+  const hasWarnings = Array.isArray(pmWarnings) && pmWarnings.length > 0;
+  const newParamsPassed = Array.isArray(pmSessions) && Array.isArray(pmWarnings);
+
+  // Build the real cost line (used in paths a and b-with-sessions)
+  const realCostLine =
+    tokenCost.total !== null
+      ? `Total tokens: ${tokenCost.total}${tokenCost.perAc !== null ? ` | Tokens/AC: ${tokenCost.perAc.toFixed(0)}` : ''}`
+      : null;
+
+  // Proxy fallback line (used in paths b-without-sessions and c)
+  const proxyLine = `Token cost not available — using dispatch count as cost proxy: ${totalDispatches} dispatches`;
+
+  // Hint line appended in path (c) only
+  const hintLine =
+    '⚠ pm-orchestrator Stop hook did not run — re-run agentops install-hooks (worktree-aware)';
+
+  // --- Path (b): warnings present ---
+  if (newParamsPassed && hasWarnings) {
+    const warningHeader = `⚠ PM session capture warning: ${pmWarnings![0]!.reason}`;
+    const costContent = realCostLine ?? proxyLine;
+    return `## Token cost\n\n${warningHeader}\n\n${costContent}`;
   }
-  return `## Token cost\n\nToken cost not available — using dispatch count as cost proxy: ${totalDispatches} dispatches`;
+
+  // --- Path (a): sessions present, no warnings ---
+  if (newParamsPassed && hasSessions && !hasWarnings) {
+    return `## Token cost\n\n${realCostLine ?? proxyLine}`;
+  }
+
+  // --- Path (c): sessions empty, no warnings (new params passed) ---
+  if (newParamsPassed && !hasSessions && !hasWarnings) {
+    return `## Token cost\n\n${proxyLine}\n\n${hintLine}`;
+  }
+
+  // --- Legacy fallback: called without new params ---
+  if (realCostLine !== null) {
+    return `## Token cost\n\n${realCostLine}`;
+  }
+  return `## Token cost\n\n${proxyLine}`;
 }

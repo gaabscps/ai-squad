@@ -80,13 +80,13 @@ After every `Task` tool dispatch, append to `actual_dispatches[]`:
   "completed_at": "<iso8601>",
   "output_packet_ref": "outputs/<dispatch_id>.json",
   "status": "<Output Packet status>",
-  "loop": 1,
+  "review_loop": 1,
   "pm_note": null
 }
 ```
 
 Field rules:
-- `loop`: integer ≥ 1 — value of `task_states[T-XXX].loops` at the time of recording (loop 1 = first attempt, loop 2 = first retry, etc.).
+- `review_loop`: integer ≥ 1 — increment `task_states[T-XXX].loops` BEFORE appending the dispatch entry to `actual_dispatches[]`; then set `review_loop` to the post-increment value. This guarantees the first dispatch for a task records `review_loop: 1` (not 0), the first retry records `review_loop: 2`, etc. (`task_states` initializes with `loops=0`; first pre-append increment yields 1.) Every dispatch entry MUST include this field. Exception roles: see audit-agent (step 8) and blocker-specialist (step 6) for their derivation rules.
 - `pm_note`: non-null string ONLY for notable events; `null` otherwise. Recognized notes:
   - Loop restart: `"Loop N restart — reviewer findings: <one-line summary>"`
   - QA fail loop: `"QA fail loop N — failed ACs: <AC-XXX, AC-YYY>"`
@@ -136,7 +136,7 @@ If **2 consecutive iterations** produce identical `(diff_hash, findings_hash, fi
 ### 6. Escalation cascade routing (per-task, async — does NOT block other tasks)
 On any cascade trigger (`status: blocked`, reviewer conflict, loop cap, progress stall):
 - Build cascade Work Packet with `cascade_trigger`, `failing_output_refs[]`.
-- Dispatch `blocker-specialist` (no fan-out — one specialist per blocker).
+- Dispatch `blocker-specialist` (no fan-out — one specialist per blocker). When appending the blocker-specialist dispatch entry to `actual_dispatches[]`, set `review_loop` to `task_states[T-XXX].loops` at cascade time — the same value the triggering dev/reviewer dispatch used. The `loops` counter is NOT incremented for a blocker-specialist dispatch (it is a cascade branch, not a new dev attempt).
 - On `status: done` (decision memo): apply memo's resume action; task continues from where it cascaded.
 - On `status: escalate`: task enters `pending_human` terminal state. Other tasks continue independently. Update `escalation_metrics.pending_human_tasks`.
 
@@ -148,7 +148,7 @@ When ready queue empty AND no task in-flight (every task is `done` or `pending_h
 - Set `pipeline_completed_at`.
 
 ### 8. Audit gate (mandatory reconciliation — issue #1 mitigation)
-**Before** computing `current_phase` or emitting handoff, dispatch `audit-agent` (singleton, no fan-out) with this Work Packet:
+**Before** computing `current_phase` or emitting handoff, dispatch `audit-agent` (singleton, no fan-out) with this Work Packet. When appending the audit-agent dispatch entry to `actual_dispatches[]`, always set `review_loop: 1` — the audit-agent is a singleton with no retry semantics and has no `task_states` association.
 ```yaml
 task_id: FEAT-NNN
 dispatch_id: <uuid>

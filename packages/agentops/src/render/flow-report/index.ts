@@ -31,6 +31,7 @@ import {
   renderAcClosure,
   renderReviewerFindings,
   renderTokenCost,
+  type PmSessionWarning,
 } from './existing-sections';
 import { renderHeader } from './header';
 import { renderPerAcDetail } from './per-ac-detail';
@@ -49,6 +50,7 @@ import { renderTimeline } from './timeline';
  * @param currentPhase - Current pipeline phase.
  * @param session    - Optional full session for rich sections (per-dispatch, per-AC, timeline, PM notes).
  * @param repoHealth - Optional repo health snapshot (AC-028).
+ * @param pmWarnings - Optional PM session capture warnings (AC-007); surfaced in header.
  */
 export function renderFlowReport(
   metrics: Metrics,
@@ -58,11 +60,16 @@ export function renderFlowReport(
   currentPhase: string,
   session?: Session,
   repoHealth?: RepoHealth | null,
+  pmWarnings?: PmSessionWarning[],
 ): string {
   const sections: string[] = [];
 
-  // 1. Header (H1 + status block + Insights)
-  sections.push(renderHeader(metrics, insights, generatedAt, featureName, currentPhase));
+  // Derive pmSessions from synthesized pm-orchestrator dispatches in session (AC-006 / f-lr-001).
+  // A pm-orchestrator dispatch exists iff the Stop hook captured a session entry.
+  const pmSessions = session?.dispatches.filter((d) => d.role === 'pm-orchestrator') ?? [];
+
+  // 1. Header (H1 + status block + Insights + AC-007 warning when present)
+  sections.push(renderHeader(metrics, insights, generatedAt, featureName, currentPhase, pmWarnings));
 
   // 2. Cost breakdown
   const dispatches = session?.dispatches ?? [];
@@ -116,8 +123,17 @@ export function renderFlowReport(
     sections.push(renderPmNotesLog(session));
   }
 
-  // Token cost (kept for back-compat when no usage data)
-  sections.push(renderTokenCost(metrics.tokenCost, metrics.totalDispatches));
+  // Token cost — forward pmSessions and pmWarnings so AC-006/AC-007 paths are reachable.
+  // Only activate the new-params paths when pmWarnings was explicitly passed by the caller
+  // (i.e., not undefined). When undefined, use legacy two-branch fallback so existing
+  // call sites that omit pmWarnings are unaffected.
+  if (pmWarnings !== undefined) {
+    sections.push(
+      renderTokenCost(metrics.tokenCost, metrics.totalDispatches, pmSessions, pmWarnings),
+    );
+  } else {
+    sections.push(renderTokenCost(metrics.tokenCost, metrics.totalDispatches));
+  }
 
   return sections.join('\n\n') + '\n';
 }

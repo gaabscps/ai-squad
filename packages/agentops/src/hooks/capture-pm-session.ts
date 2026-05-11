@@ -246,6 +246,87 @@ function upsertEntry(
   fs.renameSync(tmp, manifestPath);
 }
 
+export interface RunCaptureOptions {
+  transcriptPath: string | undefined;
+  sessionId: string;
+  repoRoot: string;
+  /** If provided, skips maybeRegenerateReport (useful in tests to avoid spawning). */
+  skipRegenReport?: boolean;
+}
+
+/**
+ * Core capture logic extracted from main() for testability.
+ * Resolves taskId + manifestPath, then runs all failure-mode checks with
+ * in-band warning writes before returning.
+ */
+export async function runCapture(opts: RunCaptureOptions): Promise<void> {
+  const { transcriptPath, sessionId, repoRoot } = opts;
+
+  if (!opts.skipRegenReport) {
+    // Run regardless of active-task lookup: this catches the case where the
+    // orchestrator just transitioned the task to current_phase=done (which
+    // pickActiveTaskId then skips, leading to early-return without report regen).
+    await maybeRegenerateReport(repoRoot);
+  }
+
+  const taskId = pickActiveTaskId(repoRoot);
+
+  // Resolve manifest path early so failure modes can write warnings in-band.
+  const manifestPath = taskId
+    ? path.join(repoRoot, '.agent-session', taskId, 'dispatch-manifest.json')
+    : null;
+
+  const ts = new Date().toISOString();
+
+  if (!transcriptPath) {
+    process.stderr.write('[capture-pm-session] no transcript_path; skipping\n');
+    if (manifestPath) {
+      appendSessionWarning(manifestPath, {
+        timestamp: ts,
+        reason: 'missing_transcript_path',
+        session_id: sessionId,
+      });
+    }
+    return;
+  }
+
+  if (!taskId || !manifestPath) {
+    process.stderr.write('[capture-pm-session] no active SDD task; skipping\n');
+    return;
+  }
+
+  if (!fs.existsSync(manifestPath)) {
+    process.stderr.write(`[capture-pm-session] manifest not found: ${manifestPath}\n`);
+    // appendSessionWarning is a no-op when manifest is missing — stderr only
+    appendSessionWarning(manifestPath, {
+      timestamp: ts,
+      reason: 'missing_manifest',
+      session_id: sessionId,
+    });
+    return;
+  }
+
+  const byModel = parseTranscript(transcriptPath);
+  const models = Object.keys(byModel);
+  if (models.length === 0) {
+    process.stderr.write('[capture-pm-session] no assistant turns in transcript; skipping\n');
+    appendSessionWarning(manifestPath, {
+      timestamp: ts,
+      reason: 'zero_assistant_turns',
+      session_id: sessionId,
+    });
+    return;
+  }
+
+  const phases = readPhaseHistory(path.join(repoRoot, '.agent-session', taskId, 'session.yml'));
+  for (const model of models) {
+    upsertEntry(manifestPath, sessionId, model, byModel[model]!, phases);
+  }
+  process.stderr.write(
+    `[capture-pm-session] ${taskId}: upserted ${models.length} model entr${models.length === 1 ? 'y' : 'ies'} for session ${sessionId.slice(0, 8)}\n`,
+  );
+}
+
 /* istanbul ignore next */
 async function main(): Promise<void> {
   const stdin = await readStdinAsync();
@@ -258,43 +339,50 @@ async function main(): Promise<void> {
   const transcriptPath = input.transcript_path ?? process.env.CLAUDE_TRANSCRIPT_PATH;
   const sessionId = input.session_id ?? process.env.CLAUDE_SESSION_ID ?? 'unknown';
   const cwd = input.cwd ?? process.cwd();
-  if (!transcriptPath) {
-    process.stderr.write('[capture-pm-session] no transcript_path; skipping\n');
-    return;
-  }
   const repoRoot = findRepoRoot(cwd);
-  // Run regardless of active-task lookup: this catches the case where the
-  // orchestrator just transitioned the task to current_phase=done (which
-  // pickActiveTaskId then skips, leading to early-return without report regen).
-  await maybeRegenerateReport(repoRoot);
-  const taskId = pickActiveTaskId(repoRoot);
-  if (!taskId) {
-    process.stderr.write('[capture-pm-session] no active SDD task; skipping\n');
-    return;
-  }
-  const manifestPath = path.join(repoRoot, '.agent-session', taskId, 'dispatch-manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    process.stderr.write(`[capture-pm-session] manifest not found: ${manifestPath}\n`);
-    return;
-  }
-  const byModel = parseTranscript(transcriptPath);
-  const models = Object.keys(byModel);
-  if (models.length === 0) {
-    process.stderr.write('[capture-pm-session] no assistant turns in transcript; skipping\n');
-    return;
-  }
-  const phases = readPhaseHistory(path.join(repoRoot, '.agent-session', taskId, 'session.yml'));
-  for (const model of models) {
-    upsertEntry(manifestPath, sessionId, model, byModel[model]!, phases);
-  }
-  process.stderr.write(
-    `[capture-pm-session] ${taskId}: upserted ${models.length} model entr${models.length === 1 ? 'y' : 'ies'} for session ${sessionId.slice(0, 8)}\n`,
-  );
+  await runCapture({ transcriptPath, sessionId, repoRoot });
 }
 
 /* istanbul ignore next */
 if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module) {
   void main();
+}
+
+export interface SessionWarningEntry {
+  timestamp: string;
+  reason: string;
+  session_id: string | null;
+}
+
+/**
+ * Atomically appends a warning entry to `pm_orchestrator_session_warnings[]`
+ * in the given manifest file. Uses the same tmp+rename pattern as upsertEntry.
+ * No-op (stderr only) if the manifest does not exist or cannot be parsed.
+ */
+export function appendSessionWarning(manifestPath: string, entry: SessionWarningEntry): void {
+  if (!fs.existsSync(manifestPath)) {
+    process.stderr.write(
+      `[capture-pm-session] cannot append warning — manifest not found: ${manifestPath}\n`,
+    );
+    return;
+  }
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    process.stderr.write(
+      `[capture-pm-session] cannot append warning — manifest unparseable: ${manifestPath}\n`,
+    );
+    return;
+  }
+  const existing = Array.isArray(manifest.pm_orchestrator_session_warnings)
+    ? (manifest.pm_orchestrator_session_warnings as SessionWarningEntry[])
+    : [];
+  existing.push(entry);
+  manifest.pm_orchestrator_session_warnings = existing;
+  const tmp = manifestPath + '.pm-session-warn.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, manifestPath);
 }
 
 export {

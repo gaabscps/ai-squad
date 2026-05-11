@@ -1,0 +1,68 @@
+task_id: "FEAT-FIXT-MISSING-QA"
+squad: "sdd"
+feature_name: "Fixture MISSING-QA — qa dispatch with no output packet"
+schema_version: 1
+
+spec_ref: "./.agent-session/FEAT-FIXT-MISSING-QA/spec.md"
+
+started_at: "2026-05-10T09:00:00Z"
+last_activity_at: "2026-05-10T11:30:00Z"
+completed_at: "2026-05-10T11:30:00Z"
+
+current_phase: "done"
+current_owner: "orchestrator"
+
+pipeline_started_at: "2026-05-10T09:30:00Z"
+pipeline_completed_at: "2026-05-10T11:30:00Z"
+
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
+
+task_states:
+  BATCH-A:
+    state: "done"
+    review_loops: 0
+    qa_loops: 0
+    blocker_calls: 0
+    started_at: "2026-05-10T09:30:00Z"
+    completed_at: "2026-05-10T11:30:00Z"
+
+budget_defaults:
+  review_loops_max: 3
+  qa_loops_max: 2
+  blocker_calls_max: 2
+
+escalation_metrics:
+  total_tasks: 1
+  done_tasks: 1
+  pending_human_tasks: 0
+  escalation_rate: 0
+
+phase_history:
+  - phase: "specify"
+    started_at: "2026-05-10T09:00:00Z"
+    completed_at: "2026-05-10T09:15:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "plan"
+    started_at: "2026-05-10T09:15:00Z"
+    completed_at: "2026-05-10T09:25:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "tasks"
+    started_at: "2026-05-10T09:25:00Z"
+    completed_at: "2026-05-10T09:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""
+  - phase: "implementation"
+    started_at: "2026-05-10T09:30:00Z"
+    completed_at: "2026-05-10T11:30:00Z"
+    artifact_status: "approved"
+    skipped: false
+    skip_reason: ""

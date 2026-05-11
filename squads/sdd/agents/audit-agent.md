@@ -50,8 +50,9 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 3. Read `tasks_ref` — extract every `T-XXX` and the AC universe (`AC covered:` per task).
 4. List files in `outputs_dir_ref` — every file should be `<dispatch_id>.json`.
 5. Run the **6 reconciliation checks** below. Each check that fails contributes one finding.
-6. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
-7. Emit Output Packet (atomic write).
+6. Run the **Phase 4 sweep** — role-specific Output Packet validation for qa, code-reviewer, logic-reviewer dispatches. Collect all gaps; emit one consolidated finding if any exist.
+7. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
+8. Emit Output Packet (atomic write).
 
 ## The 6 reconciliation checks
 
@@ -73,14 +74,71 @@ Aggregate `ac_coverage` from every `qa` Output Packet. Every AC ID in `tasks.md`
 **Check 6 — Source-file ownership (orchestrator non-edit invariant).**
 Run `git diff --name-only HEAD` to enumerate files modified in the working tree. Aggregate the union of `files_changed[]` across all `dev` Output Packets. The two sets must be equal (modulo `.agent-session/` paths, which are orchestrator-managed and excluded). Files in the working tree NOT covered by any `dev` packet → finding `severity: blocker, audit_finding_kind: orchestrator_edited_source` (orchestrator bypassed dispatch and edited directly). If git is not available (consumer repo not a git working tree), emit `kind: absence` evidence and a `severity: major` warning instead of `blocker` — best-effort fallback.
 
+## Phase 4 sweep — role-specific Output Packet validation (AC-003)
+
+Run this sweep **after** the 6 reconciliation checks and **before** emitting the Output Packet. Collect all failures into a single consolidated finding — do NOT short-circuit on the first failure.
+
+**Roles in scope:** `qa`, `code-reviewer`, `logic-reviewer`.
+
+**For each entry in `actual_dispatches[]` whose `role` is one of the three above:**
+
+1. **Locate the packet file.** The expected filename pattern is `outputs/<dispatch_id>-<role-marker>-*.json` where `<role-marker>` is `qa` for qa, `cr` for code-reviewer, or `lr` for logic-reviewer. Use a glob (`Bash: ls outputs/<dispatch_id>-<marker>*.json 2>/dev/null`) to find the file. Fallback: if the glob returns no results, also try the bare `outputs/<dispatch_id>.json` path (some pipelines omit the role marker on single-role dispatches).
+
+2. **If no matching file is found:**
+   Record a gap entry: `dispatch_id=<id> role=<role> — Output Packet file missing (expected outputs/<dispatch_id>-<marker>*.json)`.
+
+3. **If a file is found, re-validate it via the hook:**
+   Run:
+   ```
+   python3 squads/sdd/hooks/verify-output-packet.py --check-only <path>
+   ```
+   Require exit 0. On non-zero exit the hook prints a structured JSON error to stdout — parse that JSON to extract the `error` field. Record a gap entry: `dispatch_id=<id> role=<role> — <error field from hook output>`.
+
+4. **After iterating all in-scope dispatches:** if the gap list is non-empty, add a single consolidated finding to the findings array:
+   ```
+   severity: blocker
+   audit_finding_kind: missing_output_packet
+   ref: outputs/
+   rationale: "Phase 4 sweep: <N> packet(s) missing or malformed — see findings[].note"
+   note: "<semicolon-separated inline list of all gap entries>"
+   ```
+   The full gap list goes into the consolidated finding's `note` field (NOT the Output Packet's top-level `notes` field, which has a `maxLength: 80` schema constraint that cannot hold multi-entry gap lists). Format the `note` value as a semicolon-separated inline list:
+   ```
+   Gap 1: dispatch_id=d-003 role=qa — Output Packet file missing (expected outputs/d-003-qa*.json); Gap 2: dispatch_id=d-005 role=code-reviewer — dispatch_id=d-005-cr: code-reviewer Output Packet missing required field 'findings' (array required; empty list [] is valid as an explicit 'no findings' claim)
+   ```
+   The session status MUST be `blocked` (not `done`) when any gap is recorded.
+
+5. **If the gap list is empty:** no additional finding is added for this sweep. The session may still be `blocked` due to findings from the 6 reconciliation checks.
+
+## Phase 4 sweep — review_loop validation on dev fix-dispatches (AC-008)
+
+Run this check **as part of** the Phase 4 sweep, **after** role-specific Output Packet validation and **before** emitting the Output Packet.
+
+**Roles in scope:** `dev`.
+
+**For each entry in `actual_dispatches[]` whose `role == "dev"`:**
+
+1. **Check if this is a fix-dispatch.** A fix-dispatch has `previous_findings_ref` field non-null (or legacy `previous_findings` field non-empty). If the field is absent or null, this is a first-pass dispatch; skip.
+
+2. **If this is a fix-dispatch:** verify that `review_loop >= 2`. If `review_loop` is missing or `< 2`, record a gap entry: `dispatch_id=<id> — fix-dispatch missing review_loop annotation (expected >= 2)`.
+
+3. **If the gap list is non-empty after checking all dev fix-dispatches:** add a single consolidated finding to the findings array (reuse existing `missing_output_packet` kind per schema enum, or emit the gap as part of the existing Phase 4 finding if already recording role-packet gaps):
+   ```
+   severity: blocker
+   audit_finding_kind: missing_output_packet
+   ref: dispatch-manifest.json
+   rationale: "Fix-dispatch missing review_loop: <N> dispatches lack required annotation"
+   ```
+   Append the fix-dispatch gaps to the consolidated finding's `note` field as a semicolon-separated inline list (same format as Phase 4 role-packet gaps).
+
 ## Output contract (Output Packet)
 - `status`:
-  - `done` — all 6 checks pass; orchestrator may emit handoff
-  - `blocked` — one or more findings; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
+  - `done` — all 6 checks pass AND Phase 4 sweep finds no gaps; orchestrator may emit handoff
+  - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
   - `escalate` — audit cannot run (manifest unreadable, outputs dir missing); orchestrator escalates to human
-- `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the 6 above>, ref: <pointer>, rationale: ≤120 chars}`
+- `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the 6 above>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
 - `evidence[]`: pointers to manifest entries and output packet files inspected
-- `notes`: optional, ≤80 chars
+- `notes`: ≤80 chars (schema constraint); brief pointer only — e.g. "Phase 4 gaps: see findings[N].note for full list"
 
 ## Hard rules
 - Never: edit any file (read-only). `Bash` is allowed ONLY for git read-only commands (`git diff`, `git status`, `git log`) — never `git add`, `git commit`, `git reset`, or any write operation.

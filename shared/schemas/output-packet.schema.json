@@ -77,7 +77,7 @@
           "id": { "type": "string" },
           "severity": {
             "type": "string",
-            "enum": ["info", "warning", "error", "critical", "major", "blocker"]
+            "enum": ["info", "warning", "error", "critical", "major", "blocker", "minor"]
           },
           "rationale": { "type": "string", "maxLength": 120 },
           "dimension": {

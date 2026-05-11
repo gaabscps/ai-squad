@@ -55,8 +55,83 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 
 ## Output contract (Output Packet)
 - `status`: `done` (clean) | `needs_review` (findings exist) | `blocked` | `escalate`
-- `findings[]`: `{ac_ref, file, line, severity: blocker|major|minor, gap_kind: edge_case|missing_flow|partial_failure|race|invariant, evidence_ref, rationale (≤120 chars)}`
+- `findings[]` **(MANDATORY)**: Array of finding objects. Empty array `[]` is a valid explicit "no findings" claim; omitting the field entirely is a schema violation. Schema per finding:
+  ```json
+  {
+    "ac_ref": "AC-001",
+    "file": "path/to/file.ts",
+    "line": 42,
+    "severity": "critical" | "major" | "minor",
+    "gap_kind": "edge_case" | "missing_flow" | "partial_failure" | "race" | "invariant",
+    "evidence_ref": "file:42-50" | "absence",
+    "rationale": "string (≤120 chars)"
+  }
+  ```
 - Evidence kind: `file` (always with line range), or `absence` (when the gap is missing code, not present code)
+
+### Worked Examples for Findings
+
+**Critical** — AC violation or catastrophic failure path:
+```json
+{
+  "ac_ref": "AC-005",
+  "file": "src/store/transaction.ts",
+  "line": 27,
+  "severity": "critical",
+  "gap_kind": "partial_failure",
+  "evidence_ref": "file:27-35",
+  "rationale": "Lock acquired but no try/finally; if save() throws, lock never released. Deadlock."
+}
+```
+
+**Major** — significant edge case unhandled:
+```json
+{
+  "ac_ref": "AC-003",
+  "file": "src/parser.ts",
+  "line": 8,
+  "severity": "major",
+  "gap_kind": "edge_case",
+  "evidence_ref": "file:8-14",
+  "rationale": "Empty input string [] causes division-by-zero at line 12; AC-003 requires safe handling."
+}
+```
+
+**Minor** — corner case or race under high concurrency:
+```json
+{
+  "ac_ref": "AC-008",
+  "file": "src/cache.ts",
+  "line": 51,
+  "severity": "minor",
+  "gap_kind": "race",
+  "evidence_ref": "file:51-58",
+  "rationale": "Two concurrent .set() calls may both call rebuild(); rare under normal load but violates AC-008 atomicity guarantee."
+}
+```
+
+### Example: Missing Validation Flow
+When code should validate but does not (absence):
+```json
+{
+  "ac_ref": "AC-002",
+  "file": "src/api/routes.ts",
+  "line": 12,
+  "severity": "major",
+  "gap_kind": "missing_flow",
+  "evidence_ref": "absence",
+  "rationale": "POST /items endpoint missing input validation; AC-002 requires all inputs validated before use."
+}
+```
+
+### Example: Clean Review (No Findings)
+When all ACs are satisfied and no gaps remain:
+```json
+{
+  "status": "done",
+  "findings": []
+}
+```
 
 ## Hard rules
 - Never: edit any file (read-only).

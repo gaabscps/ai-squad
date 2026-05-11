@@ -56,8 +56,65 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 
 ## Output contract (Output Packet)
 - `status`: `done` (clean) | `needs_review` (findings exist) | `blocked` | `escalate`
-- `findings[]`: `{file, line, severity: blocker|major|minor, dimension: design|style|naming|comments|complexity, evidence_ref, rationale (≤120 chars)}`
+- `findings[]` **(MANDATORY)**: Array of finding objects. Empty array `[]` is a valid explicit "no findings" claim; omitting the field entirely is a schema violation. Schema per finding:
+  ```json
+  {
+    "file": "path/to/file.ts",
+    "line": 42,
+    "severity": "critical" | "major" | "minor",
+    "dimension": "design" | "style" | "naming" | "comments" | "complexity",
+    "evidence_ref": "file:42-50",
+    "rationale": "string (≤120 chars)"
+  }
+  ```
 - Evidence kind: `file` (always with line range)
+
+### Worked Examples for Findings
+
+**Critical** — violation of project invariant or dangerous pattern:
+```json
+{
+  "file": "src/utils/auth.ts",
+  "line": 18,
+  "severity": "critical",
+  "dimension": "design",
+  "evidence_ref": "file:18-25",
+  "rationale": "Direct password comparison without constant-time protection; timing attack vector."
+}
+```
+
+**Major** — significant deviation from codebase convention:
+```json
+{
+  "file": "src/index.ts",
+  "line": 5,
+  "severity": "major",
+  "dimension": "naming",
+  "evidence_ref": "file:5-10",
+  "rationale": "Exported function `getFoo()` should be `getFooValue()` per project convention."
+}
+```
+
+**Minor** — style or clarity issue:
+```json
+{
+  "file": "src/helpers.ts",
+  "line": 33,
+  "severity": "minor",
+  "dimension": "style",
+  "evidence_ref": "file:33-35",
+  "rationale": "Inconsistent indentation (tabs vs spaces); project uses spaces."
+}
+```
+
+### Example: Clean Review (No Findings)
+When the implementation is clean, emit:
+```json
+{
+  "status": "done",
+  "findings": []
+}
+```
 
 ## Hard rules
 - Never: edit any file (read-only).

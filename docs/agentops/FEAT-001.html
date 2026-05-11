@@ -1,0 +1,2242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Extract AgentOps observability into @ai-squad/agentops npm package — AgentOps</title>
+  <style>
+:root {
+  --bg: #fff;
+  --bg-muted: #f7f7f9;
+  --fg: #1a1a1a;
+  --fg-muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --status-pass: #16a34a;
+  --status-warn: #ca8a04;
+  --status-fail: #dc2626;
+  /* Semantic aliases for story-card fact-sheet (FEAT-005 T-012) */
+  --color-surface: var(--bg-muted);
+  --color-border: var(--border);
+  --color-text-primary: var(--fg);
+  --color-text-secondary: var(--fg-muted);
+  --color-text-tertiary: #9ca3af;
+  --color-warn: var(--status-warn);
+  --color-warn-bg: rgba(255, 200, 0, 0.08);
+  /* Spacing scale */
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  /* Radius scale */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  /* Typography scale */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --bg-muted: #161b22;
+    --fg: #c9d1d9;
+    --fg-muted: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --status-pass: #3fb950;
+    --status-warn: #d29922;
+    --status-fail: #f85149;
+    /* Semantic aliases (same var() refs, resolve to dark-mode primitives above) */
+    --color-surface: var(--bg-muted);
+    --color-border: var(--border);
+    --color-text-primary: var(--fg);
+    --color-text-secondary: var(--fg-muted);
+    --color-text-tertiary: #6b7280;
+    --color-warn: var(--status-warn);
+    --color-warn-bg: rgba(255, 200, 0, 0.14);
+    /* Scale tokens — same in both modes */
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --text-xs: 11px;
+    --text-sm: 13px;
+    --text-base: 1rem;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+h1, h2, h3, h4 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+th {
+  background: var(--bg-muted);
+  font-weight: 600;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--bg-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.kpi-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.kpi-bar h1 {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  margin: 0;
+}
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+.story {
+  margin-bottom: 2rem;
+}
+.story-card { padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--color-border); }
+.story-card header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.story-card header h3 { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.story-card header h3 .dot { color: var(--color-text-tertiary); margin: 0 0.4em; }
+
+.story-card__stats { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.story-card__stat { display: inline-flex; gap: 0.3em; align-items: baseline; }
+.story-card__stat-label { color: var(--color-text-tertiary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+.story-card__stat-value { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+
+.story-card__pipeline { display: inline-flex; flex-wrap: wrap; gap: 0.4em; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+.story-card__summary { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.45; }
+.story-card__summary--empty { color: var(--color-text-tertiary); font-style: italic; }
+
+.story-card__retry { padding: var(--space-2) var(--space-3); background: var(--color-warn-bg); border-left: 3px solid var(--color-warn); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-primary); }
+
+.story-card__drilldowns { display: flex; flex-direction: column; gap: var(--space-2); }
+.story-card__drilldowns details { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.story-card__drilldowns details > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-secondary); user-select: none; }
+.story-card__drilldowns details > summary:hover { color: var(--color-text-primary); }
+.story-card__drilldowns details[open] > summary { margin-bottom: var(--space-2); color: var(--color-text-primary); }
+.story-card__drilldowns table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.story-card__drilldowns th { text-align: left; color: var(--color-text-tertiary); font-weight: 500; padding: 0.25em 0.5em 0.25em 0; border-bottom: 1px solid var(--color-border); }
+.story-card__drilldowns td { padding: 0.25em 0.5em 0.25em 0; }
+.story-card__drilldowns ul { margin: 0; padding-left: var(--space-3); font-size: var(--text-xs); }
+.story-card__drilldowns ul li { margin-bottom: 0.3em; }
+.story-card__pmnote { margin: 0; font-size: var(--text-xs); white-space: pre-wrap; color: var(--color-text-secondary); }
+
+@media (max-width: 767px) {
+  .story-card__stats { font-size: var(--text-xs); }
+  .story-card header { flex-direction: column; align-items: flex-start; }
+}
+.kpi-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.cost-section {
+  margin: 0 0 2rem;
+  padding: 1.25rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cost-section > h2 {
+  margin: 0;
+}
+.cost-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.cost-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.cost-card .cost-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.cost-card .cost-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.cost-card small {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.cost-models {
+  margin-top: 0.5rem;
+  font-size: 12px;
+}
+.cost-models td,
+.cost-models th {
+  font-variant-numeric: tabular-nums;
+}
+.cost-breakdown {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0;
+}
+.cost-breakdown > summary {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  list-style: none;
+}
+.cost-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+.cost-breakdown > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--fg-muted);
+  transition: transform 0.15s;
+}
+.cost-breakdown[open] > summary::before {
+  transform: rotate(90deg);
+}
+.cost-breakdown > .cost-models {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+}
+.cost-note {
+  margin: 0.75rem 0 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cost-empty {
+  margin: 0;
+  color: var(--fg-muted);
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.flow-card {
+  display: block;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: var(--fg);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.flow-card:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.flow-card header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 0.5rem;
+}
+.trends {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  align-items: center;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.badge-pass {
+  background: var(--status-pass);
+  color: white;
+}
+.badge-warn {
+  background: var(--status-warn);
+  color: white;
+}
+.badge-fail {
+  background: var(--status-fail);
+  color: white;
+}
+.badge-neutral {
+  background: var(--border);
+  color: var(--fg);
+}
+.compliance-notice {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 4px solid var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 10%, transparent);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.compliance-notice strong {
+  font-weight: 600;
+}
+.compliance-notice code {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.compliance-pre-standard {
+  border-left-color: var(--border);
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+}
+details > summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+details > summary::before {
+  content: "▶";
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+details[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+details > *:not(summary) {
+  padding: 0.75rem;
+}
+.drilldown {
+  margin-bottom: 2rem;
+}
+.raw-data {
+  margin-bottom: 2rem;
+}
+.md-embed {
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.md-embed h1, .md-embed h2, .md-embed h3 {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+  margin: 1rem 0 0.5rem;
+}
+.md-embed table {
+  margin: 0.5rem 0;
+}
+.md-embed pre {
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.md-embed code {
+  background: none;
+  padding: 0;
+}
+.repo-health-current {
+  margin-bottom: 2rem;
+}
+.repo-health-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}</style>
+</head>
+<body>
+    <header class="kpi-bar">
+  <h1>Extract AgentOps observability into @ai-squad/agentops npm package <span class="badge badge-pass">✓</span></h1>
+  <div class="kpis">
+    <span>8h34m</span>
+    <span>—</span>
+    
+    <span>30/17 ACs</span>
+    <span>mut —</span>
+    <span>type —</span>
+    <span>0 loops</span>
+  </div>
+</header>
+    
+    <main>
+      <section class="story">
+        <h2>Story</h2>
+        <article class="story-card story-card--done" aria-label="batch D-T001">
+  <header><h3>D-T001</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">22m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Scaffolded packages/agentops/ with package. json (@ai-squad/agentops@0.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t001-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t001-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t001-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t001-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t001-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t001-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t001-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T002">
+  <header><h3>D-T002</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">7h9m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Patched scan. ts line 24 to use AGENTOPS_SESSION_PREFIX env var (default: FEAT-).</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (5 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t002-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t002-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t002-lr-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t002-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t002-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T005">
+  <header><h3>D-T005</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">7h9m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary">scan. ts refactored to dynamic prefix + formatEmptyScanMessage exported.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (11 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t005-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>code-reviewer</td><td>d-t005-cr-03</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t005-dev-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t005-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t005-dev-03</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t005-dev-04</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t005-dev-05</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t005-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t005-lr-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t005-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t005-cr-04</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T006">
+  <header><h3>D-T006</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1h</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Fixed compliance. test.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (8 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t006-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>code-reviewer</td><td>d-t006-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t006-dev-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t006-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t006-dev-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t006-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t006-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t006-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T007">
+  <header><h3>D-T007</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1h</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary story-card__summary--empty">(no summary)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t007-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>code-reviewer</td><td>d-t007-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t007-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t007-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t007-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t007-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t007-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T008">
+  <header><h3>D-T008</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1h</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Implemented doctor. ts: Field|Value|Source table with ⚠ on defaults, exit 1 + actionable stderr on missing sessionPrefix.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t008-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>code-reviewer</td><td>d-t008-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t008-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t008-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t008-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t008-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t008-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T009">
+  <header><h3>D-T009</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">7h9m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Fixed EXDEV: tmp now in same dir as target (dir not os. tmpdir()).</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (9 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t009-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>code-reviewer</td><td>d-t009-cr-02</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t009-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t009-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t009-dev-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t009-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t009-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t009-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t009-cr-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T010">
+  <header><h3>D-T010</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1h</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Created src/cli. ts exporting makeProgram() with commander@12 wiring report/capture/doctor/install-hooks subcommands.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (5 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t010-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t010-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t010-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t010-lr-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t010-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T011">
+  <header><h3>D-T011</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">7h9m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer → dev → logic-reviewer → qa</span></div>
+  <p class="story-card__summary story-card__summary--empty">(no summary)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (5 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>d-t011-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t011-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t011-lr-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t011-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t011-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T003">
+  <header><h3>D-T003</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">26m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Fixed jest. config.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (5 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t003-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t003-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t003-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t003-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t003-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T004">
+  <header><h3>D-T004</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">34m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Implemented ConfigResolver (src/config. ts): reads .</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (10 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t004-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t004-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t004-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t004-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t004-cr-02</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t004-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>dev</td><td>d-t004-dev-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t004-cr-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t004-lr-03</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t004-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T012">
+  <header><h3>D-T012</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">25m 41s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Installed @ai-squad/agentops tarball in calendarfr as a dependency. Updated agentops:report script from tsx invocation to `agentops report`.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t012-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t012-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t012-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t012-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t012-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t012-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t012-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T013">
+  <header><h3>D-T013</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">38m 22s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary story-card__summary--empty">(no summary)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (4 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t013-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t013-cr-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t013-lr-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t013-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T014">
+  <header><h3>D-T014</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">43m 29s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">CHANGELOG. md created at packages/agentops/CHANGELOG.</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t014-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t014-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t014-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t014-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t014-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t014-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t014-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done" aria-label="batch D-T015">
+  <header><h3>D-T015</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">19m 50s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev → code-reviewer ‖ logic-reviewer → qa</span></div>
+  <p class="story-card__summary">Deleted scripts/agentops/ entirely; removed 3 stale npm scripts (agentops:backfill, agentops:capture-pm, type-coverage:json) that referenced vendored code. Kept agentops:report (uses installed CLI).</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (7 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>d-t015-dev-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t015-cr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>logic-reviewer</td><td>d-t015-lr-01</td><td>—</td><td>—</td><td>—</td><td>needs_review</td></tr><tr><td>dev</td><td>d-t015-dev-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>code-reviewer</td><td>d-t015-cr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>logic-reviewer</td><td>d-t015-lr-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr><tr><td>qa</td><td>d-t015-qa-01</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done-retried" aria-label="batch D-AUDIT">
+  <header><h3>D-AUDIT</h3><span class="badge badge-warn" aria-label="status: done with retries">↻ done (retried)</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1h9m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">—</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">audit-agent</span></div>
+  <p class="story-card__summary story-card__summary--empty">(no summary)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (2 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>audit-agent</td><td>d-audit-01</td><td>—</td><td>—</td><td>—</td><td>blocked</td></tr><tr><td>audit-agent</td><td>d-audit-02</td><td>—</td><td>—</td><td>—</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+      </section>
+      <section class="cost-section">
+  <header class="cost-header">
+    <h2>Cost</h2>
+    <span class="badge badge-fail">coverage 0/106 (0%)</span>
+  </header>
+  <div class="cost-grid">
+    <div class="cost-card">
+  <span class="cost-label">Total cost</span>
+  <span class="cost-value">—</span>
+  
+</div>
+    <div class="cost-card">
+  <span class="cost-label">$ / AC</span>
+  <span class="cost-value">—</span>
+  <small>17 ACs</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">$ / dispatch</span>
+  <span class="cost-value">—</span>
+  <small>avg of 0</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Tokens</span>
+  <span class="cost-value">—</span>
+  
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Wall-clock</span>
+  <span class="cost-value">—</span>
+  <small>0 dispatches with usage</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Tool uses</span>
+  <span class="cost-value">—</span>
+  
+</div>
+  </div>
+  
+  
+  
+  <p class="cost-note"><em>no usage data available — dispatch count fallback: 106 dispatches</em></p>
+</section>
+      <section class="drilldown">
+<h2>Drilldown</h2>
+<details>
+<summary>Per-AC closure detail</summary>
+<div><table>
+<thead><tr><th>AC ID</th><th>Status</th><th>Validator</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>AC-001</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-002</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-003</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-004</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-005</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-006</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-007</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-008</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-009</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-010</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-011</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-012</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-013</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-014</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-015</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-016</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-017</td><td>missing</td><td>qa</td><td>—</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>Per-dispatch breakdown</summary>
+<div><table>
+<thead><tr><th>Dispatch ID</th><th>Role</th><th>Status</th><th>Loop</th><th>Tokens</th><th>Duration</th><th>PM note</th></tr></thead>
+<tbody>
+<tr><td>d-t001-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t002-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-cr-03</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-dev-01</td><td>dev</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-dev-03</td><td>dev</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-dev-04</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-dev-05</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-lr-03</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-dev-01</td><td>dev</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-dev-03</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t006-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t007-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t008-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-cr-02</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-dev-03</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t010-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t010-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t010-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t010-lr-01</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t010-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t011-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t011-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t011-lr-01</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t011-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t002-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t002-lr-01</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t001-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t002-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t003-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t003-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t003-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t003-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t003-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-cr-02</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-dev-03</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-cr-03</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-lr-03</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t004-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t012-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t013-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t013-cr-01</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t013-lr-01</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t013-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t014-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-dev-01</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-cr-01</td><td>code-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-lr-01</td><td>logic-reviewer</td><td>needs_review</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-dev-02</td><td>dev</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-lr-02</td><td>logic-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t015-qa-01</td><td>qa</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-audit-01</td><td>audit-agent</td><td>blocked</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t002-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t005-cr-04</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t009-cr-03</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-t011-cr-02</td><td>code-reviewer</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>d-audit-02</td><td>audit-agent</td><td>done</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>Repo health snapshot</summary>
+<div><p>Repo health: not measured (run <code>npm run mutation &amp;&amp; npm run type-coverage &amp;&amp; npm run arch:check</code> first)</p></div>
+</details>
+<details>
+<summary>Reviewer findings</summary>
+<div><ul><li>fs import style inconsistent with sibling files (parse.ts, repo-health.ts use `import fs from &#39;fs/promises&#39;`; config.ts uses `import { promises as fsp } from &#39;fs&#39;`). Pick one idiom.</li>
+<li>File header references FEAT-002/FEAT-003 only; ConfigResolver types appended at line 183 cover FEAT-001. Header is stale after this edit.</li>
+<li>`parseJsonEnv` return type hardcoded to `string[] | null`; plan A-04 implies generic reuse. Not generic — minor rigidity for 2 call-sites.</li>
+<li>AGENTOPS_SESSION_PREFIX=&quot;&quot; passes !==undefined check; empty prefix breaks scan filter (matches all dirs). Needs empty-string guard.</li>
+<li>Catch block swallows JSON parse errors as ENOENT; user gets misleading &#39;sessionPrefix is required&#39; instead of actionable parse error. Violates AC-007 actionability.</li>
+<li>JSON.parse cast as Partial&lt;AgentOpsConfig&gt; with no runtime validation; wrong types (number, object) flow through silently breaking downstream invariants.</li>
+<li>fileConfig.priorFlows accepted without Array.isArray check; string value yields ResolvedField&lt;string[]&gt; with non-array value. Violates AC-002.</li>
+<li>Same as priorFlows — bypassFlows from file unchecked; non-array value slips into ResolvedField&lt;string[]&gt;.</li>
+<li>fileConfig.sessionPrefix not validated as string|string[]; numbers/objects from file pass through.</li>
+<li>No test covers syntactically invalid .agentops.json — actionability of error message untested (AC-007).</li>
+<li>No test for empty-string AGENTOPS_SESSION_PREFIX — boundary case for required-field invariant.</li>
+<li>No test covers number/string for sessionPrefix/priorFlows/bypassFlows from .agentops.json file.</li>
+<li>File header still lists FEAT-002/FEAT-003 only; ConfigResolver types added at line 183 cover FEAT-001 — header remains stale after this edit.</li>
+<li>Stale scratch file scan.ts.new left in src/; must be deleted before merge — not part of any module graph. (File is identical to scan.ts.)</li>
+<li>Named import style `{ type Dirent, promises as fsp }` diverges from codebase peers (config.ts, repo-health.ts use `import fs from &#39;fs/promises&#39;`).</li>
+<li>formatEmptyScanMessage is exported but has zero production call-sites yet — belongs in helpers or unexported until T-010 wires it.</li>
+<li>Env-var fallback &#39;FEAT-&#39; in main() has no comment explaining it&#39;s a transitional bridge until T-010/ConfigResolver.</li>
+<li>eslint-disable wrapping a single `__dirname` const is unusual noise; __dirname is valid in Jest/CJS without suppression.</li>
+<li>Named import { type Dirent, promises as fsp } diverges from codebase peers (config.ts, parse.ts, install-hooks.ts, repo-health.ts all use `import fs from &#39;fs/promises&#39;`). Carried from cr-01.</li>
+<li>formatEmptyScanMessage imported and used to write stderr at line 134, then EmptyScanError constructor also calls it internally — message emitted twice. Stderr write before throw is intentional for ...</li>
+<li>eslint-disable/enable pair wrapping a single __dirname const is noise; __dirname is valid in Jest CJS without suppression. Carried from cr-01.</li>
+<li>Module-level eslint-disable no-undef spanning entire file (lines 10-558); targeted disable or removal cleaner.</li>
+<li>Non-existent-root AC-005 block sets up stderrSpy but never asserts on stderrOutput content — spy is unused. Either assert on stderr message or remove the spy.</li>
+<li>Empty-scan guard missing: scan returns [] silently, main() continues, writes empty index.md/html, exits 0. AC-005 requires exit 1 + formatEmptyScanMessage. formatEmptyScanMessage is exported but ne...</li>
+<li>scan(root, &#39;&#39;) returns ALL session dirs — empty string is a prefix of every dirname. Invariant break: &#39;configured prefix&#39; becomes wildcard. Guard needed: reject empty string or empty-string element...</li>
+<li>enrich(raw) called with 1 arg — priorFlows/bypassFlows default to []. All sessions classified &#39;standard&#39; regardless of config. main() must pass resolved priorFlows/bypassFlows from loadConfig or env.</li>
+<li>No tests for empty-string prefix, empty-array prefix, or array containing empty string — edge-case invariants unverified.</li>
+<li>FEAT- fallback hardcode is transitional bridge (acceptable until T-010 wires ConfigResolver) — flag for closure in T-010.</li>
+<li>TEST_PRIOR_FLOWS/TEST_BYPASS_FLOWS const declarations placed between import statements — should precede or follow the full import block per TS/ESLint conventions.</li>
+<li>enrich(raw) called with 1 arg — new signature accepts priorFlows/bypassFlows; defaults to [] so all sessions classified &#39;standard&#39; at runtime regardless of config. Production call site not updated....</li>
+<li>Precedence when taskId appears in both priorFlows AND bypassFlows is implicit (priorFlows wins via early-return at line 58) but undocumented in JSDoc and untested — silent invariant.</li>
+<li>Safe-default invariant complianceForFlow(id, [], []) === &#39;standard&#39; is not directly exercised — only populated-array paths are tested. Edge case absence.</li>
+<li>loadConfig() can throw ConfigError (e.g. missing sessionPrefix); no try/catch — unhandled rejection exits Stop hook without graceful degradation, aborting PM session capture.</li>
+<li>Inline AC-003 ticket references are commit-msg-style prose; sibling files use JSDoc block comments at function level only.</li>
+<li>CommonJS require() inside ESM test file; module already mocked via jest.mock at line 28 — re-import is redundant and breaks style uniformity.</li>
+<li>expect(() =&gt; maybeRegenerateReport(...)).not.toThrow() wraps async fn synchronously — promise rejection is not caught by this assertion pattern.</li>
+<li>Describe block name embeds ticket ref &#39;AC-003&#39;; inconsistent with all other describe strings in file that use plain English.</li>
+<li>loadConfig() throws ConfigError if sessionPrefix missing; propagates out of maybeRegenerateReport and aborts PM session capture (primary job). Pre-T-007 capture had no config dep — this is a regres...</li>
+<li>reportCommand=&#39;&#39; (or whitespace-only string) passes validateFileConfig (type=string, not checked for non-empty), then split(&#39; &#39;) yields [&#39;&#39;] → spawn(&#39;&#39;, [], ...) throws ENOENT. Fix: trim + treat em...</li>
+<li>No test covers empty-string reportCommand or loadConfig throwing ConfigError — boundary cases for the two major gaps above.</li>
+<li>`return` after `process.exit(1)` is dead code in prod; no comment explains it exists for mock test harness compatibility.</li>
+<li>`jest.resetModules()` in beforeEach has no comment explaining the module-cache isolation purpose.</li>
+<li>Inline `stdoutSpy.mockRestore()` at line 100 is redundant — afterEach calls `jest.restoreAllMocks()`. Inconsistent teardown style across tests in same file.</li>
+<li>Comment claims 4 default fields but assertion threshold is &gt;= 3; misleading.</li>
+<li>reportCommand=&#39;&#39; from env yields blank Value cell (?? only catches null/undefined, not empty string); source=env shown, no ⚠ warning.</li>
+<li>process.stderr.write() not awaited/drained before process.exit(1); risk of truncated message on non-TTY pipes.</li>
+<li>Non-ConfigError (e.g. unexpected fs permission error) re-thrown without exit code; relies on CLI caller for exit code — caller-dependent behavior.</li>
+<li>No test covers reportCommand explicitly null from .agentops.json (source=config); should display &#39;(none)&#39; with source &#39;config&#39; and no ⚠.</li>
+<li>HOOK_COMMAND is unexported; test must redeclare it at line 31, creating silent drift risk if command changes.</li>
+<li>Bracket notation [&#39;Stop&#39;] used where dot notation .Stop is valid per ClaudeSettings type definition.</li>
+<li>No comment explaining that SyntaxError (malformed JSON) is intentionally propagated — intent ambiguous.</li>
+<li>HOOK_COMMAND redeclared as bare string literal — not imported from source. Silent drift risk.</li>
+<li>Test uses bracket notation hooks![&#39;Stop&#39;]! throughout (lines 45,46,62,63,76,77,89,90,104,119,120,133,134); source uses dot notation .Stop. Style inconsistency within same codebase.</li>
+<li>tmp written to os.tmpdir() may be on different filesystem from cwd/.claude/; fs.rename throws EXDEV, breaking the atomic-write guarantee (AC-011). Fix: use path.join(dir, `.settings.local.json.tmp-...</li>
+<li>No interrupt-simulated test (NFR-002 requires it); suite only checks post-success JSON validity.</li>
+<li>Malformed settings.local.json: JSON.parse throws SyntaxError and propagates unwrapped; no test coverage, error message not actionable.</li>
+<li>If rename fails (EXDEV/EACCES), tmp file in os.tmpdir() is orphaned; no cleanup in catch path.</li>
+<li>external:[] explicit empty array is noise; platform:node externalizes built-ins automatically — omit.</li>
+<li>prepare + prepublishOnly both invoke build; on npm publish build fires twice — redundant but not broken.</li>
+<li>Hook entry inserted by install-hooks uses a flat {command, description} shape, while the pre-existing legacy hook at line 33 uses the Claude Code nested matcher/hooks[] structure. Two incompatible ...</li>
+<li>Dependency uses a relative local tarball path (file:../ai-squad/packages/agentops/ai-squad-agentops-0.1.0.tgz). Non-portable across contributors and CI. Intended as transitional step for T-012; wil...</li>
+<li>Script agentops:report uses bare `agentops report` without `npx` prefix. The Stop hook uses `npx @ai-squad/agentops capture`. Consistent use of `npx agentops report` would be safer.</li>
+<li>AC-001..AC-015 are internal squad tracking IDs with no meaning for external npm consumers. Replace with user-facing feature descriptions.</li>
+<li>~3000 LOC, 147 test suites are internal metrics — noise in a public-facing CHANGELOG entry.</li>
+<li>agentops:backfill and agentops:capture-pm scripts still invoke local tsx scripts/agentops/ paths not retired after extraction. Will break when scripts/agentops/ is deleted in T-015.</li>
+<li>package.json dep updated to ^0.1.0 but lockfile still pins file:../ai-squad/.../tgz — npm ci will fail on CI and for other developers.</li>
+<li>calendarfr dep updated to ^0.1.0 before publish. Cannot install from registry until package is published. Should stay as local tgz until after npm publish succeeds.</li>
+<li>CHANGELOG says AC-001..AC-015 but spec defines AC-001..AC-017 (US-006 adds AC-016/017). Undercount, and AC IDs are internal.</li>
+<li>collectCoverageFrom and coverageThreshold still reference scripts/agentops/ (deleted); dead config, silently resolves to 0 files.</li>
+<li>mutate[] targets only scripts/agentops/**/*.ts (deleted); npm run mutation produces zero mutations, misleading results.</li>
+<li>testPathPattern locked to scripts/agentops/__tests__/ (deleted); Stryker test run resolves to zero tests.</li>
+<li>Exclusion rules list 4 specific scripts/agentops/*.ts entry points (deleted); dead rules may mask future arch violations.</li>
+<li>testPathIgnorePatterns retains /scripts/agentops/__fixtures__/ (deleted dir); orphaned noise.</li>
+<li>Documents npm run mutation (targets deleted dir) and agentops:backfill (deleted script) as live commands.</li>
+<li>collectCoverageFrom + coverageThreshold still target deleted scripts/agentops/**; npm run test:coverage will fail threshold gate (no files matched).</li>
+<li>mutate globs reference deleted scripts/agentops/**; npm run mutation will produce empty mutation set or error.</li>
+<li>testPathPattern points at deleted scripts/agentops/__tests__/; stryker jest runner will find zero tests.</li>
+<li>no-orphans allowedExceptions list keeps deleted scripts/agentops/*.ts paths; stale and misleading.</li>
+<li>eslint-disable-next-line no-undef for __dirname is unnecessary in Jest CJS; reduced from module-level but still noise. Non-blocking.</li>
+<li>Test imports fs via `{ promises as fsp } from &#39;fs&#39;` while source uses `fs from &#39;fs/promises&#39;`. Style drift, non-blocking.</li>
+<li>external:[] explicit empty array is noise; platform:node already externalizes built-ins. Non-blocking — cosmetic only.</li>
+<li>prepare + prepublishOnly both invoke build; double-build on npm publish — redundant but not broken.</li></ul></div>
+</details>
+<details>
+<summary>Phase durations</summary>
+<div><table>
+<thead><tr><th>Phase</th><th>Started</th><th>Completed</th><th>Duration</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>specify</td><td>20:30:00</td><td>2026-05-09 20:45:00</td><td>15m</td><td>approved</td></tr>
+<tr><td>plan</td><td>20:45:00</td><td>2026-05-09 21:05:00</td><td>20m</td><td>approved</td></tr>
+<tr><td>tasks</td><td>21:05:00</td><td>2026-05-09 21:25:00</td><td>20m</td><td>approved</td></tr>
+<tr><td>implementation</td><td>21:30:00</td><td>2026-05-10 05:04:14</td><td>454m 14s</td><td>approved</td></tr>
+</tbody>
+</table></div>
+</details>
+</section>
+      <section class="raw-data">
+  <h2>Raw data</h2>
+  <details>
+    <summary>View raw Markdown report</summary>
+    <div class="md-embed"><h1>Extract AgentOps observability into @ai-squad/agentops npm package — FEAT-001</h1>
+<blockquote>
+<p>Feature: Extract AgentOps observability into @ai-squad/agentops npm package
+Task ID: FEAT-001
+Phase: done
+Generated at: 2026-05-11T02:38:47.508Z</p>
+</blockquote>
+<h2>Insights</h2>
+<ul>
+<li>ℹ Escalation rate 0.0% is below the Galileo healthy band (&lt; 10%) — low escalation, agents resolving autonomously. <em>(Galileo healthy band)</em></li>
+<li>ℹ Dev task success rate 90.9% is at or above 80% — healthy first-try rate.</li>
+</ul>
+<h2>Cost breakdown</h2>
+<p><em>no usage data available — dispatch count fallback: 106 dispatches</em></p>
+<ul>
+<li>Total tokens: n/a<ul>
+<li>Estimated input (70%): n/a</li>
+<li>Estimated output (30%): n/a</li>
+</ul>
+</li>
+<li>Estimated cost USD: n/a</li>
+<li>Cost per AC: n/a</li>
+<li>Cost per dispatch (avg): n/a</li>
+<li>Wall-clock duration: n/a</li>
+<li>Tool uses total: n/a</li>
+<li>Coverage: 0 of 106 dispatches included in cost calculation</li>
+</ul>
+<h2>Repo health snapshot</h2>
+<p>Repo health: not measured (run <code>npm run mutation &amp;&amp; npm run type-coverage &amp;&amp; npm run arch:check</code> first)</p>
+<h2>Per-dispatch breakdown</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Role</th>
+<th>Status</th>
+<th>Loop</th>
+<th>Tokens</th>
+<th>$</th>
+<th>Duration</th>
+<th>PM note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>d-t001-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t002-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-cr-03</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-de...</td>
+<td>dev</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-de...</td>
+<td>dev</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-lr-03</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-de...</td>
+<td>dev</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t006-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t007-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t008-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-cr-02</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t010-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t010-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t010-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t010-lr-01</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t010-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t011-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t011-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t011-lr-01</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t011-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>60m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t002-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t002-lr-01</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t001-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t002-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t003-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t003-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t003-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t003-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t003-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-cr-02</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-cr-03</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-lr-03</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t004-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>10m</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m 6s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m 3s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m 3s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m 31s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>8m 17s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>8m 17s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t012-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m 43s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t013-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 45s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t013-cr-01</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 40s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t013-lr-01</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 40s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t013-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>28m 57s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 21s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 52s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 52s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m 30s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 39s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 39s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t014-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>26m 6s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>1m 32s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-cr-01</td>
+<td>code-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m 5s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-lr-01</td>
+<td>logic-reviewer</td>
+<td>needs_review</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>6m 5s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-de...</td>
+<td>dev</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>4m 4s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 40s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-lr-02</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>5m 40s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t015-qa-01</td>
+<td>qa</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>2m 30s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-audit-01</td>
+<td>audit-agent</td>
+<td>blocked</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>44m 50s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t002-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 44s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t005-cr-04</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 44s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t009-cr-03</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 44s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-t011-cr-02</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>3m 44s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>d-audit-02</td>
+<td>audit-agent</td>
+<td>done</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>7m 44s</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2>Per-AC closure detail</h2>
+<table>
+<thead>
+<tr>
+<th>AC ID</th>
+<th>Status</th>
+<th>Validator</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AC-001</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-002</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-003</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-004</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-005</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-006</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-007</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-008</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-009</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-010</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-011</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-012</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-013</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-014</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-015</td>
+<td>pass</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-016</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-017</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2>Phase durations</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>specify</td>
+<td>15 min</td>
+</tr>
+<tr>
+<td>plan</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>tasks</td>
+<td>20 min</td>
+</tr>
+<tr>
+<td>implementation</td>
+<td>454 min</td>
+</tr>
+</tbody></table>
+<h2>Timeline</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Started</th>
+<th>Completed</th>
+<th>Duration</th>
+<th>Visual</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>specify</td>
+<td>20:30:00</td>
+<td>20:45:00</td>
+<td>15m</td>
+<td>░░░░░░░░░░</td>
+</tr>
+<tr>
+<td>plan</td>
+<td>20:45:00</td>
+<td>21:05:00</td>
+<td>20m</td>
+<td>░░░░░░░░░░</td>
+</tr>
+<tr>
+<td>tasks</td>
+<td>21:05:00</td>
+<td>21:25:00</td>
+<td>20m</td>
+<td>░░░░░░░░░░</td>
+</tr>
+<tr>
+<td>implementation</td>
+<td>21:30:00</td>
+<td>05:04:14</td>
+<td>454m 14s</td>
+<td>██████████</td>
+</tr>
+</tbody></table>
+<h2>Dispatches</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Dispatches</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>audit-agent</td>
+<td>2</td>
+</tr>
+<tr>
+<td>blocker-specialist</td>
+<td>0</td>
+</tr>
+<tr>
+<td>code-reviewer</td>
+<td>30</td>
+</tr>
+<tr>
+<td>dev</td>
+<td>33</td>
+</tr>
+<tr>
+<td>logic-reviewer</td>
+<td>26</td>
+</tr>
+<tr>
+<td>pm-orchestrator</td>
+<td>0</td>
+</tr>
+<tr>
+<td>qa</td>
+<td>15</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>106</td>
+</tr>
+</tbody></table>
+<h2>Task success rate</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Task success rate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>audit-agent</td>
+<td>50.0%</td>
+</tr>
+<tr>
+<td>blocker-specialist</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>code-reviewer</td>
+<td>50.0%</td>
+</tr>
+<tr>
+<td>dev</td>
+<td>90.9%</td>
+</tr>
+<tr>
+<td>logic-reviewer</td>
+<td>61.5%</td>
+</tr>
+<tr>
+<td>pm-orchestrator</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>qa</td>
+<td>100.0%</td>
+</tr>
+</tbody></table>
+<h2>Loop rate</h2>
+<p>Loop rate: 0.0%</p>
+<h2>Escalation rate</h2>
+<p>Escalation rate: 0.0% — below healthy band (&lt; 10%)</p>
+<h2>AC closure</h2>
+<p>Total: 17 | Pass: 30 | Partial: 0 | Fail: 0 | Missing: 2</p>
+<h2>Reviewer findings density</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>critical</td>
+<td>0</td>
+</tr>
+<tr>
+<td>major</td>
+<td>27</td>
+</tr>
+<tr>
+<td>minor</td>
+<td>50</td>
+</tr>
+</tbody></table>
+<h2>PM notes log</h2>
+<p><em>(no PM notes recorded)</em></p>
+<h2>Token cost</h2>
+<p>Total tokens: 0 | Tokens/AC: 0</p>
+</div>
+  </details>
+</section>
+    </main>
+  </body>
+</html>

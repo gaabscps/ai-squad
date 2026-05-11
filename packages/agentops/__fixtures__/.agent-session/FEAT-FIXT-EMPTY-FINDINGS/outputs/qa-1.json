@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "qa-1",
+  "task_id": "FEAT-FIXT-EMPTY-FINDINGS",
+  "batch_id": "BATCH-A",
+  "role": "qa",
+  "status": "done",
+  "ac_coverage": [
+    { "ac": "AC-001", "status": "pass", "evidence": "Unit test verifies valid response returned" },
+    { "ac": "AC-002", "status": "pass", "evidence": "Integration test confirms no-error processing" }
+  ],
+  "summary": "QA complete. 2/2 ACs pass. No issues found."
+}

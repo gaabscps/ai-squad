@@ -12,10 +12,14 @@ const FIXTURES_ROOT = path.resolve(__dirname, '../__fixtures__/.agent-session');
 describe('scan', () => {
   it('returns sorted absolute paths for all valid FEAT-* fixtures (string prefix)', async () => {
     const result = await scan(FIXTURES_ROOT, 'FEAT-');
-    expect(result).toHaveLength(3);
-    expect(result[0]).toMatch(/FEAT-FIXTURE-A$/);
-    expect(result[1]).toMatch(/FEAT-FIXTURE-B$/);
-    expect(result[2]).toMatch(/FEAT-FIXTURE-C$/);
+    // 3 original fixtures + 3 new regression fixtures added in FEAT-002 T-011
+    expect(result).toHaveLength(6);
+    expect(result[0]).toMatch(/FEAT-FIXT-EMPTY-FINDINGS$/);
+    expect(result[1]).toMatch(/FEAT-FIXT-MISSING-QA$/);
+    expect(result[2]).toMatch(/FEAT-FIXT-NO-WORKTREE-HOOK$/);
+    expect(result[3]).toMatch(/FEAT-FIXTURE-A$/);
+    expect(result[4]).toMatch(/FEAT-FIXTURE-B$/);
+    expect(result[5]).toMatch(/FEAT-FIXTURE-C$/);
     // sorted ascending
     expect(result).toEqual([...result].sort());
     // all paths are absolute

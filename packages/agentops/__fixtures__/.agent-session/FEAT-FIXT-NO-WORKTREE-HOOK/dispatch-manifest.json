@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-FIXT-NO-WORKTREE-HOOK",
+  "plan_generated_at": "2026-05-10T09:30:00Z",
+  "expected_pipeline": [
+    {
+      "batch_id": "BATCH-A",
+      "title": "Implementation",
+      "tasks_covered": ["T-001"],
+      "ac_scope": ["AC-001", "AC-002"],
+      "required_roles": ["dev", "qa"]
+    }
+  ],
+  "actual_dispatches": [
+    {
+      "dispatch_id": "dev-1",
+      "batch_id": "BATCH-A",
+      "role": "dev",
+      "started_at": "2026-05-10T09:30:00Z",
+      "completed_at": "2026-05-10T10:00:00Z",
+      "output_packet_ref": "outputs/dev-1.json",
+      "status": "done"
+    },
+    {
+      "dispatch_id": "qa-1",
+      "batch_id": "BATCH-A",
+      "role": "qa",
+      "started_at": "2026-05-10T10:00:00Z",
+      "completed_at": "2026-05-10T10:30:00Z",
+      "output_packet_ref": "outputs/qa-1.json",
+      "status": "done"
+    }
+  ]
+}

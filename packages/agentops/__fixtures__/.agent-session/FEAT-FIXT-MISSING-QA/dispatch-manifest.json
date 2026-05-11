@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-FIXT-MISSING-QA",
+  "plan_generated_at": "2026-05-10T09:30:00Z",
+  "expected_pipeline": [
+    {
+      "batch_id": "BATCH-A",
+      "title": "Implementation",
+      "tasks_covered": ["T-001"],
+      "ac_scope": ["AC-001", "AC-002", "AC-003"],
+      "required_roles": ["dev", "code-reviewer", "qa", "audit-agent"]
+    }
+  ],
+  "actual_dispatches": [
+    {
+      "dispatch_id": "dev-1",
+      "batch_id": "BATCH-A",
+      "role": "dev",
+      "started_at": "2026-05-10T09:30:00Z",
+      "completed_at": "2026-05-10T10:00:00Z",
+      "output_packet_ref": "outputs/dev-1.json",
+      "status": "done"
+    },
+    {
+      "dispatch_id": "code-reviewer-1",
+      "batch_id": "BATCH-A",
+      "role": "code-reviewer",
+      "started_at": "2026-05-10T10:00:00Z",
+      "completed_at": "2026-05-10T10:20:00Z",
+      "output_packet_ref": "outputs/code-reviewer-1.json",
+      "status": "done"
+    },
+    {
+      "dispatch_id": "qa-1",
+      "batch_id": "BATCH-A",
+      "role": "qa",
+      "started_at": "2026-05-10T10:20:00Z",
+      "completed_at": "2026-05-10T11:00:00Z",
+      "output_packet_ref": "outputs/qa-1.json",
+      "status": "done"
+    },
+    {
+      "dispatch_id": "audit-agent-1",
+      "batch_id": "BATCH-A",
+      "role": "audit-agent",
+      "started_at": "2026-05-10T11:00:00Z",
+      "completed_at": "2026-05-10T11:30:00Z",
+      "output_packet_ref": "outputs/audit-agent-1.json",
+      "status": "done"
+    }
+  ]
+}

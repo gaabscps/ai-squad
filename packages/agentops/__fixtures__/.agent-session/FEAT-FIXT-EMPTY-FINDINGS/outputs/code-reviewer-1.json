@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "code-reviewer-1",
+  "task_id": "FEAT-FIXT-EMPTY-FINDINGS",
+  "batch_id": "BATCH-A",
+  "role": "code-reviewer",
+  "status": "done",
+  "findings": [],
+  "summary": "Code review complete. No findings — clean implementation."
+}

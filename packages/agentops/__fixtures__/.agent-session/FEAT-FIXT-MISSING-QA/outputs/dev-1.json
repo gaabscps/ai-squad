@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "dispatch_id": "dev-1",
+  "task_id": "FEAT-FIXT-MISSING-QA",
+  "batch_id": "BATCH-A",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implemented feature per spec.",
+  "evidence": ["src/feature.ts:1-50"],
+  "files_changed": ["src/feature.ts"]
+}
