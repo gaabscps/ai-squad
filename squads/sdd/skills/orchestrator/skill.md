@@ -51,11 +51,15 @@ The Skill that runs the autonomous Implementation Pipeline. Dispatches the 6 Sub
 ### 1. Resolve Session and read inputs
 1. Determine `task_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec/Plan/Tasks (auto-derive if Plan/Tasks were skipped per `planned_phases`).
-3. **Preflight: validate `ac_scope` on every task (AC-006).** Before any dispatch, iterate every `T-XXX` in `tasks.md`. If any task does not declare an `ac_scope` field (or `ac_scope` is empty), abort with error:
+3. **Preflight: validate `ac_scope` and `Tier:` on every task.** Before any dispatch, iterate every `T-XXX` in `tasks.md`. If any task does not declare an `ac_scope` field (or `ac_scope` is empty), abort with error:
    ```
    "Task <T-XXX> in tasks.md missing required ac_scope field"
    ```
-   Do NOT dispatch any Subagent until all tasks pass this check. This guard exists because tasks without `ac_scope` cannot populate `acScope` in `expected_pipeline[]` and break the agentops coverage matrix.
+   If any task does not declare a `Tier:` field (values: T1, T2, T3, T4), abort with error:
+   ```
+   "Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"
+   ```
+   Do NOT dispatch any Subagent until all tasks pass both checks. The `ac_scope` guard exists because tasks without it cannot populate `acScope` in `expected_pipeline[]` and break the agentops coverage matrix. The `Tier` guard exists because dispatch model/effort selection is tier-driven (see "Model/effort selection" below); silently defaulting defeats the calibration.
 4. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
 5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
@@ -219,12 +223,35 @@ tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
 ac_scope: [AC-001, AC-003]
 scope_files: [src/auth/login.ts]
 previous_findings: <path-or-null>
+model: sonnet            # set by orchestrator from Tier × Loop table
+effort: high             # set by orchestrator from Tier × Loop table
+tier: T3                 # echoed for traceability; source of truth is tasks.md
 project_context:
   standards_ref: ./CLAUDE.md
 ```
 ```
 
 The Subagent body's "Input contract" specifies which fields are required for that Role. Missing fields → Subagent emits `status: blocked, blocker_kind: contract_violation`.
+
+### Model/effort selection (canonical Tier × Loop enforcement)
+On every Subagent dispatch, the orchestrator MUST populate the Work Packet `model` and `effort` fields per the canonical Tier × Loop table in [`shared/concepts/effort.md`](../../../shared/concepts/effort.md). The Subagent frontmatter default is only the fallback when the Work Packet omits these fields.
+
+**Algorithm:**
+1. Read the task's `Tier:` field from `tasks.md` (values: `T1`, `T2`, `T3`, `T4`). If absent → abort with error `"Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"`. Do NOT silently default; that defeats the calibration.
+2. Determine the dispatch's **loop kind** by inspecting `task_states[T-XXX]` and the immediately preceding dispatch in `actual_dispatches[]`:
+   - `dev` + first dispatch on task → `dev L1`
+   - `dev` + previous_findings from reviewer + `task_states.loops == 2` → `dev L2`
+   - `dev` + previous_findings from reviewer + `task_states.loops == 3` → `dev L3`
+   - `dev` + previous_findings from qa + qa-loop 1 → `dev qa-L1`
+   - `dev` + previous_findings from qa + qa-loop 2 → `dev qa-L2`
+   - `code-reviewer` / `logic-reviewer` / `qa` → look up by role only (loop-independent)
+   - `blocker-specialist` → opus, xhigh (tier-independent)
+   - `audit-agent` → haiku, medium (tier-independent)
+3. Look up `(loop_kind, tier)` in the Tier × Loop table → `(model, effort)`.
+4. Write `model`, `effort`, `tier` into the Work Packet.
+5. Echo the same `model`/`effort` into a `tier_calibration` field on the `actual_dispatches[]` entry for the dispatch (`{tier: "T3", model: "sonnet", effort: "high", loop_kind: "dev L2"}`) — agentops uses this for cost-attribution reporting.
+
+**Dynamic tier reclassification:** if reviewer findings on a `dev` L1 Output Packet reveal complexity exceeding the initial `Tier:` (e.g., findings cite invariants, race conditions, or cross-module impact not anticipated in the original tier), the orchestrator MUST update the task's `Tier:` line in `tasks.md` BEFORE dispatching the L2 dev. Append a `Tier-bump note:` line on the task explaining the bump (one line). The L2+ dispatches read the corrected tier. Tier reclassification is logged on the next `actual_dispatches[]` entry's `pm_note` as `"Tier-bump T<X> → T<Y> — <one-line reason>"`.
 
 ## Output
 - Per dispatch: Work Packet snapshot at `.agent-session/<task_id>/inputs/<dispatch_id>.json` (orchestrator writes for traceability); Output Packet at `.agent-session/<task_id>/outputs/<dispatch_id>.json` (Subagent writes via atomic write).

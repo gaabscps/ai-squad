@@ -32,22 +32,70 @@ Platform defaults: `xhigh` on Opus 4.7; `high` on Opus 4.6 and Sonnet 4.6.
 
 You can mix: `sonnet + high`, `opus + medium`, `opus + xhigh`. Each combination has different cost/quality tradeoffs. The squad uses calibrated combinations per Role (see mapping below) rather than maxing both.
 
-## ai-squad calibration — model and effort per Role
+## ai-squad calibration — model and effort
 
-This is the framework's opinionated default. Justifications below.
+The framework calibrates **model** and **effort** along two axes:
 
-| Role | Materialization | Phase | Model | Effort | Why |
-|------|-----------------|-------|-------|--------|-----|
-| `spec-writer` | Skill | 1 | (inherits) | (inherits) | Skills inherit from the human's main session. Recommendation: run `/model opus` before `/spec-writer` — Phase 1 is design conversation where Opus's reasoning helps the human refine the Spec. |
-| `designer` | Skill | 2 | (inherits) | (inherits) | Inherits. Recommendation: `/model opus` — Plan decisions (architecture, risks, dependencies) are reasoning-heavy. |
-| `task-builder` | Skill | 3 | (inherits) | (inherits) | Inherits. Recommendation: `/model sonnet` — task decomposition is more procedural than the Plan. |
-| `orchestrator` | Skill | 4 | (inherits) | (inherits) | Inherits. Sonnet is sufficient for sequential dispatch. Use Opus when the orchestrator needs to decompose for multi-instance fan-out — that decision is reasoning-heavy. |
-| `dev` | Subagent | 4 | sonnet | high | Surgical implementation needs solid reasoning; `medium` breaks on non-trivial features. Sonnet keeps cost manageable under `fan_out`. Override to opus per Work Packet for architecturally complex features. |
-| `code-reviewer` | Subagent | 4 | sonnet | medium | Pattern matching against conventions is procedural, not reasoning-heavy. |
-| `logic-reviewer` | Subagent | 4 | **opus** | high | Detecting edge cases, behavioral gaps, race conditions, broken invariants requires strong reasoning — this is the Subagent where model upgrade pays the most. Effort stays at `high` (not `xhigh`) to preserve quota; `opus + high` is already a significant upgrade. |
-| `qa` | Subagent | 4 | sonnet | medium | Executing scenarios and verifying pass/fail is procedural. |
-| `blocker-specialist` | Subagent | 4 (escalation) | opus | xhigh | High-stakes arbitration; last line before the human. Both levers maxed because dispatch frequency is low (escalation only). |
-| `audit-agent` | Subagent | 4 (pre-handoff) | **haiku** | medium | Mechanical reconciliation of dispatch manifest vs. outputs/. No creative reasoning. Haiku saves quota. **Medium** (not low) because false-negative defeats the entire audit layer — the model must read carefully and not skip checks. Singleton per pipeline run, so cost per run is negligible. |
+- **Skills (Phases 1–4 entry points)** — inherit from the human's main session. Recommendations below.
+- **Subagents (Phase 4 workers)** — frontmatter declares a *default*; per-dispatch *overrides* travel in the Work Packet (`model`/`effort` fields) and are set by the orchestrator from the canonical **Tier × Loop table** below.
+
+### Skills — recommended main-session model
+
+| Skill | Recommended model | Why |
+|-------|-------------------|-----|
+| `spec-writer` | opus + high | Phase 1 is design conversation — Opus's reasoning helps the human refine the Spec. |
+| `designer` | opus + high | Plan decisions (architecture, risks, dependencies) are reasoning-heavy. |
+| `task-builder` | sonnet + high | Task decomposition is more procedural than the Plan. |
+| `orchestrator` | sonnet + high | Sequential dispatch + state merge. Bump to Opus for multi-instance fan-out planning. |
+| `pm` (autonomous) | **opus + high** | Senior critical evaluation across all phases — Sonnet here accepts workarounds the PM mandate forbids. Effort `high` (not `xhigh`) because PM time is mostly reading packets and routing, not creative reasoning per token. |
+
+### Subagent default frontmatter (fallback when Work Packet does not override)
+
+| Subagent | Default model | Default effort | Notes |
+|----------|---------------|----------------|-------|
+| `dev` | sonnet | high | Mid-tier fallback. Real dispatches receive Work Packet override per the Tier × Loop table. |
+| `code-reviewer` | sonnet | medium | Pattern-matching against conventions is procedural. |
+| `logic-reviewer` | opus | high | Detecting invariants / edge cases / race conditions pays the most from model upgrade. |
+| `qa` | sonnet | medium | Executing scenarios is procedural at mid-tier. |
+| `blocker-specialist` | opus | xhigh | High-stakes arbitration; dispatch frequency is low. |
+| `audit-agent` | haiku | medium | Mechanical manifest reconciliation. Singleton per run. |
+
+### Canonical Tier × Loop table (orchestrator-enforced Work Packet overrides)
+
+The orchestrator reads each task's `Tier:` field from `tasks.md` and overrides Work Packet `model`/`effort` per this table on every Subagent dispatch. Tier definitions and reclassification rules below.
+
+| Step / Role            | Description                                | T1 — Procedural | T2 — Pattern    | T3 — Judgement  | T4 — Core complex |
+|------------------------|--------------------------------------------|-----------------|-----------------|-----------------|-------------------|
+| **dev L1**             | First implementation                       | haiku, high     | sonnet, medium  | sonnet, high    | sonnet, high      |
+| **dev L2**             | Retry with `previous_findings` from reviewer | sonnet, medium ¹ | sonnet, high ¹  | sonnet, high    | sonnet, high      |
+| **dev L3**             | Final retry (`review_loops_max = 3`)       | sonnet, high ¹  | sonnet, high    | sonnet, high    | **opus, high** ²  |
+| **dev qa-L1**          | Retry after qa fail (skips reviewers)      | sonnet, medium  | sonnet, high    | sonnet, high    | sonnet, high      |
+| **dev qa-L2**          | Final retry after qa fail                  | sonnet, high    | sonnet, high    | sonnet, high    | **opus, high** ²  |
+| **code-reviewer**      | Any loop (L1/L2/L3)                        | haiku, high     | haiku, high     | sonnet, medium  | sonnet, medium    |
+| **logic-reviewer**     | Any loop (L1/L2/L3)                        | sonnet, medium  | sonnet, medium  | sonnet, high    | opus, high        |
+| **qa**                 | Any attempt                                | haiku, high     | haiku, high     | sonnet, medium  | **sonnet, high**  |
+| **blocker-specialist** | Any trigger (cap, stall, conflict)         | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³     |
+| **audit-agent**        | Singleton pre-handoff                      | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴   |
+
+**Notes**
+
+- ¹ Subir tier do `dev` quando há `previous_findings` carregado — contexto mais rico exige modelo mais forte para não repetir o erro do loop anterior.
+- ² Última chance em core complex: opus **high** (não medium). Economizar effort aqui é exatamente onde débito técnico entra.
+- ³ Blocker é raro e alta aposta — opus xhigh sempre. Custo agregado fica baixo porque dispatch frequency é low.
+- ⁴ Audit é reconciliação mecânica de manifesto vs outputs — haiku medium é o ponto certo. Subir desperdiça quota.
+
+### Tier definitions (operational)
+
+| Tier | Definition | Example |
+|------|-----------|---------|
+| **T1 — Procedural** | Single path, no design decision, no non-obvious invariant | Rename, add field, copy existing pattern |
+| **T2 — Pattern** | Established repo pattern, 1–2 local decisions | Endpoint mirroring existing endpoints |
+| **T3 — Judgement** | Multiple design decisions, cross-file impact | New auth flow, module refactor |
+| **T4 — Core complex** | Domain invariant, concurrency, security, data migration, public contract. Error = incident | Schema migration, lock manager, RBAC core |
+
+**Tie-break:** when in doubt between two tiers, escalate to the higher one.
+
+**Dynamic reclassification:** if L1 reviewer findings reveal complexity exceeding the initial tier, the orchestrator (or PM, in autonomous mode) MUST raise the task's `Tier:` field in `tasks.md` *before* dispatching L2 — so L2+ runs at the corrected tier. Recording the bump as a `Tier-bump note:` line on the task in `tasks.md` is recommended for audit traceability.
 
 ## Why not Opus everywhere
 
@@ -58,10 +106,12 @@ The framework's calibration places Opus only where:
 1. The Role's value comes from reasoning quality, not throughput (`logic-reviewer`, `blocker-specialist`), AND
 2. The Role's dispatch frequency or fan-out factor does not amplify cost into a quota emergency.
 
+Tier-aware calibration sharpens this further: T1/T2 tasks run dev/code-reviewer/qa on haiku, saving quota for T3/T4 work where opus pays off. The Tier × Loop table is the framework's bet on a defensible cost/quality tradeoff for the typical Max 5x user.
+
 Worst-case rough estimate for one feature with `fan_out` of 2 on dev and reviewers + 1 qa, single review cycle:
 
 - All Sonnet baseline: ~9 Sonnet dispatches
-- ai-squad calibration (logic-reviewer Opus, rest Sonnet): ~7 Sonnet + 2 Opus ≈ 17 Sonnet-equivalent units
+- Tier-aware calibration on a mixed T2/T3 feature: ~3 haiku + 4 sonnet + 2 opus ≈ 13 Sonnet-equivalent units
 - All Opus: ~9 Opus ≈ 45 Sonnet-equivalent units
 
 The middle option fits comfortably inside a Max 5x plan. The third does not.

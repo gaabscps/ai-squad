@@ -1,6 +1,6 @@
 {
   "name": "@ai-squad/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ai-squad CLI — deploy SDD/Discovery squads (skills, agents, hooks) to Claude Code (~/.claude/) and Cursor.",
   "keywords": [
     "ai-squad",

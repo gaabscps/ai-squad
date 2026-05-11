@@ -22,7 +22,8 @@ parent_plan: PLAN-FEAT-XXX
 > - `Files:` — **exact file paths** (no globs); becomes `scope_files` in the Work Packet
 > - `AC covered:` — every AC from the Spec MUST appear in ≥1 task's list; becomes `ac_scope` in the Work Packet
 > - `Depends on:` — declares ordering; predecessor must be `done` before this task starts
-> - `Estimated complexity:` — small | medium | large (informational; orchestrator may use for `effort` override)
+> - `Estimated complexity:` — small | medium | large (informational)
+> - `Tier:` — T1 | T2 | T3 | T4 (canonical complexity tier; orchestrator reads this to select `model`/`effort` per the Tier × Loop table in `shared/concepts/effort.md`). Required for `/orchestrator`. Set by `/task-builder` (or by `/pm` in autonomous mode). Reclassify dynamically when reviewer findings reveal higher complexity.
 >
 > **Sizing guidance (INVEST + Spec Kit):** task = smallest independently testable slice that touches a coherent file set (not 1 file, not 1 module). Target: **5-8 tasks per User Story, ~15-30 total per feature**. >40 tasks suggests splitting the feature.
 
