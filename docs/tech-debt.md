@@ -1,0 +1,301 @@
+---
+created: 2026-05-11
+last_updated: 2026-05-11
+source: FEAT-004 handoff + followups consolidados
+---
+
+# Tech Debt — ai-squad
+
+Catálogo de débitos técnicos identificados durante a execução das features. Cada item tem ID estável, categoria, impacto, e esforço estimado para priorização independente.
+
+> **Convenção de prioridade:**
+> - `P1` — bloqueia uso real ou corrompe dados silenciosamente
+> - `P2` — degrada observabilidade ou auditabilidade
+> - `P3` — inconsistência ou duplicação sem impacto funcional imediato
+
+---
+
+## Índice rápido
+
+| ID | Categoria | Resumo | Prioridade | Esforço |
+|----|-----------|--------|-----------|---------|
+| [DEBT-001](#debt-001) | Bug | `_DEBT_MARKER_EXEMPT_PATHS` estreita — self-block no ai-squad | P1 | M |
+| [DEBT-002](#debt-002) | Bug | Multi-feature mtime race em `find_active_session` | P2 | M |
+| [DEBT-003](#debt-003) | Bug | `BaseException` silent allow em `scan_failed` | P2 | S |
+| [DEBT-004](#debt-004) | Bug | Spec literal `pm_cost_within_budget` ≠ implementação `pm_cost_cap_exceeded` | P3 | S |
+| [DEBT-005](#debt-005) | Infra | Reviewer subagents são read-only — Output Packets viram stubs | P1 | L |
+| [DEBT-006](#debt-006) | Infra | `needs_review` + qa pass não equivale a `done` no audit-agent | P2 | S |
+| [DEBT-007](#debt-007) | Design | Drift canônico: pm-bypass.md vs cópias inline no designer/task-builder | P3 | S |
+| [DEBT-008](#debt-008) | Design | `fmtUsd`/`mdTable` duplicados em agentops report | P3 | S |
+| [DEBT-009](#debt-009) | Design | audit-agent 3 edge cases em pm_cost checks | P3 | S |
+| [DEBT-010](#debt-010) | Test | Race de 2 threads sem Barrier em capture-pm-usage tests | P3 | S |
+| [DEBT-011](#debt-011) | Test | Cenários de integração under-asserted: designer/task-builder negative paths | P3 | M |
+
+---
+
+## Bugs
+
+### DEBT-001
+
+**`_DEBT_MARKER_EXEMPT_PATHS` estreita — `/pm` self-bloqueia no ai-squad**
+
+- **Origem:** FEAT-004 / T-004
+- **Arquivo:** `squads/sdd/hooks/verify-pm-handoff-clean.py`
+- **Prioridade:** P1
+- **Esforço:** M
+
+**Descrição:**
+A lista de paths isentos da varredura de debt markers está hardcoded com prefixos muito estreitos:
+`.agent-session/`, `node_modules/`, `vendor/`, `dist/`, `build/`, `.next/`.
+
+Quando o `/pm` Skill roda *dentro* do próprio repo ai-squad, os arquivos que contêm literais de marcador legítimos não estão isentos:
+- Skill docs que ensinam como usar `TODO:` / `FIXME:` como exemplo
+- Fixtures de teste que contêm `xfail`, `@skip`, `mock-only` como strings de teste
+- O próprio `docs/tech-debt.md` (este arquivo contém exemplos de marcadores)
+
+**Impacto:** O hook bloqueia o handoff do PM com falso-positivo toda vez que o ai-squad usa `/pm` em si mesmo.
+
+**Fix sugerido:**
+Opção A — Expandir `_DEBT_MARKER_EXEMPT_PATHS` para incluir `squads/sdd/hooks/__tests__/`, `squads/sdd/skills/__tests__/`, `squads/sdd/agents/__tests__/`, `docs/`, `shared/concepts/`, `*.md` em geral.
+Opção B — Trocar de path-prefix para path-pattern (glob ou regex) com um arquivo de configuração `.pm-scan-ignore` no root (análogo ao `.gitignore`).
+
+Opção B é mais sustentável a longo prazo.
+
+---
+
+### DEBT-002
+
+**Multi-feature mtime race em `find_active_session`**
+
+- **Origem:** FEAT-004 / T-016
+- **Arquivo:** `squads/sdd/hooks/_pm_shared.py` — função `find_active_session`
+- **Prioridade:** P2
+- **Esforço:** M
+
+**Descrição:**
+`find_active_session` usa `os.path.getmtime` nos arquivos `session.yml` dentro de `.agent-session/*/` para determinar qual feature está ativa, retornando a mais recentemente modificada.
+
+Em ambientes com múltiplas features abertas simultaneamente (p.ex. dois `/orchestrator` em paralelo), o hook `capture-pm-usage.py` pode escrever o `pm_session` no manifesto da feature *errada* se ambas tiverem `session.yml` com mtimes próximos.
+
+**Impacto:** `pm_sessions[]` no dispatch-manifest.json associado à feature errada. Relatório de custo PM no agentops fica incorreto para ambas as features.
+
+**Fix sugerido:**
+Ler `session.yml.current_owner` em vez de confiar em mtime. Se `current_owner == "pm"` e `current_phase` está em uma das phases planejadas, essa é a sessão ativa. Desempatar por `last_activity_at` se mais de uma se qualificar.
+
+---
+
+### DEBT-003
+
+**`BaseException` silent allow em `scan_failed`**
+
+- **Origem:** FEAT-004 / T-005
+- **Arquivo:** `squads/sdd/hooks/verify-pm-handoff-clean.py`
+- **Prioridade:** P2
+- **Esforço:** S
+
+**Descrição:**
+O bloco `try/except` no fallback de timeout captura `Exception`, mas não `BaseException`. Subclasses como `MemoryError`, `SystemExit`, `KeyboardInterrupt` propagam silenciosamente para fora do except, podendo fazer o hook terminar sem emitir `{decision: "block"}` — o que resulta em allow implícito (hook sem output = allow na plataforma Claude Code).
+
+**Impacto:** Em condições de memória muito baixa, o hook pode falhar silenciosamente e deixar o handoff passar com debt markers presentes.
+
+**Fix sugerido:**
+Mudar `except Exception as e` para `except BaseException as e` no bloco de scan_failed. Adicionar um sentinel de output no `finally` que garante que um JSON de block é emitido se `_output_written` for False.
+
+---
+
+### DEBT-004
+
+**Spec literal `pm_cost_within_budget` ≠ implementação `pm_cost_cap_exceeded`**
+
+- **Origem:** FEAT-004 / T-009 AC-018, T-025
+- **Arquivos:** `squads/sdd/agents/audit-agent.md`, `shared/schemas/output-packet.schema.json`
+- **Prioridade:** P3
+- **Esforço:** S
+
+**Descrição:**
+A Spec (AC-018) usa o literal `pm_cost_within_budget` como nome do finding kind para quando o custo PM ultrapassa o cap. A implementação usou `pm_cost_cap_exceeded` (semânticamente mais preciso: exceeded é o estado ruim, within_budget seria o estado OK).
+
+A inconsistência está entre:
+- `squads/sdd/agents/audit-agent.md` Check 11 — usa `pm_cost_cap_exceeded` ✓
+- `shared/schemas/output-packet.schema.json` enum — usa `pm_cost_cap_exceeded` ✓
+- AC-018 no spec original — diz `pm_cost_within_budget` ✗
+
+**Impacto:** Auditoria semântica da Spec falha (AC-018 literalmente não satisfeito pela implementação). Sem impacto funcional — o hook funciona corretamente.
+
+**Fix sugerido:** Emitir spec amendment atualizando AC-018 para `pm_cost_cap_exceeded`. É a implementação que está certa.
+
+---
+
+## Infra
+
+### DEBT-005
+
+**Reviewer subagents são read-only — Output Packets viram stubs gerados pelo orchestrator**
+
+- **Origem:** FEAT-004 Wave B1/B2/B3 (52 stubs gerados)
+- **Arquivos:** `squads/sdd/agents/code-reviewer.md`, `squads/sdd/agents/logic-reviewer.md`
+- **Prioridade:** P1
+- **Esforço:** L
+
+**Descrição:**
+`code-reviewer` e `logic-reviewer` têm apenas ferramentas Read + Grep. Não conseguem escrever o Output Packet em `outputs/<dispatch_id>.json`. O orchestrator compensa gerando stubs com:
+
+```json
+{"_note": "stub generated by orchestrator — reviewer returned findings in transcript only"}
+```
+
+**Impacto concreto:**
+- Findings com `severity`, `dimension`, `evidence_ref` existem só no transcript — invisíveis ao agentops
+- Custo dos dispatches de reviewer não aparece em `cost by role` no relatório
+- Audit-agent gera false-positive `bypass_detected` porque stubs não passam na checagem de completude
+- FEAT-004 audit L3 foi bloqueado por isso e precisou de explicação manual
+
+**Opções de fix:**
+
+| Opção | Mecanismo | Complexidade | Trade-off |
+|-------|-----------|-------------|-----------|
+| A | Adicionar `Bash` restrito ao reviewer (`cat > outputs/*.json` apenas) | S | Abre superfície de ataque mínima; precisa de hook de validação de path |
+| B | Stop hook `capture-reviewer-output.py` captura transcript e escreve packet | M | Zero mudança no subagent; parse de transcript é frágil |
+| C | MCP tool `write_output_packet` dedicado | L | Cleanest; requer novo MCP server |
+
+**Recomendação:** Opção A como quick fix, Opção C como target de longo prazo.
+
+---
+
+### DEBT-006
+
+**`needs_review` + qa pass não é interpretado como `done` no audit-agent**
+
+- **Origem:** FEAT-004 Wave B1/B2/B3
+- **Arquivo:** `squads/sdd/agents/audit-agent.md`
+- **Prioridade:** P2
+- **Esforço:** S
+
+**Descrição:**
+O audit-agent Check 7 (reviewer stage completeness) exige `status: done` nos reviewer dispatches para marcar a task como completa. Mas o padrão de Wave A (que passou limpo) e a prática real de FEAT-004 é:
+
+- Reviewer retorna `status: needs_review` com minors deferidos
+- QA passa validando ACs
+- Orchestrator marca task `state: done`
+
+O audit-agent não tem a regra: **`needs_review` + qa pass subsequente = `done` para fins de gate**. Isso gera falso-positivo `bypass_detected` para tasks legítimas.
+
+**Fix sugerido:**
+Adicionar ao Check 7 do audit-agent: se uma task tem dispatch `status: needs_review` em reviewer E tem dispatch `status: done` em qa subsequente, interpretar como `reviewer_done: true` para o gate.
+
+---
+
+## Design
+
+### DEBT-007
+
+**Drift canônico: pm-bypass.md vs cópias inline no designer/task-builder**
+
+- **Origem:** FEAT-004 / T-013 e T-014 (correram em paralelo a T-012 que atualizou o canônico)
+- **Arquivos:** `squads/sdd/skills/designer/skill.md`, `squads/sdd/skills/task-builder/skill.md`, `shared/concepts/pm-bypass.md`
+- **Prioridade:** P3
+- **Esforço:** S
+
+**Descrição:**
+T-012 dev L2 atualizou `shared/concepts/pm-bypass.md` com duas adições críticas:
+1. Partial-write repair (write to `.tmp` + `os.replace`)
+2. `current_phase` advance após bypass approval
+
+T-013 (designer) e T-014 (task-builder) correram em paralelo e integraram versões do pm-bypass sem essas duas adições. As cópias inline nos dois Skills estão defasadas em relação ao canônico.
+
+**Impacto:** Em PM-mode, designer e task-builder podem deixar arquivos em estado parcial se o processo for interrompido mid-write, ou não avançar `current_phase` corretamente.
+
+**Fix sugerido:** Re-ler `shared/concepts/pm-bypass.md` e sincronizar o bloco Step 6.5 nos dois Skills linha a linha.
+
+---
+
+### DEBT-008
+
+**`fmtUsd`/`mdTable` duplicados em agentops report**
+
+- **Origem:** FEAT-004 / T-020
+- **Arquivo:** `packages/agentops/src/render/report.ts`
+- **Prioridade:** P3
+- **Esforço:** S
+
+**Descrição:**
+As funções `fmtUsd` (formata float como `$0.0042`) e `mdTable` (constrói tabela markdown) foram duplicadas em `report.ts` em vez de extraídas para um módulo compartilhado. A função `fmtUsd` também existe em `cost-breakdown.ts`.
+
+**Impacto:** Se o formato de saída mudar, requer duas edições. Baixo risco de divergência hoje, alto risco quando mais seções de relatório forem adicionadas.
+
+**Fix sugerido:** Criar `packages/agentops/src/render/utils.ts` com `fmtUsd` e `mdTable`. Re-exportar de `cost-breakdown.ts` se necessário para não quebrar imports existentes.
+
+---
+
+### DEBT-009
+
+**audit-agent 3 edge cases em pm_cost checks**
+
+- **Origem:** FEAT-004 / T-024
+- **Arquivo:** `squads/sdd/agents/audit-agent.md`
+- **Prioridade:** P3
+- **Esforço:** S
+
+**Descrição:**
+Check 11 (`pm_cost_cap_exceeded`) tem 3 edge cases não cobertos:
+
+1. **`sum` sobre `cost_usd` undefined** — se um `pm_session` não tiver o campo `cost_usd`, `sum()` retorna `None` em vez de `0`, quebrando a comparação com o cap.
+2. **`artifact_path` null** — Check 10 (`pm_gate_violations`) faz match de artifact_path; se `phase_history[phase].artifact_path` for null, a comparação pode lançar TypeError.
+3. **`notes` ausente** — se `session.yml.notes` não existir (session mais antiga), Check 10 falha ao tentar iterar `pm_decision` entries.
+
+**Fix sugerido:** Adicionar guards explícitos nos 3 pontos no audit-agent.md com comportamento definido: `cost_usd` ausente → tratar como 0; `artifact_path` null → skip match (log warning); `notes` ausente → skip Check 10 (não é violação, é session pré-FEAT-004).
+
+---
+
+## Test hygiene
+
+### DEBT-010
+
+**Race de 2 threads sem Barrier em capture-pm-usage tests**
+
+- **Origem:** FEAT-004 / T-023
+- **Arquivo:** `squads/sdd/hooks/__tests__/test_capture_pm_usage.py`
+- **Prioridade:** P3
+- **Esforço:** S
+
+**Descrição:**
+O teste de race condition usa um `threading.Barrier` para sincronizar 5 threads, mas o caso de 2 threads não tem Barrier — usa `time.sleep(0.01)` como sincronização implícita. O teste funciona na maioria das vezes, mas pode ser não-determinístico em máquinas lentas ou CI com context-switch agressivo.
+
+**Fix sugerido:** Extrair `_run_concurrent_writes(n_threads)` com Barrier para N arbitrário. Testar com n=2, n=5, n=10.
+
+---
+
+### DEBT-011
+
+**Cenários de integração under-asserted: designer/task-builder negative paths**
+
+- **Origem:** FEAT-004 / T-015
+- **Arquivo:** `squads/sdd/skills/__tests__/test_pm_bypass_integration.md`
+- **Prioridade:** P3
+- **Esforço:** M
+
+**Descrição:**
+O cenário de integração do PM bypass cobre os happy paths dos 3 Skills, mas tem gaps nas asserções negativas:
+
+1. **designer negative** — cenário de `auto_approved_by: pm` com AC-coverage gap (marker `[NEEDS CLARIFICATION]` presente) não verifica se o Skill *recusa* o bypass E escreve o marker corretamente em `session.yml.notes`.
+2. **task-builder negative** — `[P]`-violation detection em PM mode não tem cenário de rejeição explícito.
+3. **`current_phase` advance ambiguity** — não está claro se o bypass avança `current_phase` para a próxima phase planejada ou para `"implementation"`. O cenário não asserções isso.
+
+**Fix sugerido:** Adicionar 3 cenários negativos ao documento, com asserções explícitas sobre o estado de `session.yml` após cada rejeição.
+
+---
+
+## Como atacar
+
+Ordem sugerida de resolução independente:
+
+1. **DEBT-001** — P1 bug funcional que bloqueia uso real do ai-squad em si mesmo
+2. **DEBT-005** — P1 infra gap que degrada todo o pipeline (começa pela Opção A)
+3. **DEBT-006** — P2 desbloqueador: remove false-positives no audit-agent
+4. **DEBT-002** — P2 race condition em ambiente multi-feature
+5. **DEBT-003** — P2 edge case de segurança no hook de debt scan
+6. **DEBT-007** — P3 sync rápido entre Skills e canônico
+7. **DEBT-004 + DEBT-008 + DEBT-009** — P3 polish, qualquer ordem
+8. **DEBT-010 + DEBT-011** — P3 test hygiene, atacar junto
+
+> Cada item é independente e pode virar uma task isolada dentro de uma FEAT-005 ou ser atacado diretamente como hotfix dependendo do impacto.
