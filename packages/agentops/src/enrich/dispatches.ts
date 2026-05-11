@@ -4,9 +4,9 @@
 
 import { ANTHROPIC_PRICING_2026 } from '../constants';
 import { computeUsageCost } from '../measure/cost';
-import type { RawSession, Session, Usage } from '../types';
+import type { RawSession, Session, TierCalibration, Usage } from '../types';
 
-import { isRecord, isArray, isRole, isDispatchStatus, isQaStatus, isUsage } from './guards';
+import { isRecord, isArray, isRole, isDispatchStatus, isQaStatus, isUsage, isTierCalibration } from './guards';
 
 const INPUT_RATIO = 0.7;
 const OUTPUT_RATIO = 0.3;
@@ -160,6 +160,20 @@ export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
       usage = backfillLookup.get(dispatchId);
     }
 
+    // FEAT-004 T-018 / AC-016: read tier_calibration (snake_case in JSON → camelCase in TS).
+    // AC-016 contract: present-or-absent dichotomy — if guard fails, leave undefined (unknown bucket).
+    // Guard enforces all four required fields + effort enum before any field is trusted.
+    let tierCalibration: TierCalibration | undefined;
+    if (isTierCalibration(raw.tier_calibration)) {
+      const tc = raw.tier_calibration;
+      tierCalibration = {
+        tier: tc.tier,
+        model: tc.model,
+        effort: tc.effort,
+        loopKind: tc.loop_kind,
+      };
+    }
+
     const dispatchEntry: Session['dispatches'][number] = {
       dispatchId,
       role,
@@ -172,6 +186,9 @@ export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
     };
     if (usage !== undefined) {
       dispatchEntry.usage = attachCostUsd(usage);
+    }
+    if (tierCalibration !== undefined) {
+      dispatchEntry.tierCalibration = tierCalibration;
     }
 
     return [dispatchEntry];

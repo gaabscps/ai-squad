@@ -3,7 +3,7 @@
  * No `as` casts on uncertain shapes.
  */
 
-import type { Role, DispatchStatus, PhaseName, Session, Usage } from '../types';
+import type { Role, DispatchStatus, PhaseName, Session, Usage, TierCalibration, PmSessionSource } from '../types';
 
 export function isRecord(o: unknown): o is Record<string, unknown> {
   return typeof o === 'object' && o !== null && !Array.isArray(o);
@@ -77,5 +77,35 @@ export function isUsage(o: unknown): o is Usage {
     typeof o.tool_uses === 'number' &&
     typeof o.duration_ms === 'number' &&
     typeof o.model === 'string'
+  );
+}
+
+// FEAT-004 T-019 — PM session source guard (AC-013/AC-015)
+export const VALID_SOURCES: PmSessionSource[] = ['platform_captured', 'self_reported'];
+
+export function isPmSessionSource(v: unknown): v is PmSessionSource {
+  return typeof v === 'string' && (VALID_SOURCES as string[]).includes(v);
+}
+
+export const VALID_TIERS: TierCalibration['tier'][] = ['T1', 'T2', 'T3', 'T4'];
+
+const VALID_EFFORTS: TierCalibration['effort'][] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+/**
+ * FEAT-004 T-018 — isTierCalibration type guard (AC-016).
+ * Validates that an unknown value has the required shape for TierCalibration.
+ * Requires: tier ∈ T1–T4; model is string; effort ∈ low|medium|high|xhigh|max;
+ * loop_kind is string (all four required per dispatch-manifest.schema.json).
+ * JSON uses snake_case; camelCase mapping to loopKind happens in normaliseDispatches.
+ */
+export function isTierCalibration(o: unknown): o is TierCalibration & { loop_kind: string } {
+  if (!isRecord(o)) return false;
+  return (
+    typeof o.tier === 'string' &&
+    (VALID_TIERS as string[]).includes(o.tier) &&
+    typeof o.model === 'string' &&
+    typeof o.effort === 'string' &&
+    (VALID_EFFORTS as string[]).includes(o.effort) &&
+    typeof o.loop_kind === 'string'
   );
 }

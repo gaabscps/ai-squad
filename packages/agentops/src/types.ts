@@ -52,6 +52,35 @@ export interface CostMetric {
   assumption_note: string;
 }
 
+// FEAT-004 T-019 — PmSessionSource: provenance of a pm_sessions[] entry (AC-013)
+export type PmSessionSource = 'platform_captured' | 'self_reported';
+
+// FEAT-004 T-019 — PmSession: typed representation of one pm_sessions[] entry (AC-015)
+export interface PmSession {
+  sessionId: string;
+  startedAt: string;
+  completedAt: string | null;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUsd: number;
+  };
+  source: PmSessionSource;
+}
+
+// FEAT-004 T-018 — TierCalibration: per-dispatch Tier × Loop calibration (AC-016)
+export interface TierCalibration {
+  /** Tier of the task: T1–T4 */
+  tier: 'T1' | 'T2' | 'T3' | 'T4';
+  /** Model identifier as declared in the Work Packet (short name, e.g. 'sonnet', 'opus') */
+  model: string;
+  /** Effort level declared in the Work Packet */
+  effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Loop kind, e.g. 'dev L1', 'dev L2', 'dev L3', 'qa-L1', 'review' */
+  loopKind: string;
+}
+
 // DM-5 — Role: all known dispatch roles in the SDD framework
 export type Role =
   | 'dev'
@@ -116,6 +145,11 @@ export interface Session {
     pmNote: string | null;
     /** Per-dispatch token usage from <usage> annotation (FEAT-003+). Optional for back-compat. */
     usage?: Usage;
+    /**
+     * Tier × Loop calibration from Work Packet (FEAT-004 T-018 / AC-016).
+     * Undefined when absent (v1 manifests); rollup renderer buckets undefined as 'unknown'.
+     */
+    tierCalibration?: TierCalibration;
   }[];
   /** AC identifiers extracted from spec.md via regex (e.g. 'AC-001') */
   acs: string[];
@@ -140,6 +174,12 @@ export interface Session {
    * Optional for backward compatibility with pre-AC-009 Session objects.
    */
   warnings?: { reason: string; timestamp: string; session_id: string }[];
+  /**
+   * PM session cost entries from dispatch-manifest.json pm_sessions[] (FEAT-004 T-019 / AC-015).
+   * Empty array for v1 manifests (backward compat, AC-014); populated for v2 manifests.
+   * Optional for backward compatibility with pre-T-019 Session objects.
+   */
+  pmSessions?: PmSession[];
 }
 
 // DM-3 — Metrics: all computed metrics for a session
