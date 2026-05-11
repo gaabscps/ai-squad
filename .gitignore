@@ -9,3 +9,5 @@ packages/agentops/*.tgz
 
 __pycache__/
 *.py[cod]
+
+.env
