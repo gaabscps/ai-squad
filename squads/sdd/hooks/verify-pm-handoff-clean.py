@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from pathlib import Path
 
 _HOOKS_DIR = Path(__file__).resolve().parent
@@ -36,6 +37,12 @@ if str(_HOOKS_DIR) not in sys.path:
 
 from _pm_shared import enumerate_working_tree_files, grep_debt_markers
 from hook_runtime import resolve_project_root
+
+# ---------------------------------------------------------------------------
+# Soft budget for the scan operation (NFR-001: hook must complete within 5 s).
+# 4.5 s leaves 0.5 s margin for JSON serialisation and process overhead.
+# ---------------------------------------------------------------------------
+_SCAN_TIMEOUT_SECS: float = 4.5
 
 # ---------------------------------------------------------------------------
 # Hard-coded canonical debt-marker pattern (spec-frozen, do not modify here —
@@ -95,13 +102,50 @@ def main() -> int:
 
     project_dir = resolve_project_root(payload)
 
-    # Enumerate working tree files (git ls-files primary, rglob fallback).
-    # Excludes are applied inside enumerate_working_tree_files via _pm_shared.
-    files = enumerate_working_tree_files(project_dir)
+    # -----------------------------------------------------------------------
+    # AC-003 / NFR-001: wrap scan in try/except + 4.5 s soft budget.
+    # On any exception or timeout → block with reason "scan_failed: <detail>".
+    # Never silently allow on scan error.
+    # -----------------------------------------------------------------------
+    _result: dict = {}
+    _exc: list[BaseException] = []
 
-    # Grep for debt markers across all enumerated files.
-    # Pass project_dir as root so exempt canonical sources are skipped.
-    matches = grep_debt_markers(files, [_DEBT_PATTERN], root=project_dir)
+    def _run_scan() -> None:
+        try:
+            # Enumerate working tree files (git ls-files primary, rglob fallback).
+            # Excludes are applied inside enumerate_working_tree_files via _pm_shared.
+            files = enumerate_working_tree_files(project_dir)
+
+            # Grep for debt markers across all enumerated files.
+            # Pass project_dir as root so exempt canonical sources are skipped.
+            matches = grep_debt_markers(files, [_DEBT_PATTERN], root=project_dir)
+            _result["matches"] = matches
+        except Exception as exc:  # noqa: BLE001
+            _exc.append(exc)
+
+    scan_thread = threading.Thread(target=_run_scan, daemon=True)
+    scan_thread.start()
+    scan_thread.join(timeout=_SCAN_TIMEOUT_SECS)
+
+    if scan_thread.is_alive():
+        # Timeout: scan thread is still running — block with scan_failed:timeout.
+        block = {
+            "decision": "block",
+            "reason": "scan_failed: timeout — scan exceeded 4.5 s budget",
+        }
+        print(json.dumps(block))
+        return 0
+
+    if _exc:
+        # Exception raised inside scan thread — block with scan_failed:<err>.
+        block = {
+            "decision": "block",
+            "reason": f"scan_failed: {_exc[0]}",
+        }
+        print(json.dumps(block))
+        return 0
+
+    matches = _result.get("matches", [])
 
     if not matches:
         # AC-002: zero matches → allow Stop

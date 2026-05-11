@@ -13,6 +13,11 @@ hooks:
         - type: command
           command: "python3 $HOME/.claude/hooks/block-git-write.py"
           timeout: 5
+    - matcher: "Task"
+      hooks:
+        - type: command
+          command: python3 "$CLAUDE_PROJECT_DIR/squads/sdd/hooks/verify-tier-calibration.py"
+          timeout: 5
   Stop:
     - hooks:
         - type: command

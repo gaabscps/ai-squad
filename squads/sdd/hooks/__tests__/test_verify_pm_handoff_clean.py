@@ -16,6 +16,7 @@ OR:
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -532,6 +533,173 @@ class TestExemptPaths(unittest.TestCase):
                 _is_exempt(real_file, root),
                 f"src/app.py should NOT be exempt: {real_file}",
             )
+
+
+# ===========================================================================
+# AC-003 / NFR-001 — scan_failed fallback (T-005)
+# ===========================================================================
+
+class TestScanFailedFallback(unittest.TestCase):
+    """AC-003 + NFR-001: when the scan errors or times out, the hook must block
+    with reason starting with 'scan_failed:' — never silently allow.
+
+    Injection strategy: copy the hook script + hook_runtime.py into a temp
+    directory alongside a fake _pm_shared.py.  The hook computes
+    _HOOKS_DIR = Path(__file__).resolve().parent, so running the copied script
+    causes Python to resolve _pm_shared from the temp dir (fake) instead of
+    the real hooks directory.
+    """
+
+    @staticmethod
+    def _make_injected_hook_dir(
+        tmp: Path,
+        fake_pm_shared_src: str,
+    ) -> Path:
+        """Return path to the copied hook script with fake _pm_shared injected."""
+        hook_dir = tmp / "hook_sandbox"
+        hook_dir.mkdir()
+
+        # Copy the real hook script and hook_runtime.py into the sandbox.
+        shutil.copy(str(_HOOK_SCRIPT), str(hook_dir / "verify-pm-handoff-clean.py"))
+        real_hook_runtime = _HOOKS_DIR / "hook_runtime.py"
+        shutil.copy(str(real_hook_runtime), str(hook_dir / "hook_runtime.py"))
+
+        # Write the fake _pm_shared.py into the same directory.
+        (hook_dir / "_pm_shared.py").write_text(fake_pm_shared_src, encoding="utf-8")
+
+        return hook_dir / "verify-pm-handoff-clean.py"
+
+    def test_scan_error_blocks_with_scan_failed_reason(self):
+        """Patch enumerate_working_tree_files to raise; hook must block with scan_failed."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            fake_src = (
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    raise RuntimeError("simulated scan error")\n'
+                'def grep_debt_markers(files, patterns, root=None): return []\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            self.assertTrue(stdout, "Hook must emit JSON on scan error (not empty stdout)")
+            out = json.loads(stdout)
+            self.assertEqual(
+                out.get("decision"), "block",
+                f"scan error must block, got: {out}",
+            )
+            reason = out.get("reason", "")
+            self.assertTrue(
+                reason.startswith("scan_failed:"),
+                f"reason must start with 'scan_failed:', got: {reason!r}",
+            )
+            self.assertIn("simulated scan error", reason,
+                          f"reason must contain original error text: {reason!r}")
+
+    def test_scan_error_never_allows(self):
+        """Under no scan-error condition must the hook emit an allow decision."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            fake_src = (
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    raise OSError("disk read error")\n'
+                'def grep_debt_markers(files, patterns, root=None): return []\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            out = json.loads(stdout) if stdout else {}
+            decision = out.get("decision", "allow")
+            self.assertNotEqual(
+                decision, "allow",
+                f"scan error must never allow, got: {out}",
+            )
+
+    def test_timeout_blocks_with_scan_failed_reason(self):
+        """A scan that exceeds the 4.5 s budget must block with scan_failed:timeout."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Fake _pm_shared that sleeps > 4.5 s (6 s) on enumerate.
+            fake_src = (
+                'import time\n'
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    time.sleep(6)\n'
+                '    return []\n'
+                'def grep_debt_markers(files, patterns, root=None): return []\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=15,   # outer subprocess guard (larger than hook budget)
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            self.assertTrue(stdout, "Hook must emit JSON on timeout (not empty stdout)")
+            out = json.loads(stdout)
+            self.assertEqual(
+                out.get("decision"), "block",
+                f"timeout must block, got: {out}",
+            )
+            reason = out.get("reason", "")
+            self.assertTrue(
+                reason.startswith("scan_failed:"),
+                f"reason must start with 'scan_failed:' on timeout, got: {reason!r}",
+            )
+            self.assertIn("timeout", reason.lower(),
+                          f"reason must mention 'timeout': {reason!r}")
+
+    def test_nfr001_hook_completes_within_5s(self):
+        """NFR-001: hook must complete within 5 s on a representative session tree."""
+        import time
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Seed a representative small tree (no markers → allow path).
+            for i in range(20):
+                f = tmp / "src" / f"module_{i}.py"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(f"# module {i}\ndef func(): return {i}\n", encoding="utf-8")
+            payload = {**_BASE_PAYLOAD, "cwd": tmp_str}
+            start = time.monotonic()
+            result = _run_hook(payload)
+            elapsed = time.monotonic() - start
+            self.assertLess(
+                elapsed, 5.0,
+                f"NFR-001: hook took {elapsed:.2f}s (> 5s limit)",
+            )
+            decision = result.get("decision", "allow")
+            self.assertEqual(decision, "allow",
+                             f"Expected allow on clean tree, got: {result}")
 
 
 if __name__ == "__main__":
