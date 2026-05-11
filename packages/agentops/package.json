@@ -1,6 +1,6 @@
 {
   "name": "@ai-squad/agentops",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AgentOps observability for ai-squad SDD/Discovery pipelines",
   "main": "./dist/index.js",
   "bin": {

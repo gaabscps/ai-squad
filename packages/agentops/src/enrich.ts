@@ -9,12 +9,58 @@
  *   enrich/status.ts      — status derivation and escalation metrics
  */
 
+import fs from 'fs';
+import path from 'path';
+
 import { complianceForFlow } from './constants';
 import { normaliseDispatches, aggregateQaResults, attachOutputPackets } from './enrich/dispatches';
-import { isRecord, isCurrentPhase } from './enrich/guards';
+import { isRecord, isArray, isCurrentPhase } from './enrich/guards';
 import { normalisePhases, normaliseExpectedPipeline } from './enrich/phases';
 import { deriveStatus, extractEscalationMetrics } from './enrich/status';
 import type { RawSession, Session } from './types';
+
+// ---------------------------------------------------------------------------
+// AC-009 — warnings.json reader
+// ---------------------------------------------------------------------------
+
+export interface SessionWarning {
+  reason: string;
+  timestamp: string;
+  session_id: string;
+}
+
+/**
+ * Load .agent-session/<taskId>/warnings.json and return entries mapped to
+ * the PmSessionWarning shape (reason + timestamp + session_id).
+ * Returns [] if the file is absent, empty, or malformed — caller always gets
+ * a valid array without throwing.
+ */
+export function loadSessionWarnings(sessionDirPath: string): SessionWarning[] {
+  const warningsPath = path.join(sessionDirPath, 'warnings.json');
+  if (!fs.existsSync(warningsPath)) return [];
+  try {
+    const raw = fs.readFileSync(warningsPath, 'utf-8').trim();
+    if (!raw) return [];
+    const doc = JSON.parse(raw) as unknown;
+    if (!isRecord(doc)) return [];
+    const entries = doc.warnings;
+    if (!isArray(entries)) return [];
+    const out: SessionWarning[] = [];
+    for (const entry of entries) {
+      if (!isRecord(entry)) continue;
+      const reason = typeof entry.reason === 'string' ? entry.reason : 'unknown';
+      const timestamp = typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString();
+      const session_id =
+        isRecord(entry.metadata) && typeof entry.metadata.session_id === 'string'
+          ? entry.metadata.session_id
+          : 'unknown';
+      out.push({ reason, timestamp, session_id });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // AC extraction from spec.md
@@ -82,6 +128,9 @@ export function enrich(
 
   const status = deriveStatus(currentPhase, raw.manifest, sessionYml);
 
+  // AC-009: load warnings.json from session dir — no external param needed.
+  const warnings = loadSessionWarnings(raw.sessionDirPath);
+
   return {
     taskId: raw.taskId,
     featureName,
@@ -96,5 +145,6 @@ export function enrich(
     qaResults,
     expectedPipeline,
     escalationMetrics,
+    warnings,
   };
 }

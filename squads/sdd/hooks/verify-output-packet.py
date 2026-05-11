@@ -18,6 +18,7 @@ and prints a structured JSON error to stdout.
 
 Pure stdlib. Python 3.8+.
 """
+import importlib.util as _ilu
 import json
 import re
 import sys
@@ -27,7 +28,21 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
+_SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
+
 from hook_runtime import resolve_project_root
+
+
+def _try_append_warning(task_id: str, reason: str, metadata: dict | None = None) -> None:
+    """AC-007: append a warning via shared/lib/warnings.py for soft-fail conditions."""
+    try:
+        _spec = _ilu.spec_from_file_location("squad_warnings", str(_SHARED_LIB / "warnings.py"))
+        if _spec and _spec.loader:
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
+            _mod.append_warning(task_id, reason, "verify-output-packet", metadata=metadata, severity="warning")
+    except Exception as exc:
+        print(f"verify-output-packet: warning append skipped ({exc})", file=sys.stderr)
 
 REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "summary", "evidence"}
 VALID_STATUSES = {"done", "needs_review", "blocked", "escalate"}
@@ -189,6 +204,27 @@ def find_active_session(project_dir: Path) -> Path | None:
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
+_USAGE_EXEMPT_ROLES = {"pm-orchestrator"}
+
+
+def _validate_usage_field(packet: dict) -> tuple[bool, str]:
+    """AC-001 (usage enforcement): every role except pm-orchestrator must have 'usage' field present.
+
+    'usage' may be null (hook fills it post-write) or an object — both accepted
+    at write time. The field must exist as a key in the packet.
+    """
+    role = packet.get("role", "")
+    if role in _USAGE_EXEMPT_ROLES:
+        return True, "valid"
+    dispatch_id = packet.get("dispatch_id", "<unknown>")
+    if "usage" not in packet:
+        return (
+            False,
+            f"usage field is required for role {role} (dispatch_id={dispatch_id})",
+        )
+    return True, "valid"
+
+
 def validate_packet(packet_path: Path) -> tuple[bool, str]:
     try:
         packet = json.loads(packet_path.read_text())
@@ -199,7 +235,12 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
         return False, f"Output Packet missing required fields: {sorted(missing)}"
     if packet.get("status") not in VALID_STATUSES:
         return False, f"Output Packet status '{packet.get('status')}' not in {sorted(VALID_STATUSES)}"
-    # Discriminated-union role-specific validation (AC-001, AC-002).
+    # AC-001: usage field enforcement (universal, pm-orchestrator exempt).
+    # Checked separately from REQUIRED_FIELDS to emit role-specific error message.
+    ok, reason = _validate_usage_field(packet)
+    if not ok:
+        return False, reason
+    # Discriminated-union role-specific validation (qa, code-reviewer, logic-reviewer).
     role = packet.get("role", "")
     role_validator = ROLE_REQUIRED_FIELDS.get(role)
     if role_validator is not None:
@@ -246,6 +287,9 @@ def check_only(packet_path: Path) -> int:
     return 0
 
 
+_TASK_ID_RE_MAIN = re.compile(r"^(FEAT|DISC)-\d{3,4}$")
+
+
 def main() -> int:
     # --check-only <path> mode: validate an existing packet without stdin parsing.
     if len(sys.argv) >= 3 and sys.argv[1] == "--check-only":
@@ -274,8 +318,57 @@ def main() -> int:
     project_dir = resolve_project_root(payload)
     session_dir = find_active_session(project_dir)
     if session_dir is None:
+        # AC-007: soft-fail — dispatch_id found but no session dir; warn if task_id extractable.
+        # Derivation: take the first two dash-separated segments (e.g. "FEAT-003-dev" → "FEAT-003").
+        # If the candidate does not match (FEAT|DISC)-NNN, fall through to orphans file.
+        parts = dispatch_id.split("-")
+        task_id_candidate = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else None
+        if task_id_candidate and _TASK_ID_RE_MAIN.match(task_id_candidate):
+            _try_append_warning(
+                task_id_candidate,
+                "session_dir_not_found",
+                metadata={"dispatch_id": dispatch_id},
+            )
+        else:
+            # Fallback: write to global orphans file so the warning is not silently dropped.
+            orphans_path = project_dir / ".agent-session" / "_orphans" / "warnings.json"
+            try:
+                orphans_path.parent.mkdir(parents=True, exist_ok=True)
+                import fcntl as _fcntl
+                with orphans_path.open("a+", encoding="utf-8") as _fh:
+                    _fcntl.flock(_fh.fileno(), _fcntl.LOCK_EX)
+                    try:
+                        _fh.seek(0)
+                        _raw = _fh.read().strip()
+                        _doc = {"schema_version": 1, "warnings": []}
+                        if _raw:
+                            try:
+                                _parsed = json.loads(_raw)
+                                if isinstance(_parsed, dict) and isinstance(_parsed.get("warnings"), list):
+                                    _doc = _parsed
+                            except json.JSONDecodeError:
+                                pass
+                        import uuid as _uuid
+                        from datetime import datetime as _dt, timezone as _tz
+                        _doc["warnings"].append({
+                            "id": str(_uuid.uuid4()),
+                            "timestamp": _dt.now(_tz.utc).isoformat(),
+                            "source": "verify-output-packet",
+                            "reason": "session_dir_not_found",
+                            "severity": "warning",
+                            "metadata": {"dispatch_id": dispatch_id, "task_id": None},
+                        })
+                        _fh.seek(0)
+                        _fh.truncate()
+                        json.dump(_doc, _fh, indent=2)
+                        _fh.write("\n")
+                    finally:
+                        _fcntl.flock(_fh.fileno(), _fcntl.LOCK_UN)
+            except Exception:
+                pass
         return 0
 
+    task_id = session_dir.name
     packet_path = session_dir / "outputs" / f"{dispatch_id}.json"
     if not packet_path.exists():
         decision = {

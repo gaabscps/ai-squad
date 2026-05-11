@@ -18,17 +18,130 @@ Skip behavior (returns silently):
 
 Concurrency: file lock (fcntl.flock LOCK_EX) on the manifest while
 read-modify-writing. Pure stdlib. Python 3.8+.
+
+Failure handling (AC-003):
+  On OSError / lock-fail / transcript-invalid / _session_id absent,
+  appends a structured entry to .agent-session/<task_id>/.capture-usage-failed.json.
+
+Warning channel (AC-007):
+  On idempotent skip (usage already captured) or partial capture,
+  calls shared/lib/warnings.py::append_warning to structured log.
 """
 import fcntl
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
+# shared/lib is two directories up from hooks/
+_SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
+if str(_SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(_SHARED_LIB))
+
 from hook_runtime import resolve_project_root
+
+_TASK_ID_RE = re.compile(r"^FEAT-\d{3,4}$")
+
+
+def _task_id_from_session_dir(session_dir: Path) -> str | None:
+    """Extract task_id from session directory name if it matches ^FEAT-\\d{3,4}$."""
+    name = session_dir.name
+    if _TASK_ID_RE.match(name):
+        return name
+    return None
+
+
+def _append_capture_failure(session_dir: Path, dispatch_id: str, reason: str, attempted_sources: list[str]) -> None:
+    """AC-003: append a structured failure entry to .capture-usage-failed.json.
+
+    Uses fcntl.LOCK_EX on the marker file to prevent a read-modify-write race
+    when concurrent subagent capture-failures land simultaneously.
+
+    On JSONDecodeError of the existing file (M5): renames the corrupt file to
+    .capture-usage-failed.json.corrupt-<timestamp> (preserve evidence) and starts
+    a fresh array. Logs via _try_append_warning so the audit can pick it up.
+    """
+    task_id = _task_id_from_session_dir(session_dir)
+    marker_path = session_dir / ".capture-usage-failed.json"
+    entry = {
+        "dispatch_id": dispatch_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "reason": reason,
+        "attempted_sources": attempted_sources,
+    }
+    try:
+        # Open with a+ so we can lock, read, rewrite in-place.
+        with marker_path.open("a+", encoding="utf-8") as fh:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            _fh_closed = False
+            try:
+                fh.seek(0)
+                raw = fh.read().strip()
+                existing: list = []
+                if raw:
+                    try:
+                        existing = json.loads(raw)
+                        if not isinstance(existing, list):
+                            existing = []
+                    except json.JSONDecodeError:
+                        # M5: preserve corrupt file evidence, start fresh.
+                        ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+                        corrupt_path = marker_path.with_name(
+                            f".capture-usage-failed.json.corrupt-{ts_suffix}"
+                        )
+                        try:
+                            marker_path.rename(corrupt_path)
+                        except OSError:
+                            pass
+                        if task_id:
+                            _try_append_warning(
+                                session_dir,
+                                task_id,
+                                "capture_failure_marker_corrupt",
+                                "capture-subagent-usage",
+                                metadata={"corrupt_path": str(corrupt_path)},
+                            )
+                        # fh still references the renamed (corrupt) inode — unlock,
+                        # close it, then open a fresh marker_path and write [entry].
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                        _fh_closed = True
+                        fh.close()
+                        with marker_path.open("a+", encoding="utf-8") as fh2:
+                            fcntl.flock(fh2.fileno(), fcntl.LOCK_EX)
+                            try:
+                                json.dump([entry], fh2, indent=2)
+                                fh2.write("\n")
+                            finally:
+                                fcntl.flock(fh2.fileno(), fcntl.LOCK_UN)
+                        return
+                existing.append(entry)
+                fh.seek(0)
+                fh.truncate()
+                json.dump(existing, fh, indent=2)
+                fh.write("\n")
+            finally:
+                if not _fh_closed:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except OSError as exc:
+        print(f"capture-subagent-usage: cannot write failure marker ({exc})", file=sys.stderr)
+
+
+def _try_append_warning(session_dir: Path, task_id: str, reason: str, source: str, metadata: dict | None = None) -> None:
+    """AC-007: call shared/lib/squad_warnings::append_warning for non-critical conditions."""
+    try:
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location("squad_warnings", str(_SHARED_LIB / "warnings.py"))
+        if _spec and _spec.loader:
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
+            _mod.append_warning(task_id, reason, source, metadata=metadata, severity="warning")
+    except Exception as exc:
+        print(f"capture-subagent-usage: warning append skipped ({exc})", file=sys.stderr)
 
 
 def find_active_session(project_dir: Path) -> Path | None:
@@ -119,7 +232,8 @@ def iso_diff_ms(start_iso: str, end_iso: str) -> int:
         return 0
 
 
-def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict) -> None:
+def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict, session_dir: Path | None = None) -> bool:
+    """Update manifest with usage data. Returns True on success, False on idempotent skip."""
     with manifest_path.open("r+", encoding="utf-8") as fh:
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
@@ -130,17 +244,17 @@ def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict) -> None:
                     f"capture-subagent-usage: malformed manifest ({exc})",
                     file=sys.stderr,
                 )
-                return
+                return False
             dispatches = manifest.get("actual_dispatches") or []
             if not isinstance(dispatches, list):
-                return
+                return False
             for entry in dispatches:
                 if not isinstance(entry, dict):
                     continue
                 if entry.get("dispatch_id") != dispatch_id:
                     continue
                 if isinstance(entry.get("usage"), dict):
-                    return  # idempotent
+                    return False  # idempotent — usage already written
                 started = entry.get("started_at")
                 completed = entry.get("completed_at")
                 duration_ms = (
@@ -167,9 +281,10 @@ def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict) -> None:
                 fh.seek(0)
                 fh.truncate()
                 json.dump(manifest, fh, indent=2)
-                return
+                return True
         finally:
             fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    return False
 
 
 def main() -> int:
@@ -184,12 +299,26 @@ def main() -> int:
 
     session_id = payload.get("session_id")
     transcript_path_str = payload.get("transcript_path")
-    if not isinstance(session_id, str) or not isinstance(transcript_path_str, str):
-        return 0
 
     project_dir = resolve_project_root(payload)
     session_dir = find_active_session(project_dir)
     if session_dir is None:
+        return 0
+
+    task_id = _task_id_from_session_dir(session_dir)
+
+    # AC-003: session_id absent — structured failure, not silent skip
+    if not isinstance(session_id, str):
+        if task_id:
+            _append_capture_failure(
+                session_dir,
+                dispatch_id="<unknown>",
+                reason="session_id_missing",
+                attempted_sources=[],
+            )
+        return 0
+
+    if not isinstance(transcript_path_str, str):
         return 0
 
     manifest_path = session_dir / "dispatch-manifest.json"
@@ -203,18 +332,69 @@ def main() -> int:
 
     try:
         packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        # AC-003: transcript/packet parse failure
+        if task_id:
+            _append_capture_failure(
+                session_dir,
+                dispatch_id=str(packet_path.stem),
+                reason="transcript_invalid",
+                attempted_sources=[str(packet_path)],
+            )
         return 0
+
     dispatch_id = packet.get("dispatch_id") if isinstance(packet, dict) else None
     if not isinstance(dispatch_id, str):
+        # AC-003: _session_id present but dispatch_id absent in packet
+        if task_id:
+            _append_capture_failure(
+                session_dir,
+                dispatch_id="<unknown>",
+                reason="session_id_missing",
+                attempted_sources=[str(packet_path)],
+            )
         return 0
 
     usage = parse_transcript(Path(transcript_path_str))
 
+    # AC-007: warn on suspicious zero-token parse (partial capture)
+    totals = usage.get("totals", {})
+    total_tokens = (
+        totals.get("input_tokens", 0)
+        + totals.get("output_tokens", 0)
+        + totals.get("cache_creation_input_tokens", 0)
+        + totals.get("cache_read_input_tokens", 0)
+    )
+    if total_tokens == 0 and task_id:
+        _try_append_warning(
+            session_dir,
+            task_id,
+            reason="zero_token_parse",
+            source="capture-subagent-usage",
+            metadata={"dispatch_id": dispatch_id, "transcript_path": transcript_path_str},
+        )
+
     try:
-        update_manifest(manifest_path, dispatch_id, usage)
+        already_captured = not update_manifest(manifest_path, dispatch_id, usage, session_dir)
+        # AC-007: warn on suspicious idempotent skip (usage was already populated)
+        if already_captured and task_id:
+            _try_append_warning(
+                session_dir,
+                task_id,
+                reason="idempotent_skip_suspicious",
+                source="capture-subagent-usage",
+                metadata={"dispatch_id": dispatch_id},
+            )
     except OSError as exc:
+        # AC-003: OSError during manifest write
         print(f"capture-subagent-usage: manifest update failed ({exc})", file=sys.stderr)
+        if task_id:
+            _append_capture_failure(
+                session_dir,
+                dispatch_id=dispatch_id,
+                reason="oserror",
+                attempted_sources=[str(manifest_path), transcript_path_str],
+            )
 
     return 0
 

@@ -43,6 +43,9 @@ BASE_PACKET = {
     "status": "done",
     "summary": "implemented feature",
     "evidence": [],
+    # AC-001 (usage enforcement): usage field required for all non-pm-orchestrator roles.
+    # Set to None (hook fills it post-write) so role-specific tests don't fail on usage gate.
+    "usage": None,
 }
 
 

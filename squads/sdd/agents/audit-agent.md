@@ -74,6 +74,36 @@ Aggregate `ac_coverage` from every `qa` Output Packet. Every AC ID in `tasks.md`
 **Check 6 — Source-file ownership (orchestrator non-edit invariant).**
 Run `git diff --name-only HEAD` to enumerate files modified in the working tree. Aggregate the union of `files_changed[]` across all `dev` Output Packets. The two sets must be equal (modulo `.agent-session/` paths, which are orchestrator-managed and excluded). Files in the working tree NOT covered by any `dev` packet → finding `severity: blocker, audit_finding_kind: orchestrator_edited_source` (orchestrator bypassed dispatch and edited directly). If git is not available (consumer repo not a git working tree), emit `kind: absence` evidence and a `severity: major` warning instead of `blocker` — best-effort fallback.
 
+**Check 7 — PM session presence (AC-001b).**
+Read `dispatch-manifest.json#pm_orchestrator_sessions[]`. If the array is absent, empty, or every entry has `usage.input_tokens + usage.output_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens == 0` (i.e., total captured tokens == 0), emit finding:
+```
+severity: blocker
+audit_finding_kind: pm_session_not_captured
+ref: dispatch-manifest.json#pm_orchestrator_sessions
+rationale: "PM session not captured — pm_orchestrator_sessions[] empty or all entries have zero tokens"
+```
+This check is PM-exclusive: it validates the `pm_orchestrator_sessions[]` channel populated by `capture-pm-session.ts`, not the `usage` field on `actual_dispatches[]`.
+
+**Check 8 — Subagent usage presence (AC-002).**
+Iterate `actual_dispatches[]`. For every entry where `role != "pm-orchestrator"` AND (`usage` key is absent OR `usage.total_tokens == 0`), emit one finding per failing entry:
+```
+severity: blocker
+audit_finding_kind: usage_not_captured
+ref: dispatch-manifest.json#actual_dispatches[<dispatch_id>]
+rationale: "usage not captured for role <role> dispatch <dispatch_id>"
+```
+Collect all failing entries — do not short-circuit on the first failure.
+
+**Check 9 — Capture failure marker (AC-003).**
+Read `.agent-session/<task_id>/.capture-usage-failed.json` if it exists. For every entry in the array, emit one finding:
+```
+severity: blocker
+audit_finding_kind: usage_capture_failed
+ref: .agent-session/<task_id>/.capture-usage-failed.json
+rationale: "Usage capture failed for dispatch <dispatch_id>: <reason>"
+```
+If the file does not exist, this check passes silently.
+
 ## Phase 4 sweep — role-specific Output Packet validation (AC-003)
 
 Run this sweep **after** the 6 reconciliation checks and **before** emitting the Output Packet. Collect all failures into a single consolidated finding — do NOT short-circuit on the first failure.
@@ -110,7 +140,23 @@ Run this sweep **after** the 6 reconciliation checks and **before** emitting the
 
 5. **If the gap list is empty:** no additional finding is added for this sweep. The session may still be `blocked` due to findings from the 6 reconciliation checks.
 
-## Phase 4 sweep — review_loop validation on dev fix-dispatches (AC-008)
+## Phase 4 sweep — warnings.json summary (AC-008)
+
+Run this step **after** all reconciliation checks and **before** emitting the Output Packet.
+
+1. Read `.agent-session/<task_id>/warnings.json` if it exists.
+2. If the file exists but is malformed JSON, treat as 0 warnings and emit a finding `audit_finding_kind: warnings_file_corrupt` with `severity: major` pointing to the file. Do not crash — continue to the next check.
+3. Count entries by `severity` (`info`, `warning`, `error`) and by `source`.
+4. Include the counts in the Output Packet `summary` field (append a brief note, e.g. `"Warnings: 2 warning, 1 error (sources: capture-pm-session, verify-output-packet)."`).
+5. Include a pointer evidence entry:
+   ```
+   kind: file
+   ref: .agent-session/<task_id>/warnings.json
+   note: "<N> entries: {severity_counts}; {source_counts}"
+   ```
+6. If `warnings.json` does not exist, skip this step silently (no finding — absence is normal for clean runs).
+
+## Phase 4 sweep — review_loop validation on dev fix-dispatches
 
 Run this check **as part of** the Phase 4 sweep, **after** role-specific Output Packet validation and **before** emitting the Output Packet.
 

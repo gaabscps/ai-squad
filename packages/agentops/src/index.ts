@@ -187,6 +187,9 @@ export async function main(options?: {
   const flowMdContents = new Map<string, string>();
 
   for (const { session, metrics } of processed) {
+    // AC-009: pass session.warnings to the render layer without external param.
+    // session.warnings is populated by enrich() from .agent-session/<taskId>/warnings.json.
+    const pmWarnings = session.warnings;
     const md = renderFlowReport(
       metrics,
       metrics.insights,
@@ -195,6 +198,7 @@ export async function main(options?: {
       metrics.currentPhase,
       session,
       repoHealth,
+      pmWarnings,
     );
     const outFile = path.join(outDir, `${metrics.taskId}.md`);
     await atomicWrite(outFile, md);

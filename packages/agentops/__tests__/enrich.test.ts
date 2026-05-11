@@ -3,6 +3,8 @@
  * T-009: 5+ tests covering all ACs in scope.
  */
 
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { enrich } from '../src/enrich';
@@ -1358,5 +1360,113 @@ describe('enrich', () => {
     };
     const session = enrich(raw);
     expect(session.dispatches[0]!.usage).toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // AC-009: loadSessionWarnings wired into enrich() (B1 fix)
+  // ---------------------------------------------------------------------------
+
+  describe('AC-009: session.warnings populated from sessionDirPath warnings.json', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'enrich-warnings-test-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    function makeRaw(sessionDirPath: string): RawSession {
+      return {
+        taskId: 'FEAT-WARNINGS',
+        sessionYml: {
+          task_id: 'FEAT-WARNINGS',
+          feature_name: 'Warnings',
+          current_phase: 'done',
+          started_at: '2026-01-01T00:00:00Z',
+        },
+        manifest: { expected_pipeline: [], actual_dispatches: [] },
+        outputs: [],
+        specMd: null,
+        sessionDirPath,
+      };
+    }
+
+    it('returns empty warnings[] when warnings.json is absent', () => {
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toEqual([]);
+    });
+
+    it('returns empty warnings[] when warnings.json is empty', () => {
+      fs.writeFileSync(path.join(tmpDir, 'warnings.json'), '');
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toEqual([]);
+    });
+
+    it('returns empty warnings[] when warnings.json is malformed', () => {
+      fs.writeFileSync(path.join(tmpDir, 'warnings.json'), 'not-valid-json');
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toEqual([]);
+    });
+
+    it('returns warning entries from warnings.json — session_id from metadata.session_id', () => {
+      const doc = {
+        schema_version: 1,
+        warnings: [
+          {
+            id: 'abc-123',
+            timestamp: '2026-01-01T00:00:00Z',
+            source: 'capture-pm-session',
+            reason: 'missing_transcript_path',
+            severity: 'warning',
+            metadata: { session_id: 'sess-abc' },
+          },
+        ],
+      };
+      fs.writeFileSync(path.join(tmpDir, 'warnings.json'), JSON.stringify(doc));
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toHaveLength(1);
+      expect(session.warnings[0]).toMatchObject({
+        reason: 'missing_transcript_path',
+        timestamp: '2026-01-01T00:00:00Z',
+        session_id: 'sess-abc',
+      });
+    });
+
+    it('falls back session_id to "unknown" when metadata.session_id absent (m1 fix)', () => {
+      const doc = {
+        schema_version: 1,
+        warnings: [
+          {
+            id: 'def-456',
+            timestamp: '2026-01-01T00:01:00Z',
+            source: 'verify-output-packet',
+            reason: 'session_dir_not_found',
+            severity: 'warning',
+            metadata: {},
+          },
+        ],
+      };
+      fs.writeFileSync(path.join(tmpDir, 'warnings.json'), JSON.stringify(doc));
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toHaveLength(1);
+      expect(session.warnings[0]!.session_id).toBe('unknown');
+    });
+
+    it('returns multiple warnings preserving order', () => {
+      const doc = {
+        schema_version: 1,
+        warnings: [
+          { id: '1', timestamp: '2026-01-01T00:00:00Z', source: 'a', reason: 'r1', severity: 'warning', metadata: { session_id: 's1' } },
+          { id: '2', timestamp: '2026-01-01T00:01:00Z', source: 'b', reason: 'r2', severity: 'error', metadata: { session_id: 's2' } },
+        ],
+      };
+      fs.writeFileSync(path.join(tmpDir, 'warnings.json'), JSON.stringify(doc));
+      const session = enrich(makeRaw(tmpDir));
+      expect(session.warnings).toHaveLength(2);
+      expect(session.warnings[0]!.reason).toBe('r1');
+      expect(session.warnings[1]!.reason).toBe('r2');
+    });
   });
 });

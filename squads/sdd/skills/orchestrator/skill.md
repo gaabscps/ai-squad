@@ -51,8 +51,13 @@ The Skill that runs the autonomous Implementation Pipeline. Dispatches the 6 Sub
 ### 1. Resolve Session and read inputs
 1. Determine `task_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec/Plan/Tasks (auto-derive if Plan/Tasks were skipped per `planned_phases`).
-3. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
-4. Set `pipeline_started_at` (or leave intact on `--resume`).
+3. **Preflight: validate `ac_scope` on every task (AC-006).** Before any dispatch, iterate every `T-XXX` in `tasks.md`. If any task does not declare an `ac_scope` field (or `ac_scope` is empty), abort with error:
+   ```
+   "Task <T-XXX> in tasks.md missing required ac_scope field"
+   ```
+   Do NOT dispatch any Subagent until all tasks pass this check. This guard exists because tasks without `ac_scope` cannot populate `acScope` in `expected_pipeline[]` and break the agentops coverage matrix.
+4. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
+5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
 ### 1b. Write the dispatch manifest (Outbox + GitHub required-checks pattern)
 Before any `Task` dispatch, atomically write `.agent-session/<task_id>/dispatch-manifest.json` (JSON, not YAML — hook scripts parse this with Python stdlib `json` module, no yaml dependency):
@@ -63,8 +68,24 @@ Before any `Task` dispatch, atomically write `.agent-session/<task_id>/dispatch-
   "task_id": "FEAT-NNN",
   "plan_generated_at": "<iso8601>",
   "expected_pipeline": [
-    {"task_id": "T-001", "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"]},
-    {"task_id": "T-002", "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"]}
+    {
+      "task_id": "T-001",
+      "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"],
+      "acScope": ["AC-001", "AC-002"],
+      "tasksCovered": ["T-001"]
+    },
+    {
+      "task_id": "T-002",
+      "required_roles": ["dev", "code-reviewer", "logic-reviewer", "qa"],
+      "acScope": ["AC-003", "AC-004"],
+      "tasksCovered": ["T-002"]
+    },
+    {
+      "task_id": "audit-agent",
+      "required_roles": ["audit-agent"],
+      "acScope": [],
+      "tasksCovered": ["T-001", "T-002"]
+    }
   ],
   "actual_dispatches": []
 }
@@ -92,6 +113,10 @@ Field rules:
   - QA fail loop: `"QA fail loop N — failed ACs: <AC-XXX, AC-YYY>"`
   - Escalation: `"Escalated to blocker-specialist — <trigger kind>"`
   - Progress stall: `"Progress stall detected (fingerprint match)"`
+
+**`expected_pipeline[]` population rules (AC-005):**
+- `acScope`: array of AC-IDs from the task's `ac_scope` field in `tasks.md` (e.g. `["AC-001", "AC-002"]`). For `audit-agent`, set to `[]` (audit validates all tasks, not a specific AC subset).
+- `tasksCovered`: for task-scoped roles (dev, code-reviewer, logic-reviewer, qa), always `[task_id]` (single-element array). For `audit-agent`, set to the full list of all `T-XXX` IDs in the pipeline. Both fields are required — omitting them will cause the agentops coverage matrix to emit warnings.
 
 The `usage` field on each entry is populated automatically by the `capture-subagent-usage.py` Stop hook — the orchestrator does NOT write it. The hook correlates via `_session_id` injected into the output packet by `stamp-session-id.py` (PostToolUse).
 
@@ -122,6 +147,16 @@ Pipeline per task (per `squads/sdd/docs/concepts/pipeline.md`):
 - On reviewers clean: dispatch `qa`.
 - On `qa` fail: loop to `dev` (cap: `qa_loops_max=2`, skips reviewers).
 - On any cap hit OR `status: blocked` from any Subagent: cascade to `blocker-specialist` (cap: `blocker_calls_max=2` per task).
+
+**Pre-`done` usage check (AC-004):** Before transitioning any task-scoped dispatch entry in `actual_dispatches[]` to `status: done`, the orchestrator MUST re-read the manifest and verify that `usage` is present and `usage.total_tokens > 0` for that dispatch. This check applies to all roles except `pm-orchestrator` and `audit-agent`. Protocol:
+1. Re-read `dispatch-manifest.json` (atomic read — no lock needed for read-only).
+2. Find the entry for the dispatch just completed.
+3. If `usage` is absent or `usage.total_tokens == 0`:
+   - Set the entry's `status` to `blocked` with `pm_note: "usage_missing"`.
+   - Cascade to `blocker-specialist` with `cascade_trigger: "usage_missing"`.
+   - Do NOT mark the task `done`. Blocker-specialist decides whether to retry capture or escalate.
+4. If `usage.total_tokens > 0`: proceed normally to mark the dispatch `done`.
+This check is synchronous and deterministic — no async timeout. The `capture-subagent-usage.py` Stop hook runs before the orchestrator processes the return, so usage is available if the hook ran successfully.
 
 After every Subagent return: atomically update `session.yml.task_states[T-XXX]` (tmp + rename). Sole-writer invariant = no race.
 

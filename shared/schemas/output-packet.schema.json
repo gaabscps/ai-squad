@@ -4,7 +4,7 @@
   "title": "ai-squad Output Packet",
   "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist, audit-agent. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
   "type": "object",
-  "required": ["spec_id", "dispatch_id", "role", "status", "summary", "evidence"],
+  "required": ["spec_id", "dispatch_id", "role", "status", "summary", "evidence", "usage"],
   "additionalProperties": false,
   "properties": {
     "spec_id": {
@@ -99,9 +99,12 @@
               "role_mismatch",
               "pipeline_stage_skipped",
               "ac_not_validated",
-              "orchestrator_edited_source"
+              "orchestrator_edited_source",
+              "pm_session_not_captured",
+              "usage_not_captured",
+              "usage_capture_failed"
             ],
-            "description": "audit-agent findings ONLY — reconciliation gap categories from the 6 canonical checks (see agents/audit-agent.md)"
+            "description": "audit-agent findings ONLY — reconciliation gap categories from the 9 canonical checks (see agents/audit-agent.md)"
           }
         }
       }
@@ -203,6 +206,28 @@
         "codebase-mapper", "risk-analyst"
       ],
       "description": "Optional hint; orchestrator decides actual routing"
+    },
+    "usage": {
+      "description": "Per-dispatch token usage, populated by capture-subagent-usage.py Stop hook. Required for all roles except pm-orchestrator. Set to null when emitting; hook fills it in.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["total_tokens", "tool_uses", "duration_ms", "model"],
+          "additionalProperties": true,
+          "properties": {
+            "total_tokens": { "type": "integer", "minimum": 0 },
+            "tool_uses": { "type": "integer", "minimum": 0 },
+            "duration_ms": { "type": "integer", "minimum": 0 },
+            "model": { "type": "string" },
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "output_tokens": { "type": "integer", "minimum": 0 },
+            "cache_creation_input_tokens": { "type": "integer", "minimum": 0 },
+            "cache_read_input_tokens": { "type": "integer", "minimum": 0 },
+            "cost_usd": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
     }
   }
 }

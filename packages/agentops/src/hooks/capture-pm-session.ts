@@ -7,6 +7,7 @@
  */
 
 import { spawn } from 'child_process';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -287,6 +288,10 @@ export async function runCapture(opts: RunCaptureOptions): Promise<void> {
         session_id: sessionId,
       });
     }
+    if (taskId) {
+      const sessionDir = path.join(repoRoot, '.agent-session', taskId);
+      await appendToWarningsJson(sessionDir, taskId, 'missing_transcript_path', sessionId, repoRoot);
+    }
     return;
   }
 
@@ -303,6 +308,8 @@ export async function runCapture(opts: RunCaptureOptions): Promise<void> {
       reason: 'missing_manifest',
       session_id: sessionId,
     });
+    const sessionDir = path.join(repoRoot, '.agent-session', taskId);
+    await appendToWarningsJson(sessionDir, taskId, 'missing_manifest', sessionId, repoRoot);
     return;
   }
 
@@ -315,6 +322,8 @@ export async function runCapture(opts: RunCaptureOptions): Promise<void> {
       reason: 'zero_assistant_turns',
       session_id: sessionId,
     });
+    const sessionDir = path.join(repoRoot, '.agent-session', taskId);
+    await appendToWarningsJson(sessionDir, taskId, 'zero_assistant_turns', sessionId, repoRoot);
     return;
   }
 
@@ -383,6 +392,41 @@ export function appendSessionWarning(manifestPath: string, entry: SessionWarning
   const tmp = manifestPath + '.pm-session-warn.tmp';
   fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
   fs.renameSync(tmp, manifestPath);
+}
+
+/**
+ * AC-009 / AC-007 — write a structured warning to warnings.json in the session dir
+ * by delegating to shared/lib/warnings.ts::appendWarning.
+ *
+ * Resolution: walks up from repoRoot to find `shared/lib/warnings.js` (compiled)
+ * or `shared/lib/warnings.ts` (ts-node / jest). Falls back to silent no-op on
+ * any error — caller is a Stop hook.
+ */
+export async function appendToWarningsJson(
+  _sessionDir: string,
+  taskId: string,
+  reason: string,
+  sessionId: string,
+  repoRoot?: string,
+): Promise<void> {
+  try {
+    // Walk up to repo root to find shared/lib/warnings.
+    // repoRoot is passed when known; otherwise derive from this file's location.
+    const root = repoRoot ?? findRepoRoot(path.dirname(__filename));
+    const sharedLib = path.join(root, 'shared', 'lib', 'warnings');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { appendWarning } = require(sharedLib) as {
+      appendWarning: (taskId: string, opts: { reason: string; source: string; metadata?: Record<string, unknown>; severity?: string }) => Promise<unknown>;
+    };
+    await appendWarning(taskId, {
+      reason,
+      source: 'capture-pm-session',
+      metadata: { session_id: sessionId },
+      severity: 'warning',
+    });
+  } catch {
+    // silent — hook must not fail
+  }
 }
 
 export {

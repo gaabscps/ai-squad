@@ -134,6 +134,12 @@ export interface Session {
   escalationMetrics: {
     escalationRate: number;
   } | null;
+  /**
+   * Structured warning entries from .agent-session/<taskId>/warnings.json (AC-009).
+   * Empty array when warnings.json is absent, empty, or malformed.
+   * Optional for backward compatibility with pre-AC-009 Session objects.
+   */
+  warnings?: { reason: string; timestamp: string; session_id: string }[];
 }
 
 // DM-3 — Metrics: all computed metrics for a session

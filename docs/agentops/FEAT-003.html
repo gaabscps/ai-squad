@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enforce 100%-complete agentops inputs (usage + warnings + scope coverage) — AgentOps</title>
+  <style>
+:root {
+  --bg: #fff;
+  --bg-muted: #f7f7f9;
+  --fg: #1a1a1a;
+  --fg-muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --status-pass: #16a34a;
+  --status-warn: #ca8a04;
+  --status-fail: #dc2626;
+  /* Semantic aliases for story-card fact-sheet (FEAT-005 T-012) */
+  --color-surface: var(--bg-muted);
+  --color-border: var(--border);
+  --color-text-primary: var(--fg);
+  --color-text-secondary: var(--fg-muted);
+  --color-text-tertiary: #9ca3af;
+  --color-warn: var(--status-warn);
+  --color-warn-bg: rgba(255, 200, 0, 0.08);
+  /* Spacing scale */
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  /* Radius scale */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  /* Typography scale */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --bg-muted: #161b22;
+    --fg: #c9d1d9;
+    --fg-muted: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --status-pass: #3fb950;
+    --status-warn: #d29922;
+    --status-fail: #f85149;
+    /* Semantic aliases (same var() refs, resolve to dark-mode primitives above) */
+    --color-surface: var(--bg-muted);
+    --color-border: var(--border);
+    --color-text-primary: var(--fg);
+    --color-text-secondary: var(--fg-muted);
+    --color-text-tertiary: #6b7280;
+    --color-warn: var(--status-warn);
+    --color-warn-bg: rgba(255, 200, 0, 0.14);
+    /* Scale tokens — same in both modes */
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --text-xs: 11px;
+    --text-sm: 13px;
+    --text-base: 1rem;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+h1, h2, h3, h4 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+th {
+  background: var(--bg-muted);
+  font-weight: 600;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--bg-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.kpi-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.kpi-bar h1 {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  margin: 0;
+}
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+.story {
+  margin-bottom: 2rem;
+}
+.story-card { padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--color-border); }
+.story-card header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.story-card header h3 { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.story-card header h3 .dot { color: var(--color-text-tertiary); margin: 0 0.4em; }
+
+.story-card__stats { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.story-card__stat { display: inline-flex; gap: 0.3em; align-items: baseline; }
+.story-card__stat-label { color: var(--color-text-tertiary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+.story-card__stat-value { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+
+.story-card__pipeline { display: inline-flex; flex-wrap: wrap; gap: 0.4em; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+.story-card__summary { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.45; }
+.story-card__summary--empty { color: var(--color-text-tertiary); font-style: italic; }
+
+.story-card__retry { padding: var(--space-2) var(--space-3); background: var(--color-warn-bg); border-left: 3px solid var(--color-warn); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-primary); }
+
+.story-card__drilldowns { display: flex; flex-direction: column; gap: var(--space-2); }
+.story-card__drilldowns details { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.story-card__drilldowns details > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-secondary); user-select: none; }
+.story-card__drilldowns details > summary:hover { color: var(--color-text-primary); }
+.story-card__drilldowns details[open] > summary { margin-bottom: var(--space-2); color: var(--color-text-primary); }
+.story-card__drilldowns table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.story-card__drilldowns th { text-align: left; color: var(--color-text-tertiary); font-weight: 500; padding: 0.25em 0.5em 0.25em 0; border-bottom: 1px solid var(--color-border); }
+.story-card__drilldowns td { padding: 0.25em 0.5em 0.25em 0; }
+.story-card__drilldowns ul { margin: 0; padding-left: var(--space-3); font-size: var(--text-xs); }
+.story-card__drilldowns ul li { margin-bottom: 0.3em; }
+.story-card__pmnote { margin: 0; font-size: var(--text-xs); white-space: pre-wrap; color: var(--color-text-secondary); }
+
+@media (max-width: 767px) {
+  .story-card__stats { font-size: var(--text-xs); }
+  .story-card header { flex-direction: column; align-items: flex-start; }
+}
+.kpi-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.cost-section {
+  margin: 0 0 2rem;
+  padding: 1.25rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cost-section > h2 {
+  margin: 0;
+}
+.cost-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.cost-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.cost-card .cost-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.cost-card .cost-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.cost-card small {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.cost-models {
+  margin-top: 0.5rem;
+  font-size: 12px;
+}
+.cost-models td,
+.cost-models th {
+  font-variant-numeric: tabular-nums;
+}
+.cost-breakdown {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0;
+}
+.cost-breakdown > summary {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  list-style: none;
+}
+.cost-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+.cost-breakdown > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--fg-muted);
+  transition: transform 0.15s;
+}
+.cost-breakdown[open] > summary::before {
+  transform: rotate(90deg);
+}
+.cost-breakdown > .cost-models {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+}
+.cost-note {
+  margin: 0.75rem 0 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cost-empty {
+  margin: 0;
+  color: var(--fg-muted);
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.flow-card {
+  display: block;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: var(--fg);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.flow-card:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.flow-card header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 0.5rem;
+}
+.trends {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 12px;
+  color: var(--fg-muted);
+  align-items: center;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.badge-pass {
+  background: var(--status-pass);
+  color: white;
+}
+.badge-warn {
+  background: var(--status-warn);
+  color: white;
+}
+.badge-fail {
+  background: var(--status-fail);
+  color: white;
+}
+.badge-neutral {
+  background: var(--border);
+  color: var(--fg);
+}
+.compliance-notice {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 4px solid var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 10%, transparent);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.compliance-notice strong {
+  font-weight: 600;
+}
+.compliance-notice code {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.compliance-pre-standard {
+  border-left-color: var(--border);
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+}
+details > summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+details > summary::before {
+  content: "▶";
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+details[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+details > *:not(summary) {
+  padding: 0.75rem;
+}
+.drilldown {
+  margin-bottom: 2rem;
+}
+.raw-data {
+  margin-bottom: 2rem;
+}
+.md-embed {
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.md-embed h1, .md-embed h2, .md-embed h3 {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+  margin: 1rem 0 0.5rem;
+}
+.md-embed table {
+  margin: 0.5rem 0;
+}
+.md-embed pre {
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.md-embed code {
+  background: none;
+  padding: 0;
+}
+.repo-health-current {
+  margin-bottom: 2rem;
+}
+.repo-health-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}</style>
+</head>
+<body>
+    <header class="kpi-bar">
+  <h1>Enforce 100%-complete agentops inputs (usage + warnings + scope coverage) <span class="badge badge-neutral">…</span></h1>
+  <div class="kpis">
+    <span>—</span>
+    <span>$2.74</span>
+    <span class="kpi-sub">$0.305/AC</span>
+    <span>10/9 ACs</span>
+    <span>mut —</span>
+    <span>type —</span>
+    <span>7 loops</span>
+  </div>
+</header>
+    
+    <main>
+      <section class="story">
+        <h2>Story</h2>
+        <article class="story-card story-card--done-retried" aria-label="batch DEV-T">
+  <header><h3>DEV-T</h3><span class="badge badge-warn" aria-label="status: done with retries">↻ done (retried)</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">27m 40s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$1.81</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">dev</span></div>
+  <aside class="story-card__retry" role="status">⚠ dev retried 2× — loop 2: Loop 2 restart — reviewer findings: 1 blocker (AC-009 wiring) + 6 majors (dup h…; loop 3: Loop 3 (final cap) — surgical fix for M5 regression: orphaned fd after rename i…</aside>
+  <p class="story-card__summary">Loop 3 (final cap) — surgical fix for M5 regression: orphaned fd after rename in _append_capture_failure</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (3 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>dev</td><td>dev-T-001-loop1</td><td>1</td><td>11m 57s</td><td>111612</td><td>done</td></tr><tr><td>dev</td><td>dev-T-001-loop2</td><td>2</td><td>11m 5s</td><td>131196</td><td>done</td></tr><tr><td>dev</td><td>dev-T-001-loop3</td><td>3</td><td>1m 5s</td><td>31007</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">Loop 3 (final cap) — surgical fix for M5 regression: orphaned fd after rename in _append_capture_failure</p></details></div>
+</article>
+<article class="story-card story-card--done-retried" aria-label="batch CODE-REVIEWER">
+  <header><h3>CODE-REVIEWER</h3><span class="badge badge-warn" aria-label="status: done with retries">↻ done (retried)</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">1m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$0.11</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">code-reviewer</span></div>
+  <aside class="story-card__retry" role="status">⚠ code-reviewer retried 1× — loop 2: (no PM note)</aside>
+  <p class="story-card__summary story-card__summary--empty">(no summary)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>code-reviewer</td><td>code-reviewer-T-001-loo…</td><td>2</td><td>51s</td><td>16231</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">(no PM note)</p></details></div>
+</article>
+<article class="story-card story-card--done-retried" aria-label="batch LOGIC-REVIEWER">
+  <header><h3>LOGIC-REVIEWER</h3><span class="badge badge-warn" aria-label="status: done with retries">↻ done (retried)</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">50s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$0.11</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">logic-reviewer</span></div>
+  <aside class="story-card__retry" role="status">⚠ logic-reviewer retried 1× — loop 3: Verifying surgical fix to M5 regression only (code-reviewer skipped — out of it…</aside>
+  <p class="story-card__summary">Verifying surgical fix to M5 regression only (code-reviewer skipped — out of its scope)</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>logic-reviewer</td><td>logic-reviewer-T-001-lo…</td><td>3</td><td>45s</td><td>16831</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">Verifying surgical fix to M5 regression only (code-reviewer skipped — out of its scope)</p></details></div>
+</article>
+<article class="story-card story-card--done-retried" aria-label="batch QA-T">
+  <header><h3>QA-T</h3><span class="badge badge-warn" aria-label="status: done with retries">↻ done (retried)</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">3m 30s</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$0.42</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">qa</span></div>
+  <p class="story-card__summary">All 10 ACs validated pass — real test runs + fixture invocations + helper probe</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>qa</td><td>qa-T-001-loop1</td><td>1</td><td>3m 37s</td><td>64188</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">All 10 ACs validated pass — real test runs + fixture invocations + helper probe</p></details></div>
+</article>
+<article class="story-card story-card--blocked" aria-label="batch AUDIT-AUDIT">
+  <header><h3>AUDIT-AUDIT</h3><span class="badge badge-fail" aria-label="status: blocked">⏸ blocked</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">2m</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$0.29</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">audit-agent</span></div>
+  <p class="story-card__summary">Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pr…</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>audit-agent</td><td>audit-AUDIT-loop1</td><td>1</td><td>1m 55s</td><td>44517</td><td>blocked</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pre-existing git state, not this session)</p></details></div>
+</article>
+      </section>
+      <section class="cost-section">
+  <header class="cost-header">
+    <h2>Cost</h2>
+    <span class="badge badge-pass">coverage 7/7 (100%)</span>
+  </header>
+  <div class="cost-grid">
+    <div class="cost-card">
+  <span class="cost-label">Total cost</span>
+  <span class="cost-value">$2.74</span>
+  <small>$2.7428</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">$ / AC</span>
+  <span class="cost-value">$0.3048</span>
+  <small>9 ACs</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">$ / dispatch</span>
+  <span class="cost-value">$0.3918</span>
+  <small>avg of 7</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Tokens</span>
+  <span class="cost-value">415,582</span>
+  <small>290,907 in / 124,675 out (70/30)</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Wall-clock</span>
+  <span class="cost-value">31m 15s</span>
+  <small>7 dispatches with usage</small>
+</div>
+    <div class="cost-card">
+  <span class="cost-label">Tool uses</span>
+  <span class="cost-value">313</span>
+  <small>~44.7 per dispatch</small>
+</div>
+  </div>
+  <table class="cost-models">
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th>Dispatches</th>
+      <th>Tokens</th>
+      <th>Duration</th>
+      <th>Tool uses</th>
+      <th>USD</th>
+      <th>Share</th>
+    </tr>
+  </thead>
+  <tbody>
+<tr>
+  <td><code>sonnet-4-6</code></td>
+  <td>7</td>
+  <td>415,582</td>
+  <td>31m 15s</td>
+  <td>313</td>
+  <td>$2.7428</td>
+  <td>100.0%</td>
+</tr>
+  </tbody>
+</table>
+  <details class="cost-breakdown">
+  <summary>Cost by role (subagent type)</summary>
+  <table class="cost-models">
+    <thead>
+      <tr>
+        <th>Role</th>
+        <th>Dispatches</th>
+        <th>Tokens</th>
+        <th>Duration</th>
+        <th>USD</th>
+        <th>Share</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr>
+  <td><code>dev</code></td>
+  <td>3</td>
+  <td>273,815</td>
+  <td>24m 6s</td>
+  <td>$1.8072</td>
+  <td>65.9%</td>
+</tr>
+<tr>
+  <td><code>qa</code></td>
+  <td>1</td>
+  <td>64,188</td>
+  <td>3m 37s</td>
+  <td>$0.4236</td>
+  <td>15.4%</td>
+</tr>
+<tr>
+  <td><code>audit-agent</code></td>
+  <td>1</td>
+  <td>44,517</td>
+  <td>1m 55s</td>
+  <td>$0.2938</td>
+  <td>10.7%</td>
+</tr>
+<tr>
+  <td><code>logic-reviewer</code></td>
+  <td>1</td>
+  <td>16,831</td>
+  <td>45s</td>
+  <td>$0.1111</td>
+  <td>4.0%</td>
+</tr>
+<tr>
+  <td><code>code-reviewer</code></td>
+  <td>1</td>
+  <td>16,231</td>
+  <td>51s</td>
+  <td>$0.1071</td>
+  <td>3.9%</td>
+</tr>
+    </tbody>
+  </table>
+</details>
+  <details class="cost-breakdown">
+  <summary>Cost by SDD phase</summary>
+  <table class="cost-models">
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>Dispatches</th>
+        <th>Tokens</th>
+        <th>Duration</th>
+        <th>USD</th>
+        <th>Share</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr>
+  <td><code>unattributed</code></td>
+  <td>7</td>
+  <td>415,582</td>
+  <td>31m 15s</td>
+  <td>$2.7428</td>
+  <td>100.0%</td>
+</tr>
+    </tbody>
+  </table>
+</details>
+  <p class="cost-note"><em>70/30 input/output split assumed; harness reports only total_tokens; 7 of 7 dispatches included in cost</em></p>
+</section>
+      <section class="drilldown">
+<h2>Drilldown</h2>
+<details>
+<summary>Per-AC closure detail</summary>
+<div><table>
+<thead><tr><th>AC ID</th><th>Status</th><th>Validator</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>AC-001</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-002</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-003</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-004</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-005</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-006</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-007</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-008</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-009</td><td>missing</td><td>qa</td><td>—</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>Per-dispatch breakdown</summary>
+<div><table>
+<thead><tr><th>Dispatch ID</th><th>Role</th><th>Status</th><th>Loop</th><th>Tokens</th><th>Duration</th><th>PM note</th></tr></thead>
+<tbody>
+<tr><td>dev-T-001-loop1</td><td>dev</td><td>done</td><td>1</td><td>111612</td><td>11m 57s</td><td>—</td></tr>
+<tr><td>dev-T-001-loop2</td><td>dev</td><td>done</td><td>2</td><td>131196</td><td>11m 5s</td><td>Loop 2 restart — reviewer findings: 1 blocker (AC-009 wir...</td></tr>
+<tr><td>code-reviewer-T-0...</td><td>code-reviewer</td><td>done</td><td>2</td><td>16231</td><td>51s</td><td>—</td></tr>
+<tr><td>dev-T-001-loop3</td><td>dev</td><td>done</td><td>3</td><td>31007</td><td>1m 5s</td><td>Loop 3 (final cap) — surgical fix for M5 regression: orph...</td></tr>
+<tr><td>logic-reviewer-T-...</td><td>logic-reviewer</td><td>done</td><td>3</td><td>16831</td><td>45s</td><td>Verifying surgical fix to M5 regression only (code-review...</td></tr>
+<tr><td>qa-T-001-loop1</td><td>qa</td><td>done</td><td>1</td><td>64188</td><td>3m 37s</td><td>All 10 ACs validated pass — real test runs + fixture invo...</td></tr>
+<tr><td>audit-AUDIT-loop1</td><td>audit-agent</td><td>blocked</td><td>1</td><td>44517</td><td>1m 55s</td><td>Audit BLOCKED: usage_not_captured (bootstrap — hook not i...</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>Repo health snapshot</summary>
+<div><p>Repo health: not measured (run <code>npm run mutation &amp;&amp; npm run type-coverage &amp;&amp; npm run arch:check</code> first)</p></div>
+</details>
+<details>
+<summary>Reviewer findings</summary>
+<div><p>(none)</p></div>
+</details>
+<details>
+<summary>Phase durations</summary>
+<div><p>(no phase data available)</p></div>
+</details>
+</section>
+      <section class="raw-data">
+  <h2>Raw data</h2>
+  <details>
+    <summary>View raw Markdown report</summary>
+    <div class="md-embed"><h1>Enforce 100%-complete agentops inputs (usage + warnings + scope coverage) — FEAT-003</h1>
+<blockquote>
+<p>Feature: Enforce 100%-complete agentops inputs (usage + warnings + scope coverage)
+Task ID: FEAT-003
+Phase: escalated
+Generated at: 2026-05-11T04:09:01.218Z</p>
+</blockquote>
+<h2>Insights</h2>
+<ul>
+<li>ℹ Escalation rate 0.0% is below the Galileo healthy band (&lt; 10%) — low escalation, agents resolving autonomously. <em>(Galileo healthy band)</em></li>
+<li>ℹ Dev task success rate 100.0% is at or above 80% — healthy first-try rate.</li>
+<li>⚠ Loop rate 100.0% exceeds 50% — more than half of dispatches needed loops. Consider strengthening the preflight contract.</li>
+</ul>
+<h2>Cost breakdown</h2>
+<p><em>70/30 input/output split assumed; harness reports only total_tokens; 7 of 7 dispatches included in cost</em></p>
+<ul>
+<li>Total tokens: 415582<ul>
+<li>Estimated input (70%): 290907</li>
+<li>Estimated output (30%): 124675</li>
+</ul>
+</li>
+<li>Estimated cost USD total: $2.7428</li>
+<li>Cost per AC: $0.3048</li>
+<li>Cost per dispatch (avg): $0.3918</li>
+<li>Wall-clock duration: 31m 15s</li>
+<li>Tool uses total: 313</li>
+<li>Coverage: 7 of 7 dispatches included in cost calculation</li>
+</ul>
+<h2>Repo health snapshot</h2>
+<p>Repo health: not measured (run <code>npm run mutation &amp;&amp; npm run type-coverage &amp;&amp; npm run arch:check</code> first)</p>
+<h2>Per-dispatch breakdown</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Role</th>
+<th>Status</th>
+<th>Loop</th>
+<th>Tokens</th>
+<th>$</th>
+<th>Duration</th>
+<th>PM note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>dev-T-001...</td>
+<td>dev</td>
+<td>done</td>
+<td>1</td>
+<td>111612</td>
+<td>$0.7366</td>
+<td>11m 57s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>dev-T-001...</td>
+<td>dev</td>
+<td>done</td>
+<td>2</td>
+<td>131196</td>
+<td>$0.8659</td>
+<td>11m 5s</td>
+<td>Loop 2 restart — reviewer findings: 1 blocker (AC-009 wiring) + 6 majors (dup...</td>
+</tr>
+<tr>
+<td>code-revi...</td>
+<td>code-reviewer</td>
+<td>done</td>
+<td>2</td>
+<td>16231</td>
+<td>$0.1071</td>
+<td>51s</td>
+<td>—</td>
+</tr>
+<tr>
+<td>dev-T-001...</td>
+<td>dev</td>
+<td>done</td>
+<td>3</td>
+<td>31007</td>
+<td>$0.2046</td>
+<td>1m 5s</td>
+<td>Loop 3 (final cap) — surgical fix for M5 regression: orphaned fd after rename...</td>
+</tr>
+<tr>
+<td>logic-rev...</td>
+<td>logic-reviewer</td>
+<td>done</td>
+<td>3</td>
+<td>16831</td>
+<td>$0.1111</td>
+<td>45s</td>
+<td>Verifying surgical fix to M5 regression only (code-reviewer skipped — out of ...</td>
+</tr>
+<tr>
+<td>qa-T-001-...</td>
+<td>qa</td>
+<td>done</td>
+<td>1</td>
+<td>64188</td>
+<td>$0.4236</td>
+<td>3m 37s</td>
+<td>All 10 ACs validated pass — real test runs + fixture invocations + helper probe</td>
+</tr>
+<tr>
+<td>audit-AUD...</td>
+<td>audit-agent</td>
+<td>blocked</td>
+<td>1</td>
+<td>44517</td>
+<td>$0.2938</td>
+<td>1m 55s</td>
+<td>Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this...</td>
+</tr>
+</tbody></table>
+<h2>Per-AC closure detail</h2>
+<table>
+<thead>
+<tr>
+<th>AC ID</th>
+<th>Status</th>
+<th>Validator</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AC-001</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-002</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-003</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-004</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-005</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-006</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-007</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-008</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>AC-009</td>
+<td>missing</td>
+<td>qa</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2>Phase durations</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>specify</td>
+<td>—</td>
+</tr>
+<tr>
+<td>plan</td>
+<td>—</td>
+</tr>
+<tr>
+<td>tasks</td>
+<td>—</td>
+</tr>
+<tr>
+<td>implementation</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2>Timeline</h2>
+<p><em>(no phase data available)</em></p>
+<h2>Dispatches</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Dispatches</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>audit-agent</td>
+<td>1</td>
+</tr>
+<tr>
+<td>blocker-specialist</td>
+<td>0</td>
+</tr>
+<tr>
+<td>code-reviewer</td>
+<td>1</td>
+</tr>
+<tr>
+<td>dev</td>
+<td>3</td>
+</tr>
+<tr>
+<td>logic-reviewer</td>
+<td>1</td>
+</tr>
+<tr>
+<td>pm-orchestrator</td>
+<td>0</td>
+</tr>
+<tr>
+<td>qa</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>7</td>
+</tr>
+</tbody></table>
+<h2>Task success rate</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Task success rate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>audit-agent</td>
+<td>0.0%</td>
+</tr>
+<tr>
+<td>blocker-specialist</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>code-reviewer</td>
+<td>100.0%</td>
+</tr>
+<tr>
+<td>dev</td>
+<td>100.0%</td>
+</tr>
+<tr>
+<td>logic-reviewer</td>
+<td>100.0%</td>
+</tr>
+<tr>
+<td>pm-orchestrator</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>qa</td>
+<td>100.0%</td>
+</tr>
+</tbody></table>
+<h2>Loop rate</h2>
+<p>Loop rate: 100.0%</p>
+<h2>Escalation rate</h2>
+<p>Escalation rate: 0.0% — below healthy band (&lt; 10%)</p>
+<h2>AC closure</h2>
+<p>Total: 9 | Pass: 10 | Partial: 0 | Fail: 0 | Missing: 9</p>
+<h2>Reviewer findings density</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>critical</td>
+<td>0</td>
+</tr>
+<tr>
+<td>major</td>
+<td>0</td>
+</tr>
+<tr>
+<td>minor</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h2>PM notes log</h2>
+<ul>
+<li>[2026-05-11 03:36 dev] Loop 2 restart — reviewer findings: 1 blocker (AC-009 wiring) + 6 majors (dup helper, TS race, marker race+corrupt, drive-by edit) + 4 minors</li>
+<li>[2026-05-11 03:49 dev] Loop 3 (final cap) — surgical fix for M5 regression: orphaned fd after rename in _append_capture_failure</li>
+<li>[2026-05-11 03:50 logic-reviewer] Verifying surgical fix to M5 regression only (code-reviewer skipped — out of its scope)</li>
+<li>[2026-05-11 03:51 qa] All 10 ACs validated pass — real test runs + fixture invocations + helper probe</li>
+<li>[2026-05-11 03:54 audit-agent] Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pre-existing git state, not this session)</li>
+</ul>
+<h2>Token cost</h2>
+<p>Token cost not available — using dispatch count as cost proxy: 7 dispatches</p>
+</div>
+  </details>
+</section>
+    </main>
+  </body>
+</html>
