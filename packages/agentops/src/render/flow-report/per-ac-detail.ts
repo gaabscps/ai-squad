@@ -4,22 +4,12 @@
  */
 
 import type { Session } from '../../types';
+import { mdTable } from './utils';
 
 /** Truncates a string to maxLen chars, appending '...' if truncated */
 function trunc(s: string, maxLen: number): string {
   if (s.length <= maxLen) return s;
   return s.slice(0, maxLen - 3) + '...';
-}
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
 }
 
 /** Gets evidence note for an AC from qa output packet */

@@ -9,6 +9,7 @@
  */
 
 import type { Session, PmSession, TierCalibration } from '../types';
+import { fmtUsd, mdTable } from './flow-report/utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,22 +17,6 @@ import type { Session, PmSession, TierCalibration } from '../types';
 
 /** Ordered canonical tier labels (T4 first = highest-cost tier). */
 const TIER_ORDER: Array<TierCalibration['tier'] | 'unknown'> = ['T1', 'T2', 'T3', 'T4', 'unknown'];
-
-/** Formats a USD amount to 4 decimal places with leading $. */
-function fmtUsd(value: number): string {
-  return `$${value.toFixed(4)}`;
-}
-
-/** Builds a Markdown table from headers and rows. */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
-}
 
 // ---------------------------------------------------------------------------
 // renderCostByTier

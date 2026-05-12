@@ -152,10 +152,43 @@ export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
     const pmNote = typeof raw.pm_note === 'string' ? raw.pm_note : null;
     // FEAT-003: real capture takes precedence; backfill is fallback (AC-017, AC-022)
     let usage: Usage | undefined;
-    if (isUsage(raw.usage)) {
+    // Normalise partial usage shapes before the type guard:
+    //   - model: null (Python None) or absent → 'unknown'
+    //   - tool_uses / duration_ms absent → 0 (some manifests emit token-only entries)
+    //   - cost_usd: 0 is a placeholder in early manifests; remove so attachCostUsd recomputes
+    const rawUsage = isRecord(raw.usage)
+      ? {
+          tool_uses: 0,
+          duration_ms: 0,
+          ...raw.usage,
+          model: raw.usage.model == null ? 'unknown' : String(raw.usage.model),
+          ...(raw.usage.cost_usd === 0 ? { cost_usd: undefined } : {}),
+        }
+      : raw.usage;
+    if (isUsage(rawUsage)) {
       // Normalize model string: manifest may emit long-form "claude-sonnet-4-6"
       // but pricing table keys are short-form "sonnet-4-6" etc.
-      usage = { ...raw.usage, model: normalizeModel(raw.usage.model) };
+      usage = { ...rawUsage, model: normalizeModel(rawUsage.model) };
+      // Manifest may emit flat breakdown fields (input_tokens, output_tokens, cache_*)
+      // alongside total_tokens. Map them into breakdown so computeUsageCost uses accurate
+      // cache pricing instead of the 70/30 split assumption.
+      if (
+        !usage.breakdown &&
+        typeof rawUsage.input_tokens === 'number' &&
+        typeof rawUsage.output_tokens === 'number' &&
+        typeof rawUsage.cache_creation_input_tokens === 'number' &&
+        typeof rawUsage.cache_read_input_tokens === 'number'
+      ) {
+        usage = {
+          ...usage,
+          breakdown: {
+            input_tokens: rawUsage.input_tokens as number,
+            output_tokens: rawUsage.output_tokens as number,
+            cache_creation_input_tokens: rawUsage.cache_creation_input_tokens as number,
+            cache_read_input_tokens: rawUsage.cache_read_input_tokens as number,
+          },
+        };
+      }
     } else {
       usage = backfillLookup.get(dispatchId);
     }
@@ -234,7 +267,9 @@ export function aggregateQaResults(outputs: RawSession['outputs']): Session['qaR
       }
     } else if (isRecord(acCoverage)) {
       // Current format: object map { "AC-XXX": "pass" | "fail" | "deferred" | string[] }
-      for (const [ac, value] of Object.entries(acCoverage)) {
+      // Keys may be namespace-qualified ("FEAT-005/AC-001") — strip prefix for lookup.
+      for (const [rawAc, value] of Object.entries(acCoverage)) {
+        const ac = rawAc.includes('/') ? rawAc.slice(rawAc.lastIndexOf('/') + 1) : rawAc;
         const status = deriveQaStatusFromValue(value);
         if (status !== null) {
           results.push({ ac, status });
@@ -255,7 +290,42 @@ export function attachOutputPackets(
       return o.data.dispatch_id === d.dispatchId;
     });
     if (match && isRecord(match.data)) {
-      return { ...d, outputPacket: match.data };
+      let updatedDispatch: Session['dispatches'][number] = { ...d, outputPacket: match.data };
+      // Fallback: if dispatch has no usage but output packet carries usage, populate from packet.
+      if (!updatedDispatch.usage && isRecord(match.data)) {
+        const packetUsage = match.data.usage;
+        if (packetUsage !== null && packetUsage !== undefined && isRecord(packetUsage)) {
+          const normalized = {
+            tool_uses: 0,
+            duration_ms: 0,
+            ...packetUsage,
+            model: (packetUsage.model == null ? 'unknown' : String(packetUsage.model)),
+            ...(packetUsage.cost_usd === 0 ? { cost_usd: undefined } : {}),
+          };
+          if (isUsage(normalized)) {
+            let finalUsage = { ...normalized, model: normalizeModel(normalized.model) };
+            if (
+              !finalUsage.breakdown &&
+              typeof normalized.input_tokens === 'number' &&
+              typeof normalized.output_tokens === 'number' &&
+              typeof normalized.cache_creation_input_tokens === 'number' &&
+              typeof normalized.cache_read_input_tokens === 'number'
+            ) {
+              finalUsage = {
+                ...finalUsage,
+                breakdown: {
+                  input_tokens: normalized.input_tokens as number,
+                  output_tokens: normalized.output_tokens as number,
+                  cache_creation_input_tokens: normalized.cache_creation_input_tokens as number,
+                  cache_read_input_tokens: normalized.cache_read_input_tokens as number,
+                },
+              };
+            }
+            updatedDispatch = { ...updatedDispatch, usage: attachCostUsd(finalUsage) };
+          }
+        }
+      }
+      return updatedDispatch;
     }
     return d;
   });

@@ -27,17 +27,30 @@ interface ReviewerFindings {
  */
 export function computeAcClosureSummary(session: Session): AcClosure {
   const total = session.acs.length;
+
+  // Deduplicate: same AC may appear in multiple QA packets. Take the best status per AC
+  // (pass > partial > fail) so counts don't exceed total.
+  const STATUS_RANK: Record<string, number> = { pass: 2, partial: 1, fail: 0 };
+  const byAc = new Map<string, 'pass' | 'partial' | 'fail'>();
+  for (const result of session.qaResults) {
+    const existing = byAc.get(result.ac);
+    const newRank = STATUS_RANK[result.status] ?? -1;
+    const existRank = existing !== undefined ? (STATUS_RANK[existing] ?? -1) : -1;
+    if (!existing || newRank > existRank) {
+      byAc.set(result.ac, result.status);
+    }
+  }
+
   let pass = 0;
   let partial = 0;
   let fail = 0;
-
-  for (const result of session.qaResults) {
-    if (result.status === 'pass') pass++;
-    else if (result.status === 'partial') partial++;
-    else if (result.status === 'fail') fail++;
+  for (const status of byAc.values()) {
+    if (status === 'pass') pass++;
+    else if (status === 'partial') partial++;
+    else if (status === 'fail') fail++;
   }
 
-  const coveredAcs = new Set(session.qaResults.map((r) => r.ac));
+  const coveredAcs = new Set(byAc.keys());
   const missing = session.acs.filter((ac) => !coveredAcs.has(ac)).length;
 
   return { total, pass, partial, fail, missing };

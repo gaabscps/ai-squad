@@ -5,7 +5,7 @@ exports[`renderPerDispatchTable — Fixture A matches snapshot 1`] = `
 
 | ID | Role | Status | Loop | Tokens | $ | Duration | PM note |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| dev-1 | dev | done | — | — | — | 30m | — |
+| dev-1 | dev | done | — | 1000 | — | 0ms | — |
 | code-revi... | code-reviewer | done | — | — | — | 20m | — |
 | qa-1 | qa | done | — | — | — | 40m | — |
 | audit-agent | audit-agent | done | — | — | — | 30m | — |"

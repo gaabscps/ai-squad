@@ -481,7 +481,7 @@ details > *:not(summary) {
   <div class="cost-grid">
     <div class="cost-card">
   <span class="cost-label">Total cost</span>
-  <span class="cost-value">$3.34</span>
+  <span class="cost-value">$3.3400</span>
   <small>$3.3400</small>
 </div>
     <div class="cost-card">

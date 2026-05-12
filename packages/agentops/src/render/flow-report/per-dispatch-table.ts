@@ -5,6 +5,7 @@
 
 import { ANTHROPIC_PRICING_2026 } from '../../constants';
 import type { Session } from '../../types';
+import { mdTable } from './utils';
 
 /** Truncates a string to maxLen chars, appending '...' if truncated */
 function trunc(s: string, maxLen: number): string {
@@ -14,6 +15,7 @@ function trunc(s: string, maxLen: number): string {
 
 /** Formats milliseconds as human-readable duration */
 function fmtMs(ms: number): string {
+  if (ms < 0) return '—';
   if (ms < 1000) return `${ms}ms`;
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -22,9 +24,13 @@ function fmtMs(ms: number): string {
   return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
 }
 
-/** Computes USD cost for a single dispatch using 70/30 split assumption */
-function dispatchCostUsd(usage: { total_tokens: number; model: string } | undefined): string {
-  if (!usage || usage.model === 'unknown') return '—';
+/** Computes USD cost for a single dispatch. Uses pre-computed cost_usd when available. */
+function dispatchCostUsd(
+  usage: { total_tokens: number; model: string; cost_usd?: number } | undefined,
+): string {
+  if (!usage) return '—';
+  if (usage.cost_usd !== undefined) return `$${usage.cost_usd.toFixed(4)}`;
+  if (usage.model === 'unknown') return '—';
   const pricing =
     usage.model === 'opus-4-7'
       ? ANTHROPIC_PRICING_2026['opus-4-7']
@@ -40,17 +46,6 @@ function dispatchCostUsd(usage: { total_tokens: number; model: string } | undefi
     (input / 1_000_000) * pricing.input_per_mtok_usd +
     (output / 1_000_000) * pricing.output_per_mtok_usd;
   return `$${usd.toFixed(4)}`;
-}
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
 }
 
 /**

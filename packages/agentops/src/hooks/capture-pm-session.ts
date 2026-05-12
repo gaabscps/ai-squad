@@ -198,6 +198,156 @@ export async function maybeRegenerateReport(repoRoot: string): Promise<void> {
   }
 }
 
+/**
+ * Scans a transcript JSONL for Write tool calls to paths matching
+ * the pattern ...outputs/d-{id}.json (dispatch output packets).
+ * Returns the last matching file_path, or null if none found.
+ */
+export function findDispatchOutputPath(transcriptPath: string): string | null {
+  if (!fs.existsSync(transcriptPath)) return null;
+  const raw = fs.readFileSync(transcriptPath, 'utf-8');
+  const outputPattern = /\/outputs\/d-[^/]+\.json$/;
+  let lastMatch: string | null = null;
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    let entry: AssistantTurn & { message?: { content?: { type: string; name?: string; input?: { file_path?: string } }[] } };
+    try {
+      entry = JSON.parse(line) as typeof entry;
+    } catch {
+      continue;
+    }
+    if (entry.type !== 'assistant' || !entry.message) continue;
+    if (!Array.isArray(entry.message.content)) continue;
+    for (const c of entry.message.content) {
+      if (c.type === 'tool_use' && c.name === 'Write') {
+        const fp = c.input?.file_path;
+        if (typeof fp === 'string' && outputPattern.test(fp)) {
+          lastMatch = fp;
+        }
+      }
+    }
+  }
+  return lastMatch;
+}
+
+/**
+ * Aggregates all models in byModel into a single usage object.
+ */
+export function aggregateToUsage(byModel: Record<string, ModelAgg>): {
+  total_tokens: number;
+  tool_uses: number;
+  duration_ms: number;
+  model: string;
+  breakdown: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens: number;
+    cache_read_input_tokens: number;
+  };
+} {
+  let totalInput = 0;
+  let totalOutput = 0;
+  let totalCacheCreate = 0;
+  let totalCacheRead = 0;
+  let totalToolUses = 0;
+  let globalFirst: string | null = null;
+  let globalLast: string | null = null;
+  let chosenModel = 'unknown';
+
+  for (const [modelKey, agg] of Object.entries(byModel)) {
+    totalInput += agg.inputTokens;
+    totalOutput += agg.outputTokens;
+    totalCacheCreate += agg.cacheCreate;
+    totalCacheRead += agg.cacheRead;
+    totalToolUses += agg.toolUses;
+    if (agg.firstTs) {
+      if (!globalFirst || agg.firstTs < globalFirst) globalFirst = agg.firstTs;
+    }
+    if (agg.lastTs) {
+      if (!globalLast || agg.lastTs > globalLast) globalLast = agg.lastTs;
+    }
+    if (chosenModel === 'unknown' && modelKey !== 'unknown') {
+      chosenModel = modelKey;
+    }
+  }
+
+  const durationMs =
+    globalFirst && globalLast
+      ? Math.max(0, new Date(globalLast).getTime() - new Date(globalFirst).getTime())
+      : 0;
+
+  return {
+    total_tokens: totalInput + totalOutput + totalCacheCreate + totalCacheRead,
+    tool_uses: totalToolUses,
+    duration_ms: durationMs,
+    model: chosenModel,
+    breakdown: {
+      input_tokens: totalInput,
+      output_tokens: totalOutput,
+      cache_creation_input_tokens: totalCacheCreate,
+      cache_read_input_tokens: totalCacheRead,
+    },
+  };
+}
+
+/**
+ * Patches the output packet at outputPacketPath with usageObj.
+ * - Returns null if file doesn't exist or can't be parsed.
+ * - Returns dispatch_id without writing if usage is already non-null (idempotent).
+ * - Otherwise sets packet.usage = usageObj, atomic write, returns dispatch_id.
+ */
+export function patchOutputPacketUsage(
+  outputPacketPath: string,
+  usageObj: Record<string, unknown>,
+): string | null {
+  if (!fs.existsSync(outputPacketPath)) return null;
+  let packet: Record<string, unknown>;
+  try {
+    packet = JSON.parse(fs.readFileSync(outputPacketPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const dispatchId = typeof packet.dispatch_id === 'string' ? packet.dispatch_id : null;
+  if (!dispatchId) return null;
+  if (packet.usage !== null && packet.usage !== undefined) {
+    return dispatchId; // idempotent — already has usage
+  }
+  packet.usage = usageObj;
+  const tmp = outputPacketPath + '.dispatch-usage.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(packet, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, outputPacketPath);
+  return dispatchId;
+}
+
+/**
+ * Patches the manifest's actual_dispatches[] entry matching dispatchId with usageObj.
+ * Idempotent: no-op if not found or entry already has non-null usage.
+ */
+export function patchManifestDispatchUsage(
+  manifestPath: string,
+  dispatchId: string,
+  usageObj: Record<string, unknown>,
+): void {
+  if (!fs.existsSync(manifestPath)) return;
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  if (!Array.isArray(manifest.actual_dispatches)) return;
+  const dispatches = manifest.actual_dispatches as Record<string, unknown>[];
+  const idx = dispatches.findIndex((e) => e.dispatch_id === dispatchId);
+  if (idx === -1) return;
+  const entry = dispatches[idx]!;
+  if (entry.usage !== null && entry.usage !== undefined) return; // idempotent
+  dispatches[idx] = { ...entry, usage: usageObj };
+  manifest.actual_dispatches = dispatches;
+  const tmp = manifestPath + '.dispatch-usage.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, manifestPath);
+}
+
 export function findRepoRoot(start: string): string {
   let dir = start;
   while (dir !== path.dirname(dir)) {
@@ -326,6 +476,35 @@ export async function runCapture(opts: RunCaptureOptions): Promise<void> {
     await appendToWarningsJson(sessionDir, taskId, 'zero_assistant_turns', sessionId, repoRoot);
     return;
   }
+
+  // --- Subagent branch ---
+  // Check if this session wrote a dispatch output packet (subagent vs PM session).
+  const dispatchOutputPath = findDispatchOutputPath(transcriptPath);
+  if (dispatchOutputPath) {
+    const usageObj = aggregateToUsage(byModel);
+    const absoluteOutputPath = path.isAbsolute(dispatchOutputPath)
+      ? dispatchOutputPath
+      : path.join(repoRoot, dispatchOutputPath);
+    const dispatchId = patchOutputPacketUsage(absoluteOutputPath, usageObj as Record<string, unknown>);
+    if (dispatchId) {
+      // Derive manifestPath from output packet path if not already known.
+      let resolvedManifestPath = manifestPath;
+      if (!resolvedManifestPath) {
+        const m = absoluteOutputPath.match(/\.agent-session\/([^/]+)\/outputs\//);
+        if (m) {
+          resolvedManifestPath = path.join(repoRoot, '.agent-session', m[1]!, 'dispatch-manifest.json');
+        }
+      }
+      if (resolvedManifestPath) {
+        patchManifestDispatchUsage(resolvedManifestPath, dispatchId, usageObj as Record<string, unknown>);
+      }
+    }
+    process.stderr.write(
+      `[capture-pm-session] subagent dispatch ${dispatchId ?? 'unknown'}: usage captured\n`,
+    );
+    return; // do not write to pm_orchestrator_sessions[]
+  }
+  // --- End subagent branch ---
 
   const phases = readPhaseHistory(path.join(repoRoot, '.agent-session', taskId, 'session.yml'));
   for (const model of models) {

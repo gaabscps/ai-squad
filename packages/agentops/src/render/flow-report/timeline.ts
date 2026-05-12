@@ -4,17 +4,7 @@
  */
 
 import type { Session } from '../../types';
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
-}
+import { mdTable } from './utils';
 
 /** Formats milliseconds as human-readable duration */
 function fmtMs(ms: number): string {

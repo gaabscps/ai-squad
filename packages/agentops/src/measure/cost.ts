@@ -155,7 +155,8 @@ export function computeCostUsd(
 
   const totalAcs = session.acs.length;
   const per_ac_usd = totalAcs > 0 ? totalUsd / totalAcs : null;
-  const per_dispatch_avg_usd = totalUsd / included;
+  // Avg across ALL dispatches (not just those with cost data) — reflects true pipeline cost.
+  const per_dispatch_avg_usd = total > 0 ? totalUsd / total : null;
 
   const coverageNote =
     included < total

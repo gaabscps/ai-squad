@@ -7,6 +7,7 @@
 
 import { GALILEO_HEALTHY_ESCALATION_BAND } from '../../constants';
 import type { Metrics, Role } from '../../types';
+import { mdTable } from './utils';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -49,17 +50,6 @@ function formatDuration(value: number | 'running' | 'not_started'): string {
 function formatRate(value: number | null): string {
   if (value === null) return 'n/a';
   return pct(value);
-}
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@
 import { ANTHROPIC_PRICING_2026 } from '../../../constants';
 import { computeUsageCost } from '../../../measure/cost';
 import type { CostMetric, Session, Usage } from '../../../types';
+import { fmtUsd } from '../../flow-report/utils';
 import { escape } from '../shared/escape';
 
 const INPUT_RATIO = 0.7;
@@ -25,10 +26,6 @@ function fmtMs(ms: number): string {
   const h = Math.floor(m / 60);
   const remM = m % 60;
   return remM === 0 ? `${h}h` : `${h}h${remM}m`;
-}
-
-function fmtUsd(value: number, digits = 2): string {
-  return `$${value.toFixed(digits)}`;
 }
 
 function fmtNum(n: number): string {

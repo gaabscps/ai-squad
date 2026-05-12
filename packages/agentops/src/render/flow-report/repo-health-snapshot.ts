@@ -5,17 +5,7 @@
  */
 
 import type { RepoHealth } from '../../types';
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
-}
+import { mdTable } from './utils';
 
 /** Returns a status symbol based on threshold comparison */
 function statusSymbol(value: number, threshold: number, lowerIsBetter: boolean): string {

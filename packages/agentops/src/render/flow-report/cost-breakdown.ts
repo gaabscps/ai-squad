@@ -4,6 +4,7 @@
  */
 
 import type { Metrics } from '../../types';
+import { fmtUsd } from './utils';
 
 /** Formats milliseconds into a human-friendly duration string */
 function formatMs(ms: number): string {
@@ -14,11 +15,6 @@ function formatMs(ms: number): string {
   const remainingSecs = seconds % 60;
   if (remainingSecs === 0) return `${minutes}m`;
   return `${minutes}m ${remainingSecs}s`;
-}
-
-/** Formats a USD amount to 4 decimal places */
-function fmtUsd(value: number): string {
-  return `$${value.toFixed(4)}`;
 }
 
 /**
@@ -133,7 +129,7 @@ export function renderCostBreakdownFull(
 
   for (const d of dispatches) {
     if (d.usage) {
-      totalDurationMs += d.usage.duration_ms;
+      if (d.usage.duration_ms >= 0) totalDurationMs += d.usage.duration_ms;
       totalToolUses += d.usage.tool_uses;
       totalTokens += d.usage.total_tokens;
       usageCount++;

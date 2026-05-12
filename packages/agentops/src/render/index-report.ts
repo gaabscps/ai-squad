@@ -10,6 +10,7 @@
 import type { Compliance, Insight, Metrics, RepoHealth, Session } from '../types';
 
 import { renderRepoHealthSnapshot } from './flow-report/repo-health-snapshot';
+import { mdTable } from './flow-report/utils';
 
 /**
  * Símbolo curto para a coluna de compliance no cross-flow table.
@@ -72,21 +73,10 @@ function isoDate(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** Formats USD to 4 decimal places or '—' if null */
-function fmtUsd(value: number | null | undefined): string {
+/** Formats USD to 4 decimal places or '—' if null/undefined */
+function fmtUsdNullable(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   return `$${value.toFixed(4)}`;
-}
-
-/** Builds a Markdown table from headers and rows */
-function mdTable(headers: string[], rows: string[][]): string {
-  const sep = headers.map(() => '---');
-  const lines = [
-    `| ${headers.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ];
-  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +101,8 @@ function renderCrossFlowTable(allMetrics: { session: Session; metrics: Metrics }
   const rows = allMetrics.map(({ metrics: m }) => {
     const symbol = statusSymbol(m.status);
     const escPct = m.totalDispatches === 0 ? '—' : fmtPct(m.escalationRate);
-    const totalUsd = fmtUsd(m.cost?.total_usd);
-    const perAcUsd = fmtUsd(m.cost?.per_ac_usd);
+    const totalUsd = fmtUsdNullable(m.cost?.total_usd);
+    const perAcUsd = fmtUsdNullable(m.cost?.per_ac_usd);
     return [
       `${symbol} ${m.taskId}`,
       complianceSymbol(m.compliance),
@@ -165,7 +155,7 @@ function renderTrends(
     const delta = firstCost !== 0 ? ((lastCost - firstCost) / firstCost) * 100 : 0;
     const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
     extraBullets.push(
-      `Cost per AC: ${first.metrics.taskId}=${fmtUsd(firstCost)} → ${last.metrics.taskId}=${fmtUsd(lastCost)} (${deltaStr})`,
+      `Cost per AC: ${first.metrics.taskId}=${fmtUsdNullable(firstCost)} → ${last.metrics.taskId}=${fmtUsdNullable(lastCost)} (${deltaStr})`,
     );
   }
 
