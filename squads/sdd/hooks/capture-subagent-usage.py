@@ -167,6 +167,80 @@ def find_packet_by_session(outputs_dir: Path, session_id: str) -> Path | None:
     return None
 
 
+# Matches a `dispatch_id: <value>` line embedded in transcript content,
+# where <value> is the canonical ai-squad dispatch id shape
+# (`d-` followed by non-whitespace). Captures the bare value.
+_DISPATCH_ID_RE = re.compile(r"dispatch_id\s*:\s*[\"']?(d-[^\s\"']+)")
+
+
+def extract_dispatch_id_from_transcript(transcript_path: Path) -> str | None:
+    """Scan a subagent's JSONL transcript for the Work Packet `dispatch_id`.
+
+    Fallback correlation path used when the file-based `_session_id` stamp is
+    absent (the PostToolUse stamper can miss a write — e.g. when the subagent
+    uses MultiEdit, NotebookEdit, or writes via a Bash command, or fires
+    before `session_id` propagates into the hook payload).
+
+    The Work Packet YAML is embedded in the FIRST user message Claude Code
+    delivers to the subagent. This function scans every entry in the JSONL
+    and returns the first `dispatch_id: d-XXX` it finds — covers cases where
+    the Work Packet is rephrased or quoted later in the transcript too.
+
+    Returns the dispatch_id string (e.g. ``d-T-001-dev-l1``) or None when
+    the transcript is unreadable, malformed, or contains no Work Packet.
+    """
+    if not transcript_path.exists():
+        return None
+    try:
+        text = transcript_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+
+        # Try entry.message.content first (Claude Code transcript shape).
+        msg = entry.get("message") if isinstance(entry.get("message"), dict) else entry
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+
+        # Normalise to a single string regardless of content shape.
+        text_blob = ""
+        if isinstance(content, str):
+            text_blob = content
+        elif isinstance(content, list):
+            parts: list[str] = []
+            for block in content:
+                if isinstance(block, str):
+                    parts.append(block)
+                elif isinstance(block, dict):
+                    t = block.get("text")
+                    if isinstance(t, str):
+                        parts.append(t)
+                    # Some shapes wrap user tool_result content
+                    cnt = block.get("content")
+                    if isinstance(cnt, str):
+                        parts.append(cnt)
+            text_blob = " ".join(parts)
+
+        if not text_blob:
+            continue
+        m = _DISPATCH_ID_RE.search(text_blob)
+        if m:
+            return m.group(1)
+
+    return None
+
+
 def parse_transcript(transcript_path: Path) -> dict:
     """Sum token usage across all assistant turns. Count tool_use blocks."""
     totals = {
@@ -327,26 +401,36 @@ def main() -> int:
 
     outputs_dir = session_dir / "outputs"
     packet_path = find_packet_by_session(outputs_dir, session_id)
-    if packet_path is None:
-        return 0  # orchestrator session or no packet written
 
-    try:
-        packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        # AC-003: transcript/packet parse failure
-        if task_id:
-            _append_capture_failure(
-                session_dir,
-                dispatch_id=str(packet_path.stem),
-                reason="transcript_invalid",
-                attempted_sources=[str(packet_path)],
-            )
-        return 0
+    dispatch_id: str | None = None
+    if packet_path is not None:
+        # Primary path — file-based _session_id stamp succeeded.
+        try:
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            if task_id:
+                _append_capture_failure(
+                    session_dir,
+                    dispatch_id=str(packet_path.stem),
+                    reason="transcript_invalid",
+                    attempted_sources=[str(packet_path)],
+                )
+            return 0
+        raw_dispatch = packet.get("dispatch_id") if isinstance(packet, dict) else None
+        if isinstance(raw_dispatch, str):
+            dispatch_id = raw_dispatch
 
-    dispatch_id = packet.get("dispatch_id") if isinstance(packet, dict) else None
-    if not isinstance(dispatch_id, str):
-        # AC-003: _session_id present but dispatch_id absent in packet
-        if task_id:
+    if dispatch_id is None:
+        # Fallback — extract dispatch_id directly from the transcript's
+        # Work Packet. Covers all cases where the _session_id stamp didn't
+        # land (MultiEdit, missing-payload session_id, etc.) and explains
+        # the 30+ usage=null dispatches observed in FEAT-004 / FEAT-005.
+        dispatch_id = extract_dispatch_id_from_transcript(Path(transcript_path_str))
+
+    if not isinstance(dispatch_id, str) or not dispatch_id:
+        # Both paths failed — this really is an orchestrator session
+        # (no Work Packet) or a non-correlatable run.
+        if task_id and packet_path is not None:
             _append_capture_failure(
                 session_dir,
                 dispatch_id="<unknown>",
