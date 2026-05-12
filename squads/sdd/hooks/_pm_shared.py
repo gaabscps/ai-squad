@@ -4,7 +4,7 @@ Shared helpers for FEAT-004 PM enforcement hooks.
 Used by:
   - verify-pm-handoff-clean.py  (T-004 / AC-001)
   - verify-tier-calibration.py  (T-008/T-009 / AC-005)
-  - capture-pm-usage.py         (T-016 / AC-013)
+  - capture-pm-usage.py         (T-016 / AC-013, transcript path AC-014)
 
 Python 3.8+. No external dependencies (stdlib only).
 """
@@ -18,7 +18,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 # ---------------------------------------------------------------------------
 # Hard-coded exclude prefixes for the fallback rglob path.
@@ -356,3 +356,92 @@ def atomic_manifest_mutate(
                 raise
         finally:
             fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+
+
+# ---------------------------------------------------------------------------
+# Transcript usage aggregation
+# ---------------------------------------------------------------------------
+
+
+def aggregate_transcript_usage(transcript_path: Path) -> dict[str, Any]:
+    """Sum token usage across every assistant turn in a Claude Code JSONL transcript.
+
+    Claude Code Stop hooks receive a ``transcript_path`` pointing to the JSONL
+    record of the session. Each line is one entry; assistant turns carry a
+    ``message.usage`` block (input_tokens, output_tokens, cache_*). Aggregating
+    across the file gives total session usage — the only reliable way to capture
+    PM cost since the Stop hook payload itself does not carry ``usage``.
+
+    Returns a dict::
+
+        {
+            "input_tokens": int,
+            "output_tokens": int,
+            "cache_creation_input_tokens": int,
+            "cache_read_input_tokens": int,
+            "model": str,            # first non-empty model seen, "unknown" if none
+            "first_ts": str | None,  # earliest entry timestamp (ISO-like), or None
+            "last_ts":  str | None,  # latest entry timestamp (ISO-like), or None
+        }
+
+    Missing / unreadable / unparseable transcripts return zero counts with
+    model="unknown" and timestamps=None. Malformed individual lines are
+    skipped — callers don't need to disambiguate "no data" from "bad file".
+    """
+    totals: dict[str, Any] = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "model": "unknown",
+        "first_ts": None,
+        "last_ts": None,
+    }
+    if not transcript_path.exists():
+        return totals
+
+    try:
+        text = transcript_path.read_text(encoding="utf-8")
+    except OSError:
+        return totals
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+
+        ts = entry.get("timestamp")
+        if isinstance(ts, str) and ts:
+            if totals["first_ts"] is None or ts < totals["first_ts"]:
+                totals["first_ts"] = ts
+            if totals["last_ts"] is None or ts > totals["last_ts"]:
+                totals["last_ts"] = ts
+
+        msg = entry.get("message") if isinstance(entry.get("message"), dict) else entry
+        if not isinstance(msg, dict):
+            continue
+
+        usage = msg.get("usage")
+        if isinstance(usage, dict):
+            for k in (
+                "input_tokens",
+                "output_tokens",
+                "cache_creation_input_tokens",
+                "cache_read_input_tokens",
+            ):
+                v = usage.get(k)
+                if isinstance(v, int):
+                    totals[k] += v
+
+        if totals["model"] == "unknown":
+            m = msg.get("model")
+            if isinstance(m, str) and m:
+                totals["model"] = m
+
+    return totals

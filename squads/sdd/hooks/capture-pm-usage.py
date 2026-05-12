@@ -39,7 +39,7 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from _pm_shared import atomic_manifest_mutate
+from _pm_shared import atomic_manifest_mutate, aggregate_transcript_usage
 from hook_runtime import resolve_project_root
 
 # ---------------------------------------------------------------------------
@@ -192,6 +192,56 @@ def _build_entry_from_platform(
             "cost_usd": _estimate_cost_usd(usage_raw),
         },
         "source": "platform_captured",
+    }
+
+
+def _build_entry_from_transcript(
+    session_id: str,
+    transcript_path: Path,
+    completed_at: str,
+) -> dict | None:
+    """Build a pm_sessions entry by aggregating usage from the session transcript.
+
+    Returns None when the transcript exists but contains zero usage entries
+    (rare — usually means a freshly-started session with no assistant turns),
+    so the caller can fall through to the next capture path instead of writing
+    a meaningless all-zero entry.
+    """
+    agg = aggregate_transcript_usage(transcript_path)
+    input_t = _safe_int(agg.get("input_tokens"))
+    output_t = _safe_int(agg.get("output_tokens"))
+    cache_create = _safe_int(agg.get("cache_creation_input_tokens"))
+    cache_read = _safe_int(agg.get("cache_read_input_tokens"))
+
+    if input_t == 0 and output_t == 0 and cache_create == 0 and cache_read == 0:
+        return None
+
+    raw_started = agg.get("first_ts")
+    started_at = raw_started if _is_valid_iso(raw_started) else completed_at
+    raw_completed = agg.get("last_ts")
+    completed_at_out = raw_completed if _is_valid_iso(raw_completed) else completed_at
+
+    cost = _estimate_cost_usd({
+        "input_tokens": input_t,
+        "output_tokens": output_t,
+        "cache_creation_input_tokens": cache_create,
+        "cache_read_input_tokens": cache_read,
+    })
+
+    return {
+        "session_id": session_id,
+        "started_at": started_at,
+        "completed_at": completed_at_out,
+        "usage": {
+            "input_tokens": input_t,
+            "output_tokens": output_t,
+            "total_tokens": input_t + output_t,
+            "cache_creation_input_tokens": cache_create,
+            "cache_read_input_tokens": cache_read,
+            "cost_usd": cost,
+            "model": agg.get("model", "unknown"),
+        },
+        "source": "transcript_aggregated",
     }
 
 
@@ -361,28 +411,47 @@ def main() -> int:
 
     try:
         if isinstance(usage_raw, dict):
-            # Path 1: platform-captured telemetry present in hook payload
+            # Path 1: platform-captured telemetry present in hook payload.
             entry = _build_entry_from_platform(session_id, usage_raw, completed_at)
         else:
-            # Path 2: fallback — read pm_handoff.json written by PM Skill at handoff
-            handoff_path = session_dir / "pm_handoff.json"
-            if handoff_path.exists():
+            # Path 1b: aggregate from the JSONL transcript that Claude Code
+            # always provides on Stop. This is the primary capture path in
+            # practice — `usage` is not present on main-session Stop events.
+            raw_tp = payload.get("transcript_path")
+            if isinstance(raw_tp, str) and raw_tp.strip():
+                transcript_path = Path(raw_tp).expanduser()
                 try:
-                    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
-                    if isinstance(handoff, dict):
-                        entry = _build_entry_from_handoff(handoff, completed_at)
-                except (OSError, json.JSONDecodeError) as exc:
+                    entry = _build_entry_from_transcript(
+                        session_id, transcript_path, completed_at
+                    )
+                except Exception as exc:  # noqa: BLE001
                     print(
-                        f"capture-pm-usage: cannot read pm_handoff.json ({exc})",
+                        f"capture-pm-usage: transcript aggregation failed ({exc})",
                         file=sys.stderr,
                     )
-            else:
-                # Path 3: both absent — warn, do not write entry
-                print(
-                    "capture-pm-usage: no usage telemetry in payload and no "
-                    "pm_handoff.json found; pm_sessions entry NOT written",
-                    file=sys.stderr,
-                )
+                    entry = None
+
+            if entry is None:
+                # Path 2: fallback — pm_handoff.json written by the PM Skill.
+                handoff_path = session_dir / "pm_handoff.json"
+                if handoff_path.exists():
+                    try:
+                        handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+                        if isinstance(handoff, dict):
+                            entry = _build_entry_from_handoff(handoff, completed_at)
+                    except (OSError, json.JSONDecodeError) as exc:
+                        print(
+                            f"capture-pm-usage: cannot read pm_handoff.json ({exc})",
+                            file=sys.stderr,
+                        )
+                else:
+                    # Path 3: all paths exhausted — warn, write nothing.
+                    print(
+                        "capture-pm-usage: no usage telemetry in payload, no "
+                        "readable transcript, and no pm_handoff.json found; "
+                        "pm_sessions entry NOT written",
+                        file=sys.stderr,
+                    )
     except Exception as exc:  # noqa: BLE001
         print(
             f"capture-pm-usage: unexpected error building entry ({exc}); skipping write",

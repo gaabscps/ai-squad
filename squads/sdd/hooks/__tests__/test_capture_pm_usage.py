@@ -1584,5 +1584,220 @@ class TestFindActiveSessionT007(_FindActiveSessionBase):
             )
 
 
+# ---------------------------------------------------------------------------
+# AC-014 — transcript_aggregated path
+# ---------------------------------------------------------------------------
+# Background: Claude Code's main-session Stop hook payload does NOT include
+# `usage` telemetry — that field is populated for SubagentStop, not Stop.
+# Before this path was added, FEAT-004/005 captured zero PM token usage
+# (pm_sessions=null in dispatch-manifest.json) because both platform_captured
+# (no payload.usage) and self_reported (no pm_handoff.json) paths failed.
+#
+# Stop hook payload DOES carry `transcript_path` — the JSONL file Claude Code
+# writes per session. Aggregating `message.usage` across assistant turns gives
+# total session cost. These tests pin that behavior.
+
+def _write_jsonl_transcript(
+    transcript_path: Path,
+    turns: list[dict],
+) -> None:
+    """Write a JSONL transcript file with one turn per dict in *turns*.
+
+    Each turn dict should resemble Claude Code transcript entries — e.g.
+    {"timestamp": "2026-05-11T10:00:00Z",
+     "message": {"role": "assistant", "model": "claude-opus-4-7",
+                 "usage": {"input_tokens": 100, "output_tokens": 50, ...}}}.
+    """
+    transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    with transcript_path.open("w", encoding="utf-8") as fh:
+        for turn in turns:
+            fh.write(json.dumps(turn) + "\n")
+
+
+def _assistant_turn(
+    timestamp: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_creation: int = 0,
+    cache_read: int = 0,
+    model: str = "claude-opus-4-7",
+) -> dict:
+    return {
+        "timestamp": timestamp,
+        "message": {
+            "role": "assistant",
+            "model": model,
+            "usage": {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_creation_input_tokens": cache_creation,
+                "cache_read_input_tokens": cache_read,
+            },
+        },
+    }
+
+
+class TestTranscriptAggregated(unittest.TestCase):
+    """Verify usage is captured from transcript_path when payload.usage absent."""
+
+    def test_transcript_path_aggregated_entry_written(self):
+        """transcript_path with assistant turns → entry source=transcript_aggregated."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            transcript = tmp / "transcript.jsonl"
+            _write_jsonl_transcript(transcript, [
+                _assistant_turn("2026-05-11T10:00:00Z", input_tokens=1000, output_tokens=500),
+                _assistant_turn("2026-05-11T10:05:00Z", input_tokens=2000, output_tokens=800,
+                                cache_read=10000),
+            ])
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-transcript-1",
+                "transcript_path": str(transcript),
+            }
+            _run_hook(payload, project_dir=tmp_str)
+            manifest = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )
+            sessions = manifest.get("pm_sessions", [])
+            self.assertEqual(len(sessions), 1, f"Expected 1 entry, got: {sessions}")
+            entry = sessions[0]
+            self.assertEqual(entry["source"], "transcript_aggregated")
+            self.assertEqual(entry["usage"]["input_tokens"], 3000)
+            self.assertEqual(entry["usage"]["output_tokens"], 1300)
+            self.assertEqual(entry["usage"]["total_tokens"], 4300)
+            self.assertEqual(entry["usage"]["cache_read_input_tokens"], 10000)
+            self.assertEqual(entry["usage"]["model"], "claude-opus-4-7")
+
+    def test_transcript_path_session_timestamps_from_turns(self):
+        """started_at = first turn ts, completed_at = last turn ts."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            transcript = tmp / "transcript.jsonl"
+            _write_jsonl_transcript(transcript, [
+                _assistant_turn("2026-05-11T09:00:00Z", input_tokens=10, output_tokens=5),
+                _assistant_turn("2026-05-11T09:30:00Z", input_tokens=20, output_tokens=10),
+                _assistant_turn("2026-05-11T10:00:00Z", input_tokens=30, output_tokens=15),
+            ])
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-transcript-2",
+                "transcript_path": str(transcript),
+            }
+            _run_hook(payload, project_dir=tmp_str)
+            entry = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )["pm_sessions"][0]
+            self.assertEqual(entry["started_at"], "2026-05-11T09:00:00Z")
+            self.assertEqual(entry["completed_at"], "2026-05-11T10:00:00Z")
+
+    def test_platform_captured_preferred_over_transcript(self):
+        """payload.usage present → platform_captured wins; transcript_path ignored."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            transcript = tmp / "transcript.jsonl"
+            _write_jsonl_transcript(transcript, [
+                _assistant_turn("2026-05-11T10:00:00Z", input_tokens=99999, output_tokens=99999),
+            ])
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-platform-wins",
+                "usage": {
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+                "transcript_path": str(transcript),
+            }
+            _run_hook(payload, project_dir=tmp_str)
+            entry = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )["pm_sessions"][0]
+            self.assertEqual(entry["source"], "platform_captured")
+            self.assertEqual(entry["usage"]["input_tokens"], 100)
+
+    def test_transcript_falls_through_to_handoff_when_empty(self):
+        """transcript with zero assistant usage → fall through to self_reported path."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            transcript = tmp / "transcript.jsonl"
+            # Only a non-assistant entry — no usage to aggregate.
+            _write_jsonl_transcript(transcript, [
+                {"type": "summary", "messageId": "m1"},
+            ])
+            # Provide a pm_handoff.json as fallback.
+            (session_dir / "pm_handoff.json").write_text(json.dumps({
+                "session_id": "pm-handoff-fallback",
+                "started_at": "2026-05-11T09:00:00Z",
+                "completed_at": "2026-05-11T10:00:00Z",
+                "usage": {
+                    "input_tokens": 7,
+                    "output_tokens": 3,
+                    "total_tokens": 10,
+                    "cost_usd": 0.001,
+                },
+            }), encoding="utf-8")
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-transcript-empty",
+                "transcript_path": str(transcript),
+            }
+            _run_hook(payload, project_dir=tmp_str)
+            entry = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )["pm_sessions"][0]
+            self.assertEqual(entry["source"], "self_reported")
+
+    def test_transcript_path_missing_file_skips_to_handoff(self):
+        """transcript_path points to nonexistent file → fall through gracefully."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-missing-transcript",
+                "transcript_path": str(tmp / "does-not-exist.jsonl"),
+            }
+            result = _run_hook(payload, project_dir=tmp_str)
+            self.assertEqual(result.get("decision", "allow"), "allow")
+            manifest = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )
+            # No entry written — both transcript and handoff absent.
+            self.assertEqual(manifest.get("pm_sessions", []), [])
+
+    def test_transcript_message_role_user_does_not_count(self):
+        """Only assistant turns with usage should be aggregated (user turns may lack usage)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp)
+            transcript = tmp / "transcript.jsonl"
+            # Mix of user (no usage) and assistant (with usage) turns. The
+            # aggregator looks at message.usage regardless of role, but user
+            # turns simply don't have a usage block — so this is a smoke check
+            # that the parser doesn't crash on heterogeneous entries.
+            _write_jsonl_transcript(transcript, [
+                {"timestamp": "2026-05-11T10:00:00Z",
+                 "message": {"role": "user", "content": "hi"}},
+                _assistant_turn("2026-05-11T10:01:00Z", input_tokens=50, output_tokens=25),
+            ])
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "pm-test-mixed-roles",
+                "transcript_path": str(transcript),
+            }
+            _run_hook(payload, project_dir=tmp_str)
+            entry = json.loads(
+                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )["pm_sessions"][0]
+            self.assertEqual(entry["usage"]["input_tokens"], 50)
+            self.assertEqual(entry["usage"]["output_tokens"], 25)
+
+
 if __name__ == "__main__":
     unittest.main()
