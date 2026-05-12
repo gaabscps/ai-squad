@@ -39,12 +39,15 @@ atomic_manifest_mutate = _mod.atomic_manifest_mutate
 # Canonical pattern used by verify-pm-handoff-clean.py (T-004).
 # @skip and mock-only cannot use pure \b anchoring because @ and - are
 # non-word characters; they use lookahead/lookaround instead.
-# \b anchors TODO/FIXME/xfail/pending against identifier false-positives.
+# \b anchors TODO/FIXME/xfail against identifier false-positives.
+# pending is restricted to annotation-prefix syntax (@pending, // pending,
+# /* pending, # pending) to avoid false positives in async/state-heavy code
+# where "pending" is legitimate domain vocabulary.
 #
 # Lookahead uses (?![-\w]) (not just (?!\w)) so that a trailing hyphen also
 # blocks the match — e.g. "mock-only-fixture" must NOT match "mock-only", and
 # "@skip-slow" must NOT match "@skip".
-_CANONICAL_PATTERN = r"\b(TODO|FIXME|xfail|pending)\b|(?<!\w)(@skip)(?![-\w])|(?<!\w)(mock-only)(?![-\w])"
+_CANONICAL_PATTERN = r"\b(TODO|FIXME|xfail)\b|(?:@|//\s*|/\*\s*|#\s*)(pending)\b|(?<!\w)(@skip)(?![-\w])|(?<!\w)(mock-only)(?![-\w])"
 
 
 # ===========================================================================
@@ -290,11 +293,49 @@ class TestGrepDebtMarkersEdgeCases(unittest.TestCase):
         return p
 
     def test_no_false_positive_pending_in_identifier(self):
-        """'pending_human' must NOT match because \bpending\b fails at underscore boundary."""
+        """'pending_human' must NOT match — no annotation prefix."""
         f = self._make("f.py", "pending_human = True\n")
         result = grep_debt_markers([f], [_CANONICAL_PATTERN])
         markers = [r["marker"] for r in result]
         self.assertNotIn("pending", markers)
+
+    def test_no_false_positive_pending_domain_vocabulary(self):
+        """Bare 'pending' as domain vocabulary must NOT match (issue #2)."""
+        cases = [
+            "// Wait for no pending save.\n",
+            "*   flush any pending\n",
+            "* - saved: no pending changes\n",
+            "isPending = true\n",
+            "const [isPending, startTransition] = useTransition()\n",
+            "status: 'pending'\n",
+        ]
+        for content in cases:
+            with self.subTest(content=content.strip()):
+                f = self._make("domain.py", content)
+                result = grep_debt_markers([f], [_CANONICAL_PATTERN])
+                markers = [r["marker"] for r in result]
+                self.assertNotIn("pending", markers, f"False positive in: {content!r}")
+
+    def test_detects_annotation_pending_at(self):
+        """'@pending' must match as annotation syntax."""
+        f = self._make("at_pending.py", "@pending\n")
+        result = grep_debt_markers([f], [_CANONICAL_PATTERN])
+        markers = [r["marker"] for r in result]
+        self.assertIn("pending", markers)
+
+    def test_detects_annotation_pending_double_slash(self):
+        """'// pending' must match as JS/TS annotation syntax."""
+        f = self._make("dslash.ts", "// pending: fix this\n")
+        result = grep_debt_markers([f], [_CANONICAL_PATTERN])
+        markers = [r["marker"] for r in result]
+        self.assertIn("pending", markers)
+
+    def test_detects_annotation_pending_hash(self):
+        """'# pending' must match as Python/shell annotation syntax."""
+        f = self._make("hash.py", "# pending: implement\n")
+        result = grep_debt_markers([f], [_CANONICAL_PATTERN])
+        markers = [r["marker"] for r in result]
+        self.assertIn("pending", markers)
 
     def test_multiple_markers_in_file(self):
         content = "# TODO: first\n# FIXME: second\nclean line\n"

@@ -181,11 +181,11 @@ class TestBlockOnMarker(unittest.TestCase):
                            f"Expected at least one evidence entry for @skip: {result}")
 
     def test_pending_blocks(self):
+        # Annotation-prefix forms must block (fix for Issue #2: restrict pending
+        # to intentional debt annotation syntax only).
         result = self._assert_blocks_with_marker(
-            "pending", "status = 'pending'\n"
+            "pending", "@pending\n"
         )
-        # 'pending' word-boundary: must match bare 'pending' but test with
-        # unambiguous standalone usage
         result2 = self._assert_blocks_with_marker(
             "pending", "# pending: implement me\n"
         )

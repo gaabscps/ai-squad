@@ -46,6 +46,101 @@ if str(_SHARED_LIB) not in sys.path:
 from hook_runtime import resolve_project_root
 
 _TASK_ID_RE = re.compile(r"^FEAT-\d{3,4}$")
+_DISPATCH_ID_LOOP_RE = re.compile(r"[-_]l?(\d+)$", re.IGNORECASE)
+_ROLE_SLUG_MAP: dict[str, str] = {
+    "dev": "dev",
+    "qa": "qa",
+    "cr": "code-reviewer",
+    "lr": "logic-reviewer",
+    "audit": "audit-agent",
+    "blocker": "blocker-specialist",
+    "code-reviewer": "code-reviewer",
+    "logic-reviewer": "logic-reviewer",
+}
+
+
+def _infer_role_from_packet(dispatch_id: str, packet: dict) -> str:
+    """Infer role from output packet fields or dispatch_id pattern."""
+    if "ac_coverage" in packet:
+        return "qa"
+    if "files_changed" in packet or "ac_closure" in packet:
+        return "dev"
+    did_lower = dispatch_id.lower()
+    for slug, role in _ROLE_SLUG_MAP.items():
+        if f"-{slug}-" in did_lower or did_lower.endswith(f"-{slug}"):
+            return role
+    return "dev"
+
+
+def _infer_subtask_from_packet(dispatch_id: str, packet: dict) -> str:
+    """Infer sub-task ID (T-NNN) from output packet `task` field or dispatch_id."""
+    task = packet.get("task")
+    if isinstance(task, str) and task:
+        return task
+    m = re.search(r"(T-\d{3,4})", dispatch_id, re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    return "unknown"
+
+
+def _infer_loop_from_packet(dispatch_id: str, packet: dict) -> int:
+    """Infer review_loop from output packet `loop` field or dispatch_id suffix."""
+    loop = packet.get("loop")
+    if isinstance(loop, int) and loop > 0:
+        return loop
+    m = _DISPATCH_ID_LOOP_RE.search(dispatch_id)
+    if m:
+        try:
+            return max(1, int(m.group(1)))
+        except ValueError:
+            pass
+    return 1
+
+
+def _build_auto_entry(dispatch_id: str, packet: dict, usage: dict) -> dict:
+    """Build an actual_dispatches[] entry from an Output Packet.
+
+    Called when the orchestrator never wrote the entry during the session
+    (bookkeeping gap). Preserves ac_coverage so the agentops AC matrix is
+    populated even when the orchestrator skipped step 1b.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    role = _infer_role_from_packet(dispatch_id, packet)
+    task_id = _infer_subtask_from_packet(dispatch_id, packet)
+    review_loop = _infer_loop_from_packet(dispatch_id, packet)
+    status = packet.get("status", "done")
+    totals = usage.get("totals", {})
+
+    entry: dict = {
+        "dispatch_id": dispatch_id,
+        "task_id": task_id,
+        "role": role,
+        "started_at": None,
+        "completed_at": now_iso,
+        "output_packet_ref": f"outputs/{dispatch_id}.json",
+        "status": status,
+        "review_loop": review_loop,
+        "pm_note": "auto_captured: orchestrator bookkeeping gap",
+        "auto_captured": True,
+        "usage": {
+            "total_tokens": (
+                totals.get("input_tokens", 0)
+                + totals.get("output_tokens", 0)
+                + totals.get("cache_creation_input_tokens", 0)
+                + totals.get("cache_read_input_tokens", 0)
+            ),
+            "input_tokens": totals.get("input_tokens", 0),
+            "output_tokens": totals.get("output_tokens", 0),
+            "cache_creation_input_tokens": totals.get("cache_creation_input_tokens", 0),
+            "cache_read_input_tokens": totals.get("cache_read_input_tokens", 0),
+            "tool_uses": totals.get("tool_uses", 0),
+            "duration_ms": 0,
+            "model": usage.get("model", "unknown"),
+        },
+    }
+    if "ac_coverage" in packet:
+        entry["ac_coverage"] = packet["ac_coverage"]
+    return entry
 
 
 def _task_id_from_session_dir(session_dir: Path) -> str | None:
@@ -306,8 +401,19 @@ def iso_diff_ms(start_iso: str, end_iso: str) -> int:
         return 0
 
 
-def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict, session_dir: Path | None = None) -> bool:
-    """Update manifest with usage data. Returns True on success, False on idempotent skip."""
+def update_manifest(
+    manifest_path: Path,
+    dispatch_id: str,
+    usage: dict,
+    session_dir: Path | None = None,
+    packet_data: dict | None = None,
+) -> bool:
+    """Update manifest with usage data. Returns True on success, False on idempotent skip.
+
+    When the orchestrator skipped writing the dispatch entry (bookkeeping gap)
+    and packet_data is provided, auto-creates the entry so agentops has the
+    full dispatch record including ac_coverage.
+    """
     with manifest_path.open("r+", encoding="utf-8") as fh:
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
@@ -352,6 +458,18 @@ def update_manifest(manifest_path: Path, dispatch_id: str, usage: dict, session_
                     "duration_ms": duration_ms,
                     "model": usage["model"],
                 }
+                fh.seek(0)
+                fh.truncate()
+                json.dump(manifest, fh, indent=2)
+                return True
+
+            # Entry not found — orchestrator bookkeeping gap.
+            # Auto-create when output packet data is available so agentops
+            # can reconstruct the full dispatch record.
+            if packet_data is not None:
+                new_entry = _build_auto_entry(dispatch_id, packet_data, usage)
+                dispatches.append(new_entry)
+                manifest["actual_dispatches"] = dispatches
                 fh.seek(0)
                 fh.truncate()
                 json.dump(manifest, fh, indent=2)
@@ -403,6 +521,7 @@ def main() -> int:
     packet_path = find_packet_by_session(outputs_dir, session_id)
 
     dispatch_id: str | None = None
+    packet_data: dict | None = None
     if packet_path is not None:
         # Primary path — file-based _session_id stamp succeeded.
         try:
@@ -416,6 +535,8 @@ def main() -> int:
                     attempted_sources=[str(packet_path)],
                 )
             return 0
+        if isinstance(packet, dict):
+            packet_data = packet  # preserve for bookkeeping-gap auto-creation
         raw_dispatch = packet.get("dispatch_id") if isinstance(packet, dict) else None
         if isinstance(raw_dispatch, str):
             dispatch_id = raw_dispatch
@@ -459,7 +580,7 @@ def main() -> int:
         )
 
     try:
-        already_captured = not update_manifest(manifest_path, dispatch_id, usage, session_dir)
+        already_captured = not update_manifest(manifest_path, dispatch_id, usage, session_dir, packet_data=packet_data)
         # AC-007: warn on suspicious idempotent skip (usage was already populated)
         if already_captured and task_id:
             _try_append_warning(

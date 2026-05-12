@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — 2026-05-12
+
+### Bug fixes
+
+- **`verify-pm-handoff-clean.py` — falso positivo com `pending` como vocabulário de domínio (Issue #2)**
+  O padrão `\b(pending)\b` disparava em código legítimo como `status = 'pending'`, `isPending`, React `useTransition`, HTTP `pendingRequest`. O `pending` agora só é detectado em contexto de anotação de dívida técnica intencional: `@pending`, `// pending`, `# pending`, `/* pending`. Código de produção que usa `pending` como estado/flag/variável não é mais bloqueado.
+
+- **`capture-subagent-usage.py` — bookkeeping gap: auto-criação de entrada no manifest quando orchestrator não escreveu**
+  Quando o orchestrator pulava o passo de escrita em `actual_dispatches[]` após disparar um Task, `update_manifest` retornava silenciosamente sem registrar nada, causando todos os ACs como "missing" no agentops report. O hook agora infere role/subtask/loop a partir do Output Packet e auto-cria a entrada (marcada `auto_captured: true`), preservando `ac_coverage` para QA packets.
+
+- **`_pm_shared.py` — bug macOS no fallback rglob (symlink /var → /private/var)**
+  `tempfile.mkdtemp()` retorna `/var/folders/...`, que é um symlink para `/private/var/folders/...`. `p.resolve().relative_to(root)` lançava `ValueError` quando `root` não estava resolvido, excluindo todos os arquivos. Corrigido com `root = root.resolve()` no início de `_rglob_files`.
+
 ## 0.2.0 — 2026-05-12
 
 **Breaking:** hooks now install per-repo instead of globally. Skills + agents stay user-global.

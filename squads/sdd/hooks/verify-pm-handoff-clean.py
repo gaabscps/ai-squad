@@ -6,7 +6,7 @@ Wired to the pm Skill's frontmatter. Fires when the pm Skill attempts to end
 its session. Refuses to allow stop if the working tree contains any of the
 canonical debt markers:
 
-  TODO  FIXME  xfail  @skip  pending  mock-only
+  TODO  FIXME  xfail  @skip  pending (annotation-prefix only)  mock-only
 
 Excludes:
   .agent-session/  node_modules/  vendor/  dist/  build/  .next/
@@ -49,8 +49,13 @@ _SCAN_TIMEOUT_SECS: float = 4.5
 # change the spec first).
 #
 # Word-boundary notes:
-#   - \bTODO\b, \bFIXME\b, \bxfail\b, \bpending\b: standard \b anchors work
-#     because these tokens consist entirely of word characters (\w).
+#   - \bTODO\b, \bFIXME\b, \bxfail\b: standard \b anchors work because these
+#     tokens consist entirely of word characters (\w).
+#   - pending: restricted to annotation-prefix syntax only — @pending,
+#     // pending, /* pending, # pending. Bare "pending" (e.g. "pending save",
+#     React isPending, HTTP pending request) is NOT a debt marker.  The capture
+#     group (pending) ensures the extracted marker text is "pending", not the
+#     full prefix+word match.
 #   - @skip: the @ character is a non-word char so \b before it anchors
 #     correctly. The lookahead (?![-\w]) blocks "false positives" like
 #     "@skip-slow" (trailing hyphen is also excluded).
@@ -61,7 +66,8 @@ _SCAN_TIMEOUT_SECS: float = 4.5
 # and must stay in sync with it.
 # ---------------------------------------------------------------------------
 _DEBT_PATTERN = (
-    r"\b(TODO|FIXME|xfail|pending)\b"
+    r"\b(TODO|FIXME|xfail)\b"
+    r"|(?:@|//\s*|/\*\s*|#\s*)(pending)\b"
     r"|(?<!\w)(@skip)(?![-\w])"
     r"|(?<!\w)(mock-only)(?![-\w])"
 )

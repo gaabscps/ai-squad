@@ -148,6 +148,7 @@ def _rglob_files(root: Path) -> list[Path]:
     constraint "No new external dependencies").  Callers in non-git environments
     should be aware of this divergence.
     """
+    root = root.resolve()
     results: list[Path] = []
     for p in root.rglob("*"):
         if p.is_dir():

@@ -1,6 +1,6 @@
 {
   "name": "@ai-squad/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ai-squad CLI — deploy SDD/Discovery squads. Skills+agents user-global (~/.claude/), hooks per-repo (<repo>/.claude/hooks/) to keep agentops telemetry consistent with hook version.",
   "keywords": [
     "ai-squad",
