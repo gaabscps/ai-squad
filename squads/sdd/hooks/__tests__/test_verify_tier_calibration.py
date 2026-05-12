@@ -1186,5 +1186,228 @@ class TestAC005ManifestMalformedAndL2Block(unittest.TestCase):
         self.assertEqual(result["decision"], "block")
 
 
+# ===========================================================================
+# AC-009: Task tool `model` parameter enforcement (root-cause cost fix)
+# ===========================================================================
+# Background: prior to this AC, the orchestrator populated `model` inside the
+# Work Packet YAML (descriptive text), but did NOT pass the `model` parameter
+# of the Task tool itself. Claude Code's Task tool then fell back to
+# "inherit from parent" — the orchestrator's own model (typically opus).
+# Result: qa/dev dispatches that the calibration table said should run on
+# haiku/sonnet actually ran on opus, multiplying real cost by 3-12×.
+#
+# These tests pin the new behavior: when canonical model is derivable,
+# the Task tool `model` param MUST be present AND match.
+
+class TestAC009ToolModelEnforcement(unittest.TestCase):
+    """Verify the Task tool `model` param is enforced against canonical."""
+
+    def setUp(self):
+        for p in Path("/tmp").glob("ai-squad-tier-cache-*.json"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        _mod._tier_cache.clear()
+
+    def _run_verify_with_tool_model(
+        self,
+        task_id: str,
+        tier: str,
+        subagent_type: str,
+        tool_model: str | None,
+        model: str = "",
+        effort: str = "",
+    ) -> dict:
+        """Call _verify_tier_calibration_for_task with a real session_dir
+        and explicit tool_model.  model/effort default empty (AC-006 path)
+        so the tool_model enforcement runs in isolation."""
+        session_dir, _ = _write_temp_files(task_id, tier, [])
+        prompt = f"WorkPacket:\n```yaml\ntask_id: {task_id}\nsubagent_type: {subagent_type}\n```"
+        return _verify_tier_calibration_for_task(
+            task_id=task_id,
+            model=model,
+            effort=effort,
+            tier=tier,
+            subagent_type=subagent_type,
+            prompt=prompt,
+            tool_model=tool_model,
+            session_dir=session_dir,
+        )
+
+    def test_tool_model_none_skips_enforcement(self):
+        """tool_model=None (legacy callers) → skip the new check, fall through to allow."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T1", "qa", tool_model=None,
+        )
+        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+
+    def test_tool_model_empty_string_blocks_with_missing_reason(self):
+        """tool_model='' (param omitted by orchestrator) → block: task_tool_model_missing."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T1", "qa", tool_model="",
+        )
+        self.assertEqual(result["decision"], "block")
+        self.assertIn("task_tool_model_missing", result.get("reason", ""))
+        # Reason must name the canonical model the orchestrator should have passed.
+        self.assertIn("haiku", result.get("reason", ""),
+                      "Block reason should suggest canonical model (haiku for qa T1)")
+
+    def test_tool_model_mismatch_qa_t1_opus_blocks(self):
+        """qa T1 canonical=haiku, tool_model=opus → block: task_tool_model_mismatch.
+
+        This is the EXACT bug we found in FEAT-004: qa ran in opus despite
+        tier_calibration saying haiku.  Hook must block.
+        """
+        result = self._run_verify_with_tool_model(
+            "T-001", "T1", "qa", tool_model="opus",
+        )
+        self.assertEqual(result["decision"], "block",
+                         f"Expected block when tool_model='opus' but canonical='haiku': {result}")
+        self.assertIn("task_tool_model_mismatch", result.get("reason", ""))
+        # Reason should name both the wrong model and the canonical.
+        self.assertIn("opus", result.get("reason", ""))
+        self.assertIn("haiku", result.get("reason", ""))
+
+    def test_tool_model_matches_canonical_allows(self):
+        """qa T1 canonical=haiku, tool_model=haiku → allow."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T1", "qa", tool_model="haiku",
+        )
+        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+
+    def test_tool_model_case_insensitive(self):
+        """Uppercase tool_model should normalize → 'HAIKU' matches canonical 'haiku'."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T1", "qa", tool_model="HAIKU",
+        )
+        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+
+    def test_tool_model_mismatch_dev_l1_t2(self):
+        """dev L1 T2 canonical=sonnet, tool_model=opus → block."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T2", "dev", tool_model="opus",
+        )
+        self.assertEqual(result["decision"], "block")
+        self.assertIn("task_tool_model_mismatch", result.get("reason", ""))
+
+    def test_tool_model_matches_dev_l1_t3(self):
+        """dev L1 T3 canonical=sonnet, tool_model=sonnet → allow."""
+        result = self._run_verify_with_tool_model(
+            "T-001", "T3", "dev", tool_model="sonnet",
+        )
+        self.assertEqual(result["decision"], "allow")
+
+    def test_tool_model_with_workpacket_compare_both_must_match(self):
+        """Work Packet model+effort populated AND tool_model populated → both checked.
+
+        Order: tool_model check first (AC-009), then Work Packet (AC-005).
+        Mismatch in either blocks.
+        """
+        session_dir, _ = _write_temp_files("T-001", "T1", [])
+        prompt = "WorkPacket:\n```yaml\ntask_id: T-001\nmodel: haiku\neffort: high\nsubagent_type: qa\n```"
+        # tool_model right, WP right → allow
+        ok = _verify_tier_calibration_for_task(
+            task_id="T-001", model="haiku", effort="high", tier="T1",
+            subagent_type="qa", prompt=prompt,
+            tool_model="haiku", session_dir=session_dir,
+        )
+        self.assertEqual(ok["decision"], "allow")
+
+        # tool_model wrong, WP right → block on tool_model
+        bad_tool = _verify_tier_calibration_for_task(
+            task_id="T-001", model="haiku", effort="high", tier="T1",
+            subagent_type="qa", prompt=prompt,
+            tool_model="opus", session_dir=session_dir,
+        )
+        self.assertEqual(bad_tool["decision"], "block")
+        self.assertIn("task_tool_model_mismatch", bad_tool.get("reason", ""))
+
+
+class TestAC009MainPipeline(unittest.TestCase):
+    """End-to-end via main(): verify tool_input.model is read from payload."""
+
+    def setUp(self):
+        for p in Path("/tmp").glob("ai-squad-tier-cache-*.json"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        _mod._tier_cache.clear()
+        # Set up a fake project dir so _resolve_session_dir() returns something.
+        self._project_dir = Path(tempfile.mkdtemp())
+        session_root = self._project_dir / ".agent-session"
+        task_dir = session_root / "T-001"
+        task_dir.mkdir(parents=True)
+        (task_dir / "tasks.md").write_text(_make_tasks_md("T-001", "T1"))
+        (session_root / "dispatch-manifest.json").write_text(
+            json.dumps({"schema_version": 1, "task_id": "T-001", "actual_dispatches": []})
+        )
+        self._prev_env = os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(self._project_dir)
+
+    def tearDown(self):
+        if self._prev_env is None:
+            os.environ.pop("CLAUDE_PROJECT_DIR", None)
+        else:
+            os.environ["CLAUDE_PROJECT_DIR"] = self._prev_env
+
+    def _payload(self, prompt: str, tool_model: str | None = None) -> dict:
+        tool_input: dict = {"prompt": prompt}
+        if tool_model is not None:
+            tool_input["model"] = tool_model
+        return {"tool_input": tool_input}
+
+    def test_main_blocks_when_tool_model_missing(self):
+        """main(): qa dispatch with no tool_input.model → block."""
+        prompt = _fenced_packet(
+            task_id="T-001", model="haiku", effort="high",
+            tier="T1", subagent_type="qa",
+        )
+        rc, out = _run_main(self._payload(prompt))
+        self.assertEqual(rc, 0)
+        self.assertTrue(out.strip(), f"Expected block output, got: {out!r}")
+        result = json.loads(out)
+        self.assertEqual(result["decision"], "block")
+        self.assertIn("task_tool_model_missing", result["reason"])
+
+    def test_main_blocks_when_tool_model_wrong(self):
+        """main(): qa T1 (canonical=haiku) with tool_input.model='opus' → block.
+
+        This is the exact bug observed in FEAT-004.
+        """
+        prompt = _fenced_packet(
+            task_id="T-001", model="haiku", effort="high",
+            tier="T1", subagent_type="qa",
+        )
+        rc, out = _run_main(self._payload(prompt, tool_model="opus"))
+        self.assertEqual(rc, 0)
+        result = json.loads(out)
+        self.assertEqual(result["decision"], "block")
+        self.assertIn("task_tool_model_mismatch", result["reason"])
+
+    def test_main_allows_when_tool_model_matches(self):
+        """main(): qa T1 with tool_input.model='haiku' → allow."""
+        prompt = _fenced_packet(
+            task_id="T-001", model="haiku", effort="high",
+            tier="T1", subagent_type="qa",
+        )
+        rc, out = _run_main(self._payload(prompt, tool_model="haiku"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "", f"Expected silent allow, got: {out!r}")
+
+    def test_main_audit_agent_short_circuits_before_tool_model_check(self):
+        """audit-agent is tier-independent — AC-007 short-circuit fires
+        BEFORE AC-009 even when tool_input.model absent."""
+        prompt = _fenced_packet(
+            task_id="T-001", model="haiku", effort="medium",
+            tier="T1", subagent_type="audit-agent",
+        )
+        # No tool_model passed — still must allow due to AC-007.
+        rc, out = _run_main(self._payload(prompt))
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "")
+
+
 if __name__ == "__main__":
     unittest.main()

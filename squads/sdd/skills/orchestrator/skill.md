@@ -215,7 +215,7 @@ The audit-agent's verdict is binding. The orchestrator MUST NOT emit a "uniform 
 - Emit handoff message (see "Handoff" section); also save to `.agent-session/<task_id>/handoff.md`.
 
 ## Dispatch contract (Work Packet embedded in `Task` prompt)
-Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in `agents/`), `description` (short), `prompt` (free-form string). There is no native JSON-payload field. Pattern: embed the Work Packet as a fenced YAML block inside `prompt`:
+Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in `agents/`), `description` (short), `prompt` (free-form string), AND `model` (enum: `sonnet` | `opus` | `haiku`). The `model` parameter is **mandatory for tiered roles** (`dev`, `code-reviewer`, `logic-reviewer`, `qa`) — see "Task tool `model` parameter" below. The Work Packet is embedded as a fenced YAML block inside `prompt`:
 
 ```
 WorkPacket:
@@ -238,8 +238,17 @@ project_context:
 
 The Subagent body's "Input contract" specifies which fields are required for that Role. Missing fields → Subagent emits `status: blocked, blocker_kind: contract_violation`.
 
+### Task tool `model` parameter (run-model enforcement — AC-009)
+**The `model` parameter of the Task tool itself controls the actual run-model of the subagent.** The Work Packet YAML is descriptive metadata — it does NOT control which model runs the subagent. If the orchestrator omits the Task tool's `model` parameter, Claude Code inherits the parent session's model (the orchestrator's own model, typically `opus`), bypassing the Tier × Loop table entirely. This was the root cause of severe cost amplification observed in early FEAT-* sessions (qa tasks calibrated for `haiku` running in `opus`, multiplying real cost 3-12×).
+
+**Invariant:** for every `dev` / `code-reviewer` / `logic-reviewer` / `qa` dispatch, the orchestrator MUST pass the `model` parameter to the Task tool with the exact canonical model value derived from the Tier × Loop table (see algorithm below). The `verify-tier-calibration.py` PreToolUse hook enforces this: dispatches without `model`, or with a wrong `model`, are blocked with `task_tool_model_missing` / `task_tool_model_mismatch` before they run.
+
+**Tier-independent roles** (`audit-agent`, `blocker-specialist`) are exempt — the hook short-circuits for these roles. Pass their `model` per their subagent file's frontmatter (haiku and opus respectively) for clarity, but the hook will not block if you omit it.
+
+**Effort:** the Task tool does not accept an `effort` parameter. Effort is communicated to the subagent via the Work Packet YAML (`effort: high|medium|low|xhigh`) so the subagent body can adjust its own thinking depth. Hook still validates Work Packet `effort` against the canonical table (AC-005).
+
 ### Model/effort selection (canonical Tier × Loop enforcement)
-On every Subagent dispatch, the orchestrator MUST populate the Work Packet `model` and `effort` fields per the canonical Tier × Loop table in [`shared/concepts/effort.md`](../../../shared/concepts/effort.md). The Subagent frontmatter default is only the fallback when the Work Packet omits these fields.
+On every Subagent dispatch, the orchestrator MUST (a) pass the Task tool `model` parameter AND (b) populate the Work Packet `model` and `effort` fields, all per the canonical Tier × Loop table in [`shared/concepts/effort.md`](../../../shared/concepts/effort.md). The Subagent frontmatter default is the documentation-only fallback — never trust it to be honored at runtime.
 
 **Algorithm:**
 1. Read the task's `Tier:` field from `tasks.md` (values: `T1`, `T2`, `T3`, `T4`). If absent → abort with error `"Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"`. Do NOT silently default; that defeats the calibration.
@@ -253,8 +262,30 @@ On every Subagent dispatch, the orchestrator MUST populate the Work Packet `mode
    - `blocker-specialist` → opus, xhigh (tier-independent)
    - `audit-agent` → haiku, medium (tier-independent)
 3. Look up `(loop_kind, tier)` in the Tier × Loop table → `(model, effort)`.
-4. Write `model`, `effort`, `tier` into the Work Packet.
-5. Echo the same `model`/`effort` into a `tier_calibration` field on the `actual_dispatches[]` entry for the dispatch (`{tier: "T3", model: "sonnet", effort: "high", loop_kind: "dev L2"}`) — agentops uses this for cost-attribution reporting.
+4. **Pass `model` as the Task tool's `model` parameter** — this is what actually controls the subagent's run-model. Omitting it bypasses the table entirely.
+5. Write `model`, `effort`, `tier` into the Work Packet YAML (descriptive only — for subagent self-awareness and audit).
+6. Echo the same `model`/`effort` into a `tier_calibration` field on the `actual_dispatches[]` entry for the dispatch (`{tier: "T3", model: "sonnet", effort: "high", loop_kind: "dev L2"}`) — agentops uses this for cost-attribution reporting.
+
+**Concrete Task tool call (canonical example for a qa T1 dispatch):**
+```
+Task(
+  subagent_type="qa",
+  model="haiku",              # ← REQUIRED — derived from Tier × Loop table
+  description="QA validation for T-001",
+  prompt='''WorkPacket:
+```yaml
+task_id: T-001
+dispatch_id: d-T-001-qa-l1
+model: haiku
+effort: high
+tier: T1
+subagent_type: qa
+...
+```
+'''
+)
+```
+Omitting `model="haiku"` causes the subagent to run on the orchestrator's own model (opus), and `verify-tier-calibration.py` will block the dispatch.
 
 **Dynamic tier reclassification:** if reviewer findings on a `dev` L1 Output Packet reveal complexity exceeding the initial `Tier:` (e.g., findings cite invariants, race conditions, or cross-module impact not anticipated in the original tier), the orchestrator MUST update the task's `Tier:` line in `tasks.md` BEFORE dispatching the L2 dev. Append a `Tier-bump note:` line on the task explaining the bump (one line). The L2+ dispatches read the corrected tier. Tier reclassification is logged on the next `actual_dispatches[]` entry's `pm_note` as `"Tier-bump T<X> → T<Y> — <one-line reason>"`.
 

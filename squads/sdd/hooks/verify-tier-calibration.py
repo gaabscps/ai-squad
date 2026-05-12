@@ -566,9 +566,10 @@ def _verify_tier_calibration_for_task(
     tier: str,
     subagent_type: str,
     prompt: str,
+    tool_model: str | None = None,
     session_dir: Path | None = None,
 ) -> dict:
-    """Full Tier × Loop verification (T-009 / AC-005, AC-008).
+    """Full Tier × Loop verification (T-009 / AC-005, AC-008, AC-009).
 
     Steps:
       1. Resolve session directory (CLAUDE_PROJECT_DIR env var or parameter).
@@ -576,11 +577,20 @@ def _verify_tier_calibration_for_task(
          Block with tier_missing if absent (AC-008).
       3. Load dispatch-manifest.json actual_dispatches[] to derive loop_kind.
       4. Look up canonical (model, effort) from the Tier × Loop table.
-      5. Compare against Work Packet model/effort.
-         - Match → allow.
-         - Diverge → block with tier_calibration_mismatch reason (AC-005).
+      5. If `tool_model` was passed (Task tool `model` param), enforce
+         it against canonical_model (AC-009 — root-cause fix for the
+         "Work Packet declares haiku but subagent runs in opus" bug).
+      6. Compare Work Packet model/effort against canonical when both are
+         populated. Skip this comparison when the Work Packet omits them
+         (AC-006 fallback — frontmatter default applies, but tool_model
+         enforcement above still guards the actual run-model).
 
     Parameters:
+      tool_model:  the `model` parameter actually passed to the Task tool
+                   (sonnet|opus|haiku|""). When None (default), skip the
+                   tool-model check — used by legacy unit tests that call
+                   this function directly. main() always passes a string
+                   (possibly empty) so production runs always enforce.
       session_dir: optional override for the .agent-session directory path.
                    When None, resolved via CLAUDE_PROJECT_DIR env var.
                    Useful in tests.
@@ -646,19 +656,55 @@ def _verify_tier_calibration_for_task(
 
     canonical_model, canonical_effort = canonical
 
-    # Step 6: compare.
-    if model == canonical_model and effort == canonical_effort:
-        return {"decision": "allow"}
+    # ---- Step 5: enforce Task tool `model` param against canonical (AC-009) ----
+    # This is the root-cause fix: the Work Packet YAML is descriptive, but the
+    # actual model that runs the subagent is the `model` parameter passed to
+    # the Task tool. If the orchestrator omits it, Claude Code inherits the
+    # parent session's model (typically opus), bypassing the Tier × Loop table.
+    if tool_model is not None:
+        tool_model_norm = tool_model.strip().lower()
+        if not tool_model_norm:
+            return {
+                "decision": "block",
+                "reason": (
+                    f"task_tool_model_missing: Task tool requires an explicit "
+                    f"`model` parameter (expected '{canonical_model}') for "
+                    f"task={task_id} (tier={task_tier}, loop_kind={loop_kind}). "
+                    f"Omitting it causes the subagent to inherit the parent "
+                    f"session's model and bypass tier calibration. "
+                    f"Pass model='{canonical_model}' to the Task tool."
+                ),
+            }
+        if tool_model_norm != canonical_model.lower():
+            return {
+                "decision": "block",
+                "reason": (
+                    f"task_tool_model_mismatch: Task tool `model` parameter "
+                    f"'{tool_model_norm}' does not match canonical "
+                    f"'{canonical_model}' for task={task_id} "
+                    f"(tier={task_tier}, loop_kind={loop_kind}). The subagent "
+                    f"would run on the wrong model. "
+                    f"Pass model='{canonical_model}' to the Task tool."
+                ),
+            }
 
-    expected_str = f"{canonical_model}, {canonical_effort}"
-    got_str = f"{model}, {effort}"
-    return {
-        "decision": "block",
-        "reason": (
-            f"tier_calibration_mismatch: expected {expected_str}, got {got_str} "
-            f"(task={task_id}, tier={task_tier}, loop_kind={loop_kind})"
-        ),
-    }
+    # ---- Step 6: compare Work Packet model/effort against canonical (AC-005) ----
+    # Skipped when either is absent (AC-006 fallback path).
+    if model and effort:
+        if model == canonical_model and effort == canonical_effort:
+            return {"decision": "allow"}
+
+        expected_str = f"{canonical_model}, {canonical_effort}"
+        got_str = f"{model}, {effort}"
+        return {
+            "decision": "block",
+            "reason": (
+                f"tier_calibration_mismatch: expected {expected_str}, got {got_str} "
+                f"(task={task_id}, tier={task_tier}, loop_kind={loop_kind})"
+            ),
+        }
+
+    return {"decision": "allow"}
 
 
 # ---------------------------------------------------------------------------
@@ -717,36 +763,35 @@ def main() -> int:
         # Silent allow — matches guard-session-scope.py:50 convention.
         return 0
 
-    # -----------------------------------------------------------------
-    # AC-006: Short-circuit allow when model or effort are absent
-    # (frontmatter fallback path — no override in Work Packet).
-    # -----------------------------------------------------------------
     model = fields.get("model", "")
     effort = fields.get("effort", "")
+
+    # Extract the Task tool's `model` parameter (sonnet|opus|haiku|""). Always
+    # a string — empty when omitted. Forwarded to the verifier so production
+    # runs always enforce the run-model against the canonical Tier × Loop cell.
+    raw_tool_model = tool_input.get("model", "")
+    tool_model = raw_tool_model if isinstance(raw_tool_model, str) else ""
 
     if not subagent_type:
         # subagent_type absent AND inference failed.
         if not model or not effort:
-            # model/effort also absent → fall through to AC-006 allow (silent).
+            # No way to derive canonical → silent allow (AC-006 fallback).
             return 0
-        else:
-            # model/effort present but subagent_type unresolvable → block.
-            print(json.dumps({
-                "decision": "block",
-                "reason": (
-                    "subagent_type required for tier verification (AC-007); "
-                    "could not be resolved from Work Packet or dispatch_id"
-                ),
-            }))
-            return 0
-
-    if not model or not effort:
-        # model/effort absent → allow (Subagent uses its own frontmatter default).
-        # Silent allow — no stdout.
+        # model/effort present but subagent_type unresolvable → block.
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                "subagent_type required for tier verification (AC-007); "
+                "could not be resolved from Work Packet or dispatch_id"
+            ),
+        }))
         return 0
 
     # -----------------------------------------------------------------
-    # All other paths: delegate to T-009 lookup (stub returns allow).
+    # Full verification path — covers AC-005 (Work Packet compare),
+    # AC-006 (Work Packet model/effort absent → fall through to allow
+    # after tool_model check), AC-008 (tier_missing), and AC-009
+    # (Task tool `model` param enforcement).
     # -----------------------------------------------------------------
     task_id = fields.get("task_id", "")
     tier = fields.get("tier", "")
@@ -758,6 +803,7 @@ def main() -> int:
         tier=tier,
         subagent_type=subagent_type,
         prompt=prompt,
+        tool_model=tool_model,
     )
 
     if result.get("decision") == "block":
