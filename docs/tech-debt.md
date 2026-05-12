@@ -30,6 +30,8 @@ Catálogo de débitos técnicos identificados durante a execução das features.
 | [DEBT-009](#debt-009) | Design | audit-agent 3 edge cases em pm_cost checks | P3 | S |
 | [DEBT-010](#debt-010) | Test | Race de 2 threads sem Barrier em capture-pm-usage tests | P3 | S |
 | [DEBT-011](#debt-011) | Test | Cenários de integração under-asserted: designer/task-builder negative paths | P3 | M |
+| [DEBT-012](#debt-012) | Design | Cache cross-dispatch é arquiteturalmente limitado por fan-out | P3 | L |
+| [DEBT-013](#debt-013) | Infra | `$HOME/.claude/hooks/` defasado vs repo — sem sync mechanism | P1 | S |
 
 ---
 
@@ -285,17 +287,76 @@ O cenário de integração do PM bypass cobre os happy paths dos 3 Skills, mas t
 
 ---
 
+### DEBT-012
+
+**Cache cross-dispatch é arquiteturalmente limitado pelo fan-out**
+
+- **Origem:** investigação de custos pós-FEAT-004 (2026-05-12)
+- **Arquivo:** N/A (decisão arquitetural — não há fix de arquivo único)
+- **Prioridade:** P3
+- **Esforço:** L
+
+**Descrição:**
+A análise de cache em FEAT-004 (apenas 3 dispatches com telemetria real, restante perdida pelo bug de captura — ver Fix #3) mostra que **dentro de cada dispatch**, o prompt cache funciona muito bem: `cache_read / cache_creation ≈ 12.5x` — Claude Code reaproveita cache entre os turnos da mesma conversa.
+
+**Mas entre dispatches paralelos da mesma task** (dev → code-reviewer → logic-reviewer → qa, todos para o mesmo T-001), não há reuso de cache:
+- Cada subagent tem system prompt diferente (body do agents/*.md)
+- Cada subagent é uma sessão Claude Code independente (Task tool)
+- O prompt cache da Anthropic é content-addressed dentro de uma sessão; cross-conversation só hita se o conteúdo for *identico* + dentro do TTL (5 min standard, 1h extended)
+
+**Implicação prática:**
+Cada dispatch paga `cache_creation` cheio na primeira turn (~2.5M tokens / dispatch para tasks com spec+plan+tasks completos no contexto). Para a feature inteira (~150 dispatches em FEAT-004), isso é ~375M tokens de cache_creation a custo de input cheio.
+
+**Por que não dá pra "compartilhar" cache entre roles:**
+Compartilhar exigiria unificar dev/reviewer/qa em uma única conversa, o que destrói o fan-out paralelo e o isolamento de contexto que é o motivo arquitetural do split Skills/Subagents (ver memória `project_skills_vs_subagents_split`).
+
+**Fix sugerido (caro — só se custo justificar):**
+- **Opção A (preferida):** orchestrator pré-extrai um "context bundle" mínimo por task (apenas as seções relevantes do spec/plan + diffs dos arquivos em `scope_files`) e embute no Work Packet em vez de pedir pra cada subagent reler `.agent-session/<id>/spec.md` inteiro. Reduz cache_creation por dispatch, sem mudar fan-out.
+- **Opção B (radical):** loops sequenciais da MESMA role (dev L1 → L2 → L3) compartilham uma única conversa Claude Code via histórico (não via novo Task dispatch). Cache reusa naturalmente entre loops. Quebra a captura por dispatch_id atual; exige re-design do manifest.
+
+**Bloqueio pra implementar:** sem métrica confiável (depende do Fix #3 chegar a produção via DEBT-013), qualquer otimização aqui é cega. Prerequisito: medir cache_creation real em ≥3 sessões pós-fix.
+
+---
+
+### DEBT-013
+
+**`$HOME/.claude/hooks/` defasado vs `squads/sdd/hooks/` — sem sync mechanism**
+
+- **Origem:** investigação de custos pós-FEAT-004 (2026-05-12)
+- **Arquivo:** `$HOME/.claude/hooks/capture-subagent-usage.py` (e outros)
+- **Prioridade:** P1
+- **Esforço:** S
+
+**Descrição:**
+Os Subagents referenciam hooks via `$HOME/.claude/hooks/<nome>.py` no frontmatter (ver `squads/sdd/agents/dev.md:14`). Mas os hooks são editados no repo em `squads/sdd/hooks/`. Sem um mecanismo de sync, as cópias divergem:
+
+- `$HOME/.claude/hooks/capture-subagent-usage.py` está **significativamente atrás** da versão do repo (falta o módulo de failure handling AC-003, warning channel AC-007, várias helpers).
+- `$HOME/.claude/hooks/stamp-session-id.py` tem regex divergente (`d` vs `d-`).
+
+**Impacto:** fixes aplicados no repo NÃO chegam a sessões reais até alguém copiar manualmente. Os Fixes #1-#3 desta investigação (AC-009 enforcement, AC-014 transcript aggregation, fallback de correlação) são **silenciosamente inativos** em runtime até sync.
+
+**Fix sugerido:**
+- **Opção A (simples):** script `scripts/install-hooks.sh` que copia `squads/sdd/hooks/*.py` pra `$HOME/.claude/hooks/`. Rodar como passo manual antes de cada session.
+- **Opção B (zero-copy):** mudar frontmatter dos subagents pra referenciar `$CLAUDE_PROJECT_DIR/squads/sdd/hooks/<nome>.py` em vez de `$HOME/.claude/hooks/`. Elimina divergência por design. Requer testar que `$CLAUDE_PROJECT_DIR` está populado em subagent context.
+- **Opção C (pre-commit hook):** git hook que sincroniza após cada commit em `squads/sdd/hooks/`. Robusto mas adiciona magic.
+
+**Recomendação:** Opção B se viável (`$CLAUDE_PROJECT_DIR` é setado pelo Claude Code antes de subagent dispatch). Senão, A com instrução clara no README.
+
+---
+
 ## Como atacar
 
 Ordem sugerida de resolução independente:
 
-1. **DEBT-001** — P1 bug funcional que bloqueia uso real do ai-squad em si mesmo
-2. **DEBT-005** — P1 infra gap que degrada todo o pipeline (começa pela Opção A)
-3. **DEBT-006** — P2 desbloqueador: remove false-positives no audit-agent
-4. **DEBT-002** — P2 race condition em ambiente multi-feature
-5. **DEBT-003** — P2 edge case de segurança no hook de debt scan
-6. **DEBT-007** — P3 sync rápido entre Skills e canônico
-7. **DEBT-004 + DEBT-008 + DEBT-009** — P3 polish, qualquer ordem
-8. **DEBT-010 + DEBT-011** — P3 test hygiene, atacar junto
+1. **DEBT-013** — P1 deploy gap que torna fixes recentes (AC-009/014) silenciosamente inativos
+2. **DEBT-001** — P1 bug funcional que bloqueia uso real do ai-squad em si mesmo
+3. **DEBT-005** — P1 infra gap que degrada todo o pipeline (começa pela Opção A)
+4. **DEBT-006** — P2 desbloqueador: remove false-positives no audit-agent
+5. **DEBT-002** — P2 race condition em ambiente multi-feature
+6. **DEBT-003** — P2 edge case de segurança no hook de debt scan
+7. **DEBT-007** — P3 sync rápido entre Skills e canônico
+8. **DEBT-004 + DEBT-008 + DEBT-009** — P3 polish, qualquer ordem
+9. **DEBT-010 + DEBT-011** — P3 test hygiene, atacar junto
+10. **DEBT-012** — P3 só atacar depois de medir cache real pós-DEBT-013
 
 > Cada item é independente e pode virar uma task isolada dentro de uma FEAT-005 ou ser atacado diretamente como hotfix dependendo do impacto.
