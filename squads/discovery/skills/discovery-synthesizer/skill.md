@@ -1,6 +1,6 @@
 ---
 name: discovery-synthesizer
-description: Phase 3 entry point of the Discovery squad. Reads the approved Frame (Q1-Q9) plus aggregated Investigate Findings (codebase map + 4 risk analyses) from memo.md, generates an Options table (3-5 alternatives + kill as row 1), applies decision rules to recommend one option (Cagan Q10), surfaces it to the human via Show-all + Recommend + confidence approval gate (RAPID Recommender role). Writes the human's Decision and an auto-generated Open Questions for Delivery section into memo.md. Surfaces a guided next-step message including the SDD entry command when Decision != kill.
+description: Phase 3 (Decide) entry point. Generates Options table, recommends one (Cagan Q10), gets human Decision via approval gate, writes Decision into `memo.md`.
 ---
 
 # Discovery Synthesizer — Phase 3 (Decide)

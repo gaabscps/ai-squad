@@ -1,6 +1,6 @@
 ---
 name: designer
-description: Phase 2 entry point. Conducts an interactive design session with the human — reads the approved Spec, proposes architecture / UX / system design decisions, refines them with the human, and writes the approved `plan.md`. Surfaces a guided next-step message based on `planned_phases`.
+description: Phase 2 entry point. Interactive design session — reads approved Spec, proposes architecture decisions, writes approved `plan.md`.
 ---
 
 # Designer — Phase 2 (Plan)

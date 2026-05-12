@@ -1,6 +1,6 @@
 ---
 name: discovery-lead
-description: Phase 1 entry point of the Discovery squad. Asks the human which Phases this Session will run (interactive checkbox via AskUserQuestion), then conducts an interactive Frame session — drafts an Opportunity Assessment 1-pager (Cagan style) into `memo.md`, refines with the human, gets explicit approval, hands off to the next planned Phase.
+description: Phase 1 (Frame) entry point. Interactive opportunity assessment — selects planned_phases, drafts Frame into `memo.md`, hands off to next Phase.
 ---
 
 # Discovery Lead — Phase 1 (Frame)

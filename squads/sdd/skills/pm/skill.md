@@ -1,6 +1,6 @@
 ---
 name: pm
-description: Autonomous Senior PM entry point. Runs the full SDD pipeline (Specify → Plan → Tasks → Implementation) end-to-end under PM judgment, replacing every human approval gate with a senior-PM critical-evaluation pass. Enforces anti-debt discipline (zero workarounds, zero deferred AC, zero silent scope cuts), the canonical Tier × Loop model/effort calibration on every Subagent dispatch, and research-before-decide on non-trivial technical choices. Use when the human wants hands-off execution with senior-PM quality gates. Recommended PM model: Opus 4.7, effort `high`.
+description: Autonomous PM entry point. Runs full SDD pipeline end-to-end, replacing all human approval gates. Recommended model: Opus 4.7, effort `high`.
 hooks:
   Stop:
     - matcher: ""

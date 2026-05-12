@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Phase 4 entry point. Reads approved Spec + Plan + Tasks (any may be absent if not in planned_phases), manages session state, dispatches Subagents (dev → code-reviewer ‖ logic-reviewer → qa, with fan-out per task), enforces per-task loop caps, emits a single human-readable handoff at the end. Routes to blocker-specialist on escalation. Supports --resume from paused or escalated state.
+description: Phase 4 entry point. Dispatches dev → parallel reviewers → qa per task, enforces loop caps, emits handoff. Supports --resume from paused/escalated state.
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit"

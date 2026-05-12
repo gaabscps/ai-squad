@@ -1,6 +1,6 @@
 ---
 name: task-builder
-description: Phase 3 entry point. Conducts an interactive task-decomposition session with the human — reads the approved Spec and Plan, proposes a granular task breakdown (with file scope, AC coverage, parallelization markers), refines with the human, writes the approved `tasks.md`. Surfaces a guided next-step message based on `planned_phases`.
+description: Phase 3 entry point. Interactive task decomposition — reads approved Spec + Plan, writes approved `tasks.md` with AC coverage and parallelization markers.
 ---
 
 # Task Builder — Phase 3 (Tasks)

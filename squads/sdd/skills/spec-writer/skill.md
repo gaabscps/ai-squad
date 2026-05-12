@@ -1,6 +1,6 @@
 ---
 name: spec-writer
-description: Phase 1 entry point. Asks the human which Phases this Session will run (interactive checkbox via AskUserQuestion), then conducts an interactive spec-writing session — drafts a Spec from `squads/sdd/templates/spec.md`, refines with the human, gets explicit approval, hands off to the next planned Phase.
+description: Phase 1 entry point. Interactive spec-writing session — selects planned_phases, drafts and approves Spec, hands off to next Phase.
 ---
 
 # Spec Writer — Phase 1 (Specify)

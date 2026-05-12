@@ -1,6 +1,6 @@
 ---
 name: discovery-orchestrator
-description: Phase 2 entry point of the Discovery squad. Reads the approved Frame from memo.md, dispatches `codebase-mapper` (sequential bootstrap) then 4× `risk-analyst` instances in parallel (one per Cagan Big Risk: value, usability, feasibility, viability), aggregates the 5 Output Packets into the memo's `## Investigate Findings` section. No retry loops — Discovery follows timebox > retry (Cagan: discovery sprint = 1 week). Conditional approval gate (only when risk severity warrants it). Surfaces a guided next-step message based on `planned_phases`.
+description: Phase 2 (Investigate) entry point. Dispatches codebase-mapper + 4× risk-analyst in parallel; aggregates findings into `memo.md`.
 ---
 
 # Discovery Orchestrator — Phase 2 (Investigate)

@@ -12,3 +12,5 @@ __pycache__/
 *.py[cod]
 
 .env
+# ai-squad per-repo hook install (managed by `ai-squad deploy`)
+.claude/hooks/
