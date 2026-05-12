@@ -445,8 +445,8 @@ details > *:not(summary) {
   <h1>Enforce 100%-complete agentops inputs (usage + warnings + scope coverage) <span class="badge badge-neutral">…</span></h1>
   <div class="kpis">
     <span>—</span>
-    <span>$2.74</span>
-    <span class="kpi-sub">$0.305/AC</span>
+    <span>$63.02</span>
+    <span class="kpi-sub">$7.002/AC</span>
     <span>10/9 ACs</span>
     <span>mut —</span>
     <span>type —</span>
@@ -490,42 +490,48 @@ details > *:not(summary) {
   <p class="story-card__summary">Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pr…</p>
   <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>audit-agent</td><td>audit-AUDIT-loop1</td><td>1</td><td>1m 55s</td><td>44517</td><td>blocked</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pre-existing git state, not this session)</p></details></div>
 </article>
+<article class="story-card story-card--done" aria-label="batch PM-ORCHESTRATOR">
+  <header><h3>PM-ORCHESTRATOR</h3><span class="badge badge-pass" aria-label="status: done">✓ done</span></header>
+  <div class="story-card__stats"><span class="story-card__stat"><span class="story-card__stat-label">time</span> <span class="story-card__stat-value">5h</span></span><span class="story-card__stat"><span class="story-card__stat-label">cost</span> <span class="story-card__stat-value">$60.28</span></span><span class="story-card__stat"><span class="story-card__stat-label">tasks</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">ACs</span> <span class="story-card__stat-value">0</span></span><span class="story-card__stat"><span class="story-card__stat-label">files</span> <span class="story-card__stat-value">0</span></span><span class="story-card__pipeline">pm-orchestrator</span></div>
+  <p class="story-card__summary">PM/orchestrator session (Stop hook): 860 turns</p>
+  <div class="story-card__drilldowns"><details><summary>Files changed (0)</summary><table class="story-card__files"><thead><tr><th>path</th><th>action</th><th>tasks</th></tr></thead><tbody></tbody></table></details><details><summary>ACs covered (0)</summary><ul class="story-card__acs"></ul></details><details><summary>Pipeline trace (1 dispatches)</summary><table class="story-card__pipeline-trace"><thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead><tbody><tr><td>pm-orchestrator</td><td>pm-orchestrator-ddafa62b</td><td>—</td><td>5h</td><td>88220369</td><td>done</td></tr></tbody></table></details><details><summary>PM note</summary><p class="story-card__pmnote">PM/orchestrator session (Stop hook): 860 turns</p></details></div>
+</article>
       </section>
       <section class="cost-section">
   <header class="cost-header">
     <h2>Cost</h2>
-    <span class="badge badge-pass">coverage 7/7 (100%)</span>
+    <span class="badge badge-pass">coverage 8/8 (100%)</span>
   </header>
   <div class="cost-grid">
     <div class="cost-card">
   <span class="cost-label">Total cost</span>
-  <span class="cost-value">$2.74</span>
-  <small>$2.7428</small>
+  <span class="cost-value">$63.0196</span>
+  <small>$63.0196</small>
 </div>
     <div class="cost-card">
   <span class="cost-label">$ / AC</span>
-  <span class="cost-value">$0.3048</span>
+  <span class="cost-value">$7.0022</span>
   <small>9 ACs</small>
 </div>
     <div class="cost-card">
   <span class="cost-label">$ / dispatch</span>
-  <span class="cost-value">$0.3918</span>
-  <small>avg of 7</small>
+  <span class="cost-value">$7.8775</span>
+  <small>avg of 8</small>
 </div>
     <div class="cost-card">
   <span class="cost-label">Tokens</span>
-  <span class="cost-value">415,582</span>
-  <small>290,907 in / 124,675 out (70/30)</small>
+  <span class="cost-value">88,635,951</span>
+  <small>62,045,166 in / 26,590,785 out (70/30)</small>
 </div>
     <div class="cost-card">
   <span class="cost-label">Wall-clock</span>
-  <span class="cost-value">31m 15s</span>
-  <small>7 dispatches with usage</small>
+  <span class="cost-value">5h31m</span>
+  <small>8 dispatches with usage</small>
 </div>
     <div class="cost-card">
   <span class="cost-label">Tool uses</span>
-  <span class="cost-value">313</span>
-  <small>~44.7 per dispatch</small>
+  <span class="cost-value">767</span>
+  <small>~95.9 per dispatch</small>
 </div>
   </div>
   <table class="cost-models">
@@ -543,11 +549,11 @@ details > *:not(summary) {
   <tbody>
 <tr>
   <td><code>sonnet-4-6</code></td>
-  <td>7</td>
-  <td>415,582</td>
-  <td>31m 15s</td>
-  <td>313</td>
-  <td>$2.7428</td>
+  <td>8</td>
+  <td>88,635,951</td>
+  <td>5h31m</td>
+  <td>767</td>
+  <td>$63.0196</td>
   <td>100.0%</td>
 </tr>
   </tbody>
@@ -567,12 +573,20 @@ details > *:not(summary) {
     </thead>
     <tbody>
 <tr>
+  <td><code>pm-orchestrator</code></td>
+  <td>1</td>
+  <td>88,220,369</td>
+  <td>5h</td>
+  <td>$60.2768</td>
+  <td>95.6%</td>
+</tr>
+<tr>
   <td><code>dev</code></td>
   <td>3</td>
   <td>273,815</td>
   <td>24m 6s</td>
   <td>$1.8072</td>
-  <td>65.9%</td>
+  <td>2.9%</td>
 </tr>
 <tr>
   <td><code>qa</code></td>
@@ -580,7 +594,7 @@ details > *:not(summary) {
   <td>64,188</td>
   <td>3m 37s</td>
   <td>$0.4236</td>
-  <td>15.4%</td>
+  <td>0.7%</td>
 </tr>
 <tr>
   <td><code>audit-agent</code></td>
@@ -588,7 +602,7 @@ details > *:not(summary) {
   <td>44,517</td>
   <td>1m 55s</td>
   <td>$0.2938</td>
-  <td>10.7%</td>
+  <td>0.5%</td>
 </tr>
 <tr>
   <td><code>logic-reviewer</code></td>
@@ -596,7 +610,7 @@ details > *:not(summary) {
   <td>16,831</td>
   <td>45s</td>
   <td>$0.1111</td>
-  <td>4.0%</td>
+  <td>0.2%</td>
 </tr>
 <tr>
   <td><code>code-reviewer</code></td>
@@ -604,7 +618,7 @@ details > *:not(summary) {
   <td>16,231</td>
   <td>51s</td>
   <td>$0.1071</td>
-  <td>3.9%</td>
+  <td>0.2%</td>
 </tr>
     </tbody>
   </table>
@@ -625,16 +639,24 @@ details > *:not(summary) {
     <tbody>
 <tr>
   <td><code>unattributed</code></td>
+  <td>1</td>
+  <td>88,220,369</td>
+  <td>5h</td>
+  <td>$60.2768</td>
+  <td>95.6%</td>
+</tr>
+<tr>
+  <td><code>implementation</code></td>
   <td>7</td>
   <td>415,582</td>
   <td>31m 15s</td>
   <td>$2.7428</td>
-  <td>100.0%</td>
+  <td>4.4%</td>
 </tr>
     </tbody>
   </table>
 </details>
-  <p class="cost-note"><em>70/30 input/output split assumed; harness reports only total_tokens; 7 of 7 dispatches included in cost</em></p>
+  <p class="cost-note"><em>70/30 input/output split assumed; harness reports only total_tokens; 8 of 8 dispatches included in cost</em></p>
 </section>
       <section class="drilldown">
 <h2>Drilldown</h2>
@@ -643,15 +665,15 @@ details > *:not(summary) {
 <div><table>
 <thead><tr><th>AC ID</th><th>Status</th><th>Validator</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td>AC-001</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-002</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-003</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-004</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-005</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-006</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-007</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-008</td><td>missing</td><td>qa</td><td>—</td></tr>
-<tr><td>AC-009</td><td>missing</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-001</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-002</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-003</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-004</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-005</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-006</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-007</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-008</td><td>pass</td><td>qa</td><td>—</td></tr>
+<tr><td>AC-009</td><td>pass</td><td>qa</td><td>—</td></tr>
 </tbody>
 </table></div>
 </details>
@@ -667,6 +689,7 @@ details > *:not(summary) {
 <tr><td>logic-reviewer-T-...</td><td>logic-reviewer</td><td>done</td><td>3</td><td>16831</td><td>45s</td><td>Verifying surgical fix to M5 regression only (code-review...</td></tr>
 <tr><td>qa-T-001-loop1</td><td>qa</td><td>done</td><td>1</td><td>64188</td><td>3m 37s</td><td>All 10 ACs validated pass — real test runs + fixture invo...</td></tr>
 <tr><td>audit-AUDIT-loop1</td><td>audit-agent</td><td>blocked</td><td>1</td><td>44517</td><td>1m 55s</td><td>Audit BLOCKED: usage_not_captured (bootstrap — hook not i...</td></tr>
+<tr><td>pm-orchestrator-d...</td><td>pm-orchestrator</td><td>done</td><td>—</td><td>88220369</td><td>300m 13s</td><td>PM/orchestrator session (Stop hook): 860 turns</td></tr>
 </tbody>
 </table></div>
 </details>
@@ -680,7 +703,14 @@ details > *:not(summary) {
 </details>
 <details>
 <summary>Phase durations</summary>
-<div><p>(no phase data available)</p></div>
+<div><table>
+<thead><tr><th>Phase</th><th>Started</th><th>Completed</th><th>Duration</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>specify</td><td>00:00:00</td><td>2026-05-11 00:00:00</td><td>0ms</td><td>done</td></tr>
+<tr><td>plan</td><td>00:00:00</td><td>2026-05-11 00:00:00</td><td>0ms</td><td>done</td></tr>
+<tr><td>implementation</td><td>03:22:15</td><td>2026-05-11 03:56:30</td><td>34m 15s</td><td>done</td></tr>
+</tbody>
+</table></div>
 </details>
 </section>
       <section class="raw-data">
@@ -688,32 +718,33 @@ details > *:not(summary) {
   <details>
     <summary>View raw Markdown report</summary>
     <div class="md-embed"><h1>Enforce 100%-complete agentops inputs (usage + warnings + scope coverage) — FEAT-003</h1>
+<p>⚠ PM session capture warning: test_reason</p>
 <blockquote>
 <p>Feature: Enforce 100%-complete agentops inputs (usage + warnings + scope coverage)
 Task ID: FEAT-003
 Phase: escalated
-Generated at: 2026-05-11T04:09:01.218Z</p>
+Generated at: 2026-05-12T01:57:09.567Z</p>
 </blockquote>
 <h2>Insights</h2>
 <ul>
 <li>ℹ Escalation rate 0.0% is below the Galileo healthy band (&lt; 10%) — low escalation, agents resolving autonomously. <em>(Galileo healthy band)</em></li>
 <li>ℹ Dev task success rate 100.0% is at or above 80% — healthy first-try rate.</li>
-<li>⚠ Loop rate 100.0% exceeds 50% — more than half of dispatches needed loops. Consider strengthening the preflight contract.</li>
+<li>⚠ Loop rate 87.5% exceeds 50% — more than half of dispatches needed loops. Consider strengthening the preflight contract.</li>
 </ul>
 <h2>Cost breakdown</h2>
-<p><em>70/30 input/output split assumed; harness reports only total_tokens; 7 of 7 dispatches included in cost</em></p>
+<p><em>70/30 input/output split assumed; harness reports only total_tokens; 8 of 8 dispatches included in cost</em></p>
 <ul>
-<li>Total tokens: 415582<ul>
-<li>Estimated input (70%): 290907</li>
-<li>Estimated output (30%): 124675</li>
+<li>Total tokens: 88635951<ul>
+<li>Estimated input (70%): 62045166</li>
+<li>Estimated output (30%): 26590785</li>
 </ul>
 </li>
-<li>Estimated cost USD total: $2.7428</li>
-<li>Cost per AC: $0.3048</li>
-<li>Cost per dispatch (avg): $0.3918</li>
-<li>Wall-clock duration: 31m 15s</li>
-<li>Tool uses total: 313</li>
-<li>Coverage: 7 of 7 dispatches included in cost calculation</li>
+<li>Estimated cost USD total: $63.0196</li>
+<li>Cost per AC: $7.0022</li>
+<li>Cost per dispatch (avg): $7.8775</li>
+<li>Wall-clock duration: 331m 28s</li>
+<li>Tool uses total: 767</li>
+<li>Coverage: 8 of 8 dispatches included in cost calculation</li>
 </ul>
 <h2>Repo health snapshot</h2>
 <p>Repo health: not measured (run <code>npm run mutation &amp;&amp; npm run type-coverage &amp;&amp; npm run arch:check</code> first)</p>
@@ -801,6 +832,16 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 <td>1m 55s</td>
 <td>Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this...</td>
 </tr>
+<tr>
+<td>pm-orches...</td>
+<td>pm-orchestrator</td>
+<td>done</td>
+<td>—</td>
+<td>88220369</td>
+<td>$60.2768</td>
+<td>300m 13s</td>
+<td>PM/orchestrator session (Stop hook): 860 turns</td>
+</tr>
 </tbody></table>
 <h2>Per-AC closure detail</h2>
 <table>
@@ -814,55 +855,55 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </thead>
 <tbody><tr>
 <td>AC-001</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-002</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-003</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-004</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-005</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-006</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-007</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-008</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
 <tr>
 <td>AC-009</td>
-<td>missing</td>
+<td>pass</td>
 <td>qa</td>
 <td>—</td>
 </tr>
@@ -877,11 +918,11 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </thead>
 <tbody><tr>
 <td>specify</td>
-<td>—</td>
+<td>0 min</td>
 </tr>
 <tr>
 <td>plan</td>
-<td>—</td>
+<td>0 min</td>
 </tr>
 <tr>
 <td>tasks</td>
@@ -889,11 +930,42 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </tr>
 <tr>
 <td>implementation</td>
-<td>—</td>
+<td>34 min</td>
 </tr>
 </tbody></table>
 <h2>Timeline</h2>
-<p><em>(no phase data available)</em></p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Started</th>
+<th>Completed</th>
+<th>Duration</th>
+<th>Visual</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>specify</td>
+<td>00:00:00</td>
+<td>00:00:00</td>
+<td>0ms</td>
+<td>░░░░░░░░░░</td>
+</tr>
+<tr>
+<td>plan</td>
+<td>00:00:00</td>
+<td>00:00:00</td>
+<td>0ms</td>
+<td>░░░░░░░░░░</td>
+</tr>
+<tr>
+<td>implementation</td>
+<td>03:22:15</td>
+<td>03:56:30</td>
+<td>34m 15s</td>
+<td>██████████</td>
+</tr>
+</tbody></table>
 <h2>Dispatches</h2>
 <table>
 <thead>
@@ -924,7 +996,7 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </tr>
 <tr>
 <td>pm-orchestrator</td>
-<td>0</td>
+<td>1</td>
 </tr>
 <tr>
 <td>qa</td>
@@ -932,7 +1004,7 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </tr>
 <tr>
 <td><strong>Total</strong></td>
-<td>7</td>
+<td>8</td>
 </tr>
 </tbody></table>
 <h2>Task success rate</h2>
@@ -965,7 +1037,7 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </tr>
 <tr>
 <td>pm-orchestrator</td>
-<td>n/a</td>
+<td>100.0%</td>
 </tr>
 <tr>
 <td>qa</td>
@@ -973,11 +1045,11 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 </tr>
 </tbody></table>
 <h2>Loop rate</h2>
-<p>Loop rate: 100.0%</p>
+<p>Loop rate: 87.5%</p>
 <h2>Escalation rate</h2>
 <p>Escalation rate: 0.0% — below healthy band (&lt; 10%)</p>
 <h2>AC closure</h2>
-<p>Total: 9 | Pass: 10 | Partial: 0 | Fail: 0 | Missing: 9</p>
+<p>Total: 9 | Pass: 10 | Partial: 0 | Fail: 0 | Missing: 0</p>
 <h2>Reviewer findings density</h2>
 <table>
 <thead>
@@ -1006,9 +1078,11 @@ Generated at: 2026-05-11T04:09:01.218Z</p>
 <li>[2026-05-11 03:50 logic-reviewer] Verifying surgical fix to M5 regression only (code-reviewer skipped — out of its scope)</li>
 <li>[2026-05-11 03:51 qa] All 10 ACs validated pass — real test runs + fixture invocations + helper probe</li>
 <li>[2026-05-11 03:54 audit-agent] Audit BLOCKED: usage_not_captured (bootstrap — hook not installed during this session) + orchestrator_edited_source (pre-existing git state, not this session)</li>
+<li>[2026-05-11 17:36 pm-orchestrator] PM/orchestrator session (Stop hook): 860 turns</li>
 </ul>
 <h2>Token cost</h2>
-<p>Token cost not available — using dispatch count as cost proxy: 7 dispatches</p>
+<p>⚠ PM session capture warning: test_reason</p>
+<p>Token cost not available — using dispatch count as cost proxy: 8 dispatches</p>
 </div>
   </details>
 </section>

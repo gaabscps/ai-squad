@@ -3,7 +3,7 @@
 > Feature: Guarantee 100%-populated agentops report after every SDD session
 > Task ID: FEAT-002
 > Phase: done
-> Generated at: 2026-05-11T02:38:47.508Z
+> Generated at: 2026-05-12T01:57:09.567Z
 
 ## Insights
 
@@ -41,31 +41,35 @@ Repo health: not measured (run `npm run mutation && npm run type-coverage && npm
 
 ## Per-AC closure detail
 
-| AC ID  | Status  | Validator | Evidence |
-| ------ | ------- | --------- | -------- |
-| AC-001 | missing | —         | —        |
-| AC-002 | missing | —         | —        |
-| AC-003 | missing | —         | —        |
-| AC-004 | missing | —         | —        |
-| AC-005 | missing | —         | —        |
-| AC-006 | missing | —         | —        |
-| AC-007 | missing | —         | —        |
-| AC-008 | missing | —         | —        |
-| AC-009 | missing | —         | —        |
-| AC-010 | missing | —         | —        |
+| AC ID  | Status | Validator | Evidence |
+| ------ | ------ | --------- | -------- |
+| AC-001 | pass   | —         | —        |
+| AC-002 | pass   | —         | —        |
+| AC-003 | pass   | —         | —        |
+| AC-004 | pass   | —         | —        |
+| AC-005 | pass   | —         | —        |
+| AC-006 | pass   | —         | —        |
+| AC-007 | pass   | —         | —        |
+| AC-008 | pass   | —         | —        |
+| AC-009 | pass   | —         | —        |
+| AC-010 | pass   | —         | —        |
 
 ## Phase durations
 
 | Phase          | Duration |
 | -------------- | -------- |
-| specify        | —        |
-| plan           | —        |
-| tasks          | —        |
+| specify        | 0 min    |
+| plan           | 0 min    |
+| tasks          | 0 min    |
 | implementation | —        |
 
 ## Timeline
 
-_(no phase data available)_
+| Phase   | Started  | Completed | Duration | Visual     |
+| ------- | -------- | --------- | -------- | ---------- |
+| specify | 00:00:00 | 00:00:00  | 0ms      | ░░░░░░░░░░ |
+| plan    | 00:00:00 | 00:00:00  | 0ms      | ░░░░░░░░░░ |
+| tasks   | 00:00:00 | 00:00:00  | 0ms      | ░░░░░░░░░░ |
 
 ## Dispatches
 
@@ -102,7 +106,7 @@ Escalation rate: 0.0% — below healthy band (< 10%)
 
 ## AC closure
 
-Total: 10 | Pass: 15 | Partial: 0 | Fail: 0 | Missing: 10
+Total: 10 | Pass: 10 | Partial: 0 | Fail: 0 | Missing: 0
 
 ## PM notes log
 
@@ -111,3 +115,5 @@ _(no PM notes recorded)_
 ## Token cost
 
 Token cost not available — using dispatch count as cost proxy: 5 dispatches
+
+⚠ pm-orchestrator Stop hook did not run — re-run agentops install-hooks (worktree-aware)

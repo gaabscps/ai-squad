@@ -3,7 +3,7 @@
 > Feature: Extract AgentOps observability into @ai-squad/agentops npm package
 > Task ID: FEAT-001
 > Phase: done
-> Generated at: 2026-05-11T02:38:47.508Z
+> Generated at: 2026-05-12T01:57:09.567Z
 
 ## Insights
 
@@ -214,7 +214,7 @@ Escalation rate: 0.0% — below healthy band (< 10%)
 
 ## AC closure
 
-Total: 17 | Pass: 30 | Partial: 0 | Fail: 0 | Missing: 2
+Total: 17 | Pass: 15 | Partial: 0 | Fail: 0 | Missing: 2
 
 ## Reviewer findings density
 
@@ -230,4 +230,6 @@ _(no PM notes recorded)_
 
 ## Token cost
 
-Total tokens: 0 | Tokens/AC: 0
+Token cost not available — using dispatch count as cost proxy: 106 dispatches
+
+⚠ pm-orchestrator Stop hook did not run — re-run agentops install-hooks (worktree-aware)

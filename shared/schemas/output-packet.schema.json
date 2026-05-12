@@ -104,6 +104,7 @@
               "usage_not_captured",
               "usage_capture_failed",
               "warnings_file_corrupt",
+              "incomplete_review",
               "pm_gate_violations",
               "pm_cost_cap_exceeded"
             ],
