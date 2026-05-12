@@ -2,11 +2,14 @@
 """
 Tests for verify-pm-handoff-clean.py.
 
-Covers (T-007 subset for T-004 scope):
+Covers (T-008 scope — AC-014, AC-015, AC-016 plus prior ACs):
   AC-001 — each of 6 debt markers blocks Stop, evidence contains file:line
   AC-002 — zero matches → allow
   AC-004 — excluded paths (.agent-session/, node_modules/, vendor/, dist/,
             build/, .next/) are not scanned
+  AC-014 — scan thread catches BaseException; hook emits scan_failed: <TypeName>
+  AC-015 — _output_written sentinel ensures non-zero exit + block on unexpected exit
+  AC-016 — tests cover AC-014 and AC-015 paths
   NFR-003 — refusal output is a valid markdown table
 
 Run with:
@@ -20,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -64,6 +68,24 @@ def _make_tree(tmp: Path, files: dict[str, str]) -> None:
 
 # Standard hook payload (stop hook — no tool_input).
 _BASE_PAYLOAD = {"stop_hook_active": False}
+
+
+def _make_hook_script(tmp: Path, fake_pm_shared_src: str) -> Path:
+    """Return path to the copied hook script with fake _pm_shared injected.
+
+    Copies the real hook script and hook_runtime.py into a sandbox directory
+    under *tmp*, then writes *fake_pm_shared_src* as _pm_shared.py so the
+    hook resolves the fake module instead of the real one.
+    """
+    hook_dir = tmp / "hook_sandbox"
+    hook_dir.mkdir()
+
+    shutil.copy(str(_HOOK_SCRIPT), str(hook_dir / "verify-pm-handoff-clean.py"))
+    real_hook_runtime = _HOOKS_DIR / "hook_runtime.py"
+    shutil.copy(str(real_hook_runtime), str(hook_dir / "hook_runtime.py"))
+    (hook_dir / "_pm_shared.py").write_text(fake_pm_shared_src, encoding="utf-8")
+
+    return hook_dir / "verify-pm-handoff-clean.py"
 
 
 # ===========================================================================
@@ -486,7 +508,6 @@ class TestExemptPaths(unittest.TestCase):
 
     def test_exempt_paths_constant_exists(self):
         """_DEBT_MARKER_EXEMPT_PATHS must be importable from _pm_shared."""
-        import sys
         hooks_dir = str(Path(__file__).resolve().parent.parent)
         if hooks_dir not in sys.path:
             sys.path.insert(0, hooks_dir)
@@ -508,7 +529,6 @@ class TestExemptPaths(unittest.TestCase):
         run in isolation (they live in the real working tree, not a tmp dir), so
         we test the shared helper's _is_exempt function directly.
         """
-        import sys
         hooks_dir = str(Path(__file__).resolve().parent.parent)
         if hooks_dir not in sys.path:
             sys.path.insert(0, hooks_dir)
@@ -550,25 +570,6 @@ class TestScanFailedFallback(unittest.TestCase):
     the real hooks directory.
     """
 
-    @staticmethod
-    def _make_injected_hook_dir(
-        tmp: Path,
-        fake_pm_shared_src: str,
-    ) -> Path:
-        """Return path to the copied hook script with fake _pm_shared injected."""
-        hook_dir = tmp / "hook_sandbox"
-        hook_dir.mkdir()
-
-        # Copy the real hook script and hook_runtime.py into the sandbox.
-        shutil.copy(str(_HOOK_SCRIPT), str(hook_dir / "verify-pm-handoff-clean.py"))
-        real_hook_runtime = _HOOKS_DIR / "hook_runtime.py"
-        shutil.copy(str(real_hook_runtime), str(hook_dir / "hook_runtime.py"))
-
-        # Write the fake _pm_shared.py into the same directory.
-        (hook_dir / "_pm_shared.py").write_text(fake_pm_shared_src, encoding="utf-8")
-
-        return hook_dir / "verify-pm-handoff-clean.py"
-
     def test_scan_error_blocks_with_scan_failed_reason(self):
         """Patch enumerate_working_tree_files to raise; hook must block with scan_failed."""
         with tempfile.TemporaryDirectory() as tmp_str:
@@ -582,7 +583,7 @@ class TestScanFailedFallback(unittest.TestCase):
                 'def grep_debt_markers(files, patterns, root=None): return []\n'
                 'def atomic_manifest_mutate(p, m): pass\n'
             )
-            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+            hook_script = _make_hook_script(tmp, fake_src)
 
             result = subprocess.run(
                 [sys.executable, str(hook_script)],
@@ -604,8 +605,9 @@ class TestScanFailedFallback(unittest.TestCase):
                 reason.startswith("scan_failed:"),
                 f"reason must start with 'scan_failed:', got: {reason!r}",
             )
-            self.assertIn("simulated scan error", reason,
-                          f"reason must contain original error text: {reason!r}")
+            # AC-014: reason must contain exception type name, not message string
+            self.assertIn("RuntimeError", reason,
+                          f"reason must contain exception type name 'RuntimeError': {reason!r}")
 
     def test_scan_error_never_allows(self):
         """Under no scan-error condition must the hook emit an allow decision."""
@@ -620,7 +622,7 @@ class TestScanFailedFallback(unittest.TestCase):
                 'def grep_debt_markers(files, patterns, root=None): return []\n'
                 'def atomic_manifest_mutate(p, m): pass\n'
             )
-            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+            hook_script = _make_hook_script(tmp, fake_src)
 
             result = subprocess.run(
                 [sys.executable, str(hook_script)],
@@ -654,7 +656,7 @@ class TestScanFailedFallback(unittest.TestCase):
                 'def grep_debt_markers(files, patterns, root=None): return []\n'
                 'def atomic_manifest_mutate(p, m): pass\n'
             )
-            hook_script = self._make_injected_hook_dir(tmp, fake_src)
+            hook_script = _make_hook_script(tmp, fake_src)
 
             result = subprocess.run(
                 [sys.executable, str(hook_script)],
@@ -681,7 +683,6 @@ class TestScanFailedFallback(unittest.TestCase):
 
     def test_nfr001_hook_completes_within_5s(self):
         """NFR-001: hook must complete within 5 s on a representative session tree."""
-        import time
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
             # Seed a representative small tree (no markers → allow path).
@@ -700,6 +701,148 @@ class TestScanFailedFallback(unittest.TestCase):
             decision = result.get("decision", "allow")
             self.assertEqual(decision, "allow",
                              f"Expected allow on clean tree, got: {result}")
+
+
+# ===========================================================================
+# AC-014, AC-015, AC-016 — BaseException + _output_written sentinel (T-008)
+# ===========================================================================
+
+class TestBaseExceptionSentinel(unittest.TestCase):
+    """AC-014 / AC-015 / AC-016: BaseException in scan thread → hook emits block, not empty."""
+
+    def test_system_exit_in_scan_thread_emits_block(self):
+        """AC-014: SystemExit raised inside scan thread must cause hook to emit block."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Fake _pm_shared raises SystemExit inside enumerate_working_tree_files.
+            fake_src = (
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    raise SystemExit("simulated SystemExit in scan")\n'
+                'def grep_debt_markers(files, patterns, root=None): return []\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = _make_hook_script(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            # AC-014: must emit non-empty JSON with decision=block
+            self.assertTrue(
+                stdout,
+                "AC-014: hook must emit JSON even when SystemExit raised in scan thread (not empty stdout)",
+            )
+            out = json.loads(stdout)
+            self.assertEqual(
+                out.get("decision"), "block",
+                f"AC-014: SystemExit in scan thread must emit block, got: {out}",
+            )
+            # AC-015: must exit non-zero
+            self.assertNotEqual(
+                result.returncode, 0,
+                f"AC-015: hook must exit non-zero on scan BaseException, got returncode={result.returncode}",
+            )
+            # reason must match scan_failed: <TypeName> (not message string)
+            reason = out.get("reason", "")
+            self.assertRegex(
+                reason,
+                r"^scan_failed: [A-Za-z]+",
+                f"AC-014: reason must be 'scan_failed: <TypeName>', got: {reason!r}",
+            )
+            self.assertIn(
+                "SystemExit", reason,
+                f"AC-014: reason must contain exception type name 'SystemExit', got: {reason!r}",
+            )
+
+    def test_base_exception_scan_never_silently_allows(self):
+        """AC-015: hook must not silently allow when BaseException raised in scan."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            fake_src = (
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    raise MemoryError("simulated MemoryError")\n'
+                'def grep_debt_markers(files, patterns, root=None): return []\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = _make_hook_script(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            out = json.loads(stdout) if stdout else {}
+            decision = out.get("decision", "allow")
+            self.assertNotEqual(
+                decision, "allow",
+                f"AC-015: MemoryError in scan must never silently allow, got: {out}",
+            )
+            # AC-015: must exit non-zero
+            self.assertNotEqual(
+                result.returncode, 0,
+                f"AC-015: hook must exit non-zero on scan BaseException, got returncode={result.returncode}",
+            )
+
+    def test_finally_sentinel_fires_on_unexpected_exception_in_main(self):
+        """AC-016: _output_written sentinel must emit block if main() crashes unexpectedly."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Fake _pm_shared that makes grep_debt_markers raise after scan succeeds,
+            # so the exception happens outside the thread (in main body) after _run_scan.
+            fake_src = (
+                'from pathlib import Path\n'
+                '_DEBT_MARKER_EXEMPT_PATHS = ()\n'
+                'def _is_exempt(f, r): return False\n'
+                'def enumerate_working_tree_files(root):\n'
+                '    return []\n'
+                'class _BadResult:\n'
+                '    def get(self, k, d=None):\n'
+                '        raise RuntimeError("simulated crash in main after scan")\n'
+                'def grep_debt_markers(files, patterns, root=None):\n'
+                '    return _BadResult()\n'
+                'def atomic_manifest_mutate(p, m): pass\n'
+            )
+            hook_script = _make_hook_script(tmp, fake_src)
+
+            result = subprocess.run(
+                [sys.executable, str(hook_script)],
+                input=json.dumps({**_BASE_PAYLOAD, "cwd": tmp_str}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=os.environ,
+            )
+            stdout = result.stdout.strip()
+            # AC-016: sentinel must have fired — stdout must contain block decision
+            self.assertTrue(
+                stdout,
+                "AC-016: finally sentinel must emit block JSON when main() crashes (not empty stdout)",
+            )
+            out = json.loads(stdout)
+            self.assertEqual(
+                out.get("decision"), "block",
+                f"AC-016: finally sentinel must emit block, got: {out}",
+            )
+            # AC-015: sentinel path must also exit non-zero
+            self.assertNotEqual(
+                result.returncode, 0,
+                f"AC-015: finally sentinel must exit non-zero, got returncode={result.returncode}",
+            )
 
 
 if __name__ == "__main__":

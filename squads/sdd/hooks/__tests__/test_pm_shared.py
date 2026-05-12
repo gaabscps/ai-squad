@@ -638,7 +638,6 @@ class TestRglobGitignoreDivergence(unittest.TestCase):
         fallback has no access to .gitignore rules.  This test documents the
         known limitation: rglob and git-path can diverge on .gitignore scope.
         """
-        import tempfile
         tmp = Path(tempfile.mkdtemp())
         # Create a .gitignore that would exclude *.log
         (tmp / ".gitignore").write_text("*.log\n", encoding="utf-8")
@@ -660,6 +659,226 @@ class TestRglobGitignoreDivergence(unittest.TestCase):
             "rglob fallback should return .gitignore-excluded files (known divergence from git path)",
         )
         self.assertIn("main.py", names)
+
+
+# ===========================================================================
+# FEAT-005 T-001/T-002: _is_exempt — expanded paths + glob support
+# AC-001, AC-002, AC-003, AC-004
+# ===========================================================================
+
+_is_exempt = _mod._is_exempt
+
+
+class TestIsExemptExpandedPaths(unittest.TestCase):
+    """AC-001/AC-002: new exempt prefixes cover docs/, shared/concepts/,
+    squads/sdd/skills/, and the three __tests__/ subdirectories."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def _make(self, rel: str) -> Path:
+        p = self.root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("TODO: marker here", encoding="utf-8")
+        return p
+
+    # AC-001 — docs/
+    def test_docs_dir_is_exempt(self):
+        f = self._make("docs/tech-debt.md")
+        self.assertTrue(_is_exempt(f, self.root), "docs/ file must be exempt (AC-001)")
+
+    # AC-001 — shared/concepts/
+    def test_shared_concepts_is_exempt(self):
+        f = self._make("shared/concepts/pm-bypass.md")
+        self.assertTrue(_is_exempt(f, self.root), "shared/concepts/ file must be exempt (AC-001)")
+
+    # AC-001 — squads/sdd/skills/
+    def test_squads_sdd_skills_is_exempt(self):
+        f = self._make("squads/sdd/skills/pm/skill.md")
+        self.assertTrue(_is_exempt(f, self.root), "squads/sdd/skills/ file must be exempt (AC-001)")
+
+    # AC-002 — squads/sdd/hooks/__tests__/
+    def test_hooks_tests_is_exempt(self):
+        f = self._make("squads/sdd/hooks/__tests__/test_foo.py")
+        self.assertTrue(_is_exempt(f, self.root), "hooks/__tests__/ file must be exempt (AC-002)")
+
+    # AC-002 — squads/sdd/agents/__tests__/
+    def test_agents_tests_is_exempt(self):
+        f = self._make("squads/sdd/agents/__tests__/test_bar.md")
+        self.assertTrue(_is_exempt(f, self.root), "agents/__tests__/ file must be exempt (AC-002)")
+
+    # AC-002 — squads/sdd/skills/__tests__/
+    def test_skills_tests_is_exempt(self):
+        f = self._make("squads/sdd/skills/__tests__/test_baz.md")
+        self.assertTrue(_is_exempt(f, self.root), "skills/__tests__/ file must be exempt (AC-002)")
+
+    # AC-004 — real source file outside all exempt paths must NOT be exempt
+    def test_non_exempt_file_not_skipped(self):
+        f = self._make("packages/agentops/src/index.ts")
+        self.assertFalse(_is_exempt(f, self.root), "non-exempt file must not be skipped (AC-004)")
+
+    # AC-004 — file that matches multiple exempt prefixes is still just exempt (no crash)
+    def test_multiple_prefix_match_no_double_processing(self):
+        # squads/sdd/skills/ AND squads/sdd/skills/__tests__/ both apply
+        f = self._make("squads/sdd/skills/__tests__/fixture.py")
+        # Simply checking that it returns True without crashing is the assertion
+        result = _is_exempt(f, self.root)
+        self.assertTrue(result, "file matching multiple prefixes must still be exempt (AC-004)")
+
+    # AC-001 — exact-equality branch: literal filename entry matches exactly
+    def test_exact_literal_filename_matches(self):
+        """rel == prefix branch: a literal filename exempt entry matches exactly."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = (
+                "squads/sdd/hooks/verify-pm-handoff-clean.py",
+            )
+            f = self._make("squads/sdd/hooks/verify-pm-handoff-clean.py")
+            self.assertTrue(
+                _is_exempt(f, self.root),
+                "literal filename entry must match via rel == prefix (AC-001)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    # AC-004 — trailing-slash prefix must NOT match sibling dir with shared prefix
+    def test_docs_prefix_does_not_match_docs2_dir(self):
+        """'docs/' prefix must NOT match 'docs2/foo.py' (trailing-slash boundary)."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = ("docs/",)
+            f = self._make("docs2/foo.py")
+            self.assertFalse(
+                _is_exempt(f, self.root),
+                "'docs/' must not match 'docs2/foo.py' (AC-004 prefix false-positive)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    # AC-004 — file outside root must return False (ValueError branch)
+    def test_file_outside_root_returns_false(self):
+        """_is_exempt returns False when file_path resolves outside root."""
+        other_tmp = Path(tempfile.mkdtemp())
+        outside_file = other_tmp / "secret.py"
+        outside_file.write_text("TODO: outside root", encoding="utf-8")
+        self.assertFalse(
+            _is_exempt(outside_file, self.root),
+            "file outside root must return False (AC-004 ValueError branch)",
+        )
+
+    # as_posix() produces forward slashes on all platforms
+    def test_forward_slash_path_separator_for_all_exempt_prefixes(self):
+        """_is_exempt must work for every expanded prefix regardless of OS path separator.
+
+        The as_posix() fix ensures rel uses '/' not '\\' so startswith("docs/")
+        works correctly cross-platform (AC-001/AC-002).
+        """
+        exempt_cases = [
+            "docs/tech-debt.md",
+            "shared/concepts/something.md",
+            "squads/sdd/skills/pm/skill.md",
+            "squads/sdd/hooks/__tests__/test_foo.py",
+            "squads/sdd/agents/__tests__/test_bar.py",
+            "squads/sdd/skills/__tests__/test_baz.py",
+        ]
+        for rel_path in exempt_cases:
+            f = self._make(rel_path)
+            self.assertTrue(
+                _is_exempt(f, self.root),
+                f"as_posix() fix: {rel_path!r} must be exempt on all platforms",
+            )
+
+
+class TestIsExemptGlobSupport(unittest.TestCase):
+    """AC-003: glob patterns (containing * or ?) in _DEBT_MARKER_EXEMPT_PATHS
+    must be matched via fnmatch.fnmatch() instead of startswith()."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+
+    def _make(self, rel: str) -> Path:
+        p = self.root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("TODO: marker here", encoding="utf-8")
+        return p
+
+    def test_glob_pattern_matches_via_fnmatch(self):
+        """Inject a glob entry into _DEBT_MARKER_EXEMPT_PATHS and verify _is_exempt dispatches via fnmatch."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = ("test_dir/*.py",)
+            matching = self._make("test_dir/helpers.py")
+            non_matching = self._make("other_dir/helpers.py")
+            self.assertTrue(
+                _is_exempt(matching, self.root),
+                "glob entry 'test_dir/*.py' must match test_dir/helpers.py via fnmatch (AC-003)",
+            )
+            self.assertFalse(
+                _is_exempt(non_matching, self.root),
+                "glob entry 'test_dir/*.py' must NOT match other_dir/helpers.py (AC-003)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    def test_glob_added_to_exempt_list_matches_via_fnmatch(self):
+        """When _DEBT_MARKER_EXEMPT_PATHS contains a glob, _is_exempt uses fnmatch."""
+        # Temporarily patch the module-level list to inject a glob entry
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original + ("docs/*.md",)
+            f = self._make("docs/tech-debt.md")
+            self.assertTrue(
+                _is_exempt(f, self.root),
+                "glob entry in exempt list must match via fnmatch (AC-003)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    def test_question_mark_wildcard_matches_single_char(self):
+        """'?' wildcard in exempt entry matches exactly one character via fnmatch (AC-003)."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = (
+                "squads/sdd/hooks/verify-pm-hand?.py",
+            )
+            f = self._make("squads/sdd/hooks/verify-pm-hando.py")
+            self.assertTrue(
+                _is_exempt(f, self.root),
+                "'?' glob entry must match single-char wildcard via fnmatch (AC-003)",
+            )
+            non_matching = self._make("squads/sdd/hooks/verify-pm-handoff-clean.py")
+            self.assertFalse(
+                _is_exempt(non_matching, self.root),
+                "'?' must NOT match multi-char segment (AC-003)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    def test_glob_star_does_not_match_outside_pattern(self):
+        """A glob pattern must not over-match files outside its scope."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = ("docs/*.md",)
+            f = self._make("packages/agentops/src/index.ts")
+            self.assertFalse(
+                _is_exempt(f, self.root),
+                "glob entry must not match unrelated paths (AC-003/AC-004)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
+
+    def test_literal_prefix_still_works_when_glob_entries_present(self):
+        """Literal prefix entries continue to work when glob entries co-exist."""
+        original = _mod._DEBT_MARKER_EXEMPT_PATHS
+        try:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = ("docs/", "squads/*.md")
+            f = self._make("docs/notes.txt")
+            self.assertTrue(
+                _is_exempt(f, self.root),
+                "literal prefix must still work alongside glob entries (AC-003)",
+            )
+        finally:
+            _mod._DEBT_MARKER_EXEMPT_PATHS = original
 
 
 if __name__ == "__main__":

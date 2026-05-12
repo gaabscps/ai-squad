@@ -102,12 +102,21 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 
 4. No markers remain. Approve in this exact order (ordering invariant: evidence lands in `session.yml` BEFORE artifact is marked approved):
 
-   a. Check for re-entry: if `session.yml` already contains `phase_history.tasks.approved_by`, REFUSE (raise). A phase already PM-approved MUST NOT be re-approved silently.
+   a. Check for re-entry / partial-write repair:
+      - IF session.yml already has `phase_history.tasks.approved_by == "pm"`
+        AND `tasks.md` frontmatter `status == "approved"`:
+          REFUSE (raise). Phase already approved by PM must not be re-approved.
+      - IF session.yml already has `phase_history.tasks.approved_by == "pm"`
+        AND `tasks.md` frontmatter `status != "approved"`:
+          Partial-write repair. Write occurred in session.yml (step 4.b) but not in tasks.md (step 4.c).
+          DO NOT raise. Skip step 4.b (session.yml write and current_phase advancement already done). Go directly to step 4.c.
+      - IF session.yml does NOT have `phase_history.tasks.approved_by`:
+          Normal path. Continue to step 4.b.
 
    b. Perform a single atomic read-modify-write on `session.yml` (one tmp + rename) writing ALL of:
       - `phase_history.tasks.approved_by: "pm"`
-      - `current_phase`: advance to the next phase per `planned_phases` (same logic as Step 10.3)
       - `notes`: append the `pm_decision` entry below
+      - `current_phase`: advance to the next phase per `planned_phases` (same logic as Step 10.3)
       (Initialize `session.yml.notes` as empty list if absent before appending.)
 
    c. Write `status: approved` to `tasks.md` frontmatter (atomic write).
@@ -119,7 +128,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
    **`pm_decision` entry shape** (appended to `session.yml.notes`):
    ```yaml
    - kind: pm_decision
-     timestamp: "<ISO8601-now>"       # UTC
+     timestamp: "<ISO8601-now>"       # ISO8601, UTC
      phase: "tasks"
      artifact_path: ".agent-session/<task_id>/tasks.md"
      gate_applied: "auto_approved_by=pm"

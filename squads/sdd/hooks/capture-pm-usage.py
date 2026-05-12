@@ -28,6 +28,7 @@ Python 3.8+. No external dependencies (stdlib only).
 from __future__ import annotations
 
 import json
+import re
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -51,6 +52,60 @@ from hook_runtime import resolve_project_root
 # Cost per million tokens (USD):
 _DEFAULT_INPUT_COST_PER_M = 3.0    # claude-sonnet pricing (input)
 _DEFAULT_OUTPUT_COST_PER_M = 15.0  # claude-sonnet pricing (output)
+
+
+# ---------------------------------------------------------------------------
+# Module-level regex patterns (compiled once, AC-012/AC-013)
+# ---------------------------------------------------------------------------
+
+# Matches `current_owner: "pm"` or `current_owner: pm` at the START of a line.
+# The `^` + `$` anchors with re.MULTILINE prevent false positives from:
+#   - comment lines (# current_owner: pm)
+#   - sibling keys (previous_current_owner: "pm")
+#   - prefix matches (current_owner: "pmx")
+_OWNER_RE = re.compile(r'^current_owner:\s*["\']?pm["\']?\s*$', re.MULTILINE)
+
+# Extracts the value of `current_phase`.
+_PHASE_RE = re.compile(r'^current_phase:\s*["\']?(\w[\w-]*)["\']?\s*$', re.MULTILINE)
+
+# Extracts the YAML list block that follows `planned_phases:`.
+_PLANNED_PHASES_RE = re.compile(r'^planned_phases:\s*\n((?:[ \t]+-[ \t]+\S.*\n?)*)', re.MULTILINE)
+
+# Extracts `last_activity_at` value for tie-breaking.
+_ACTIVITY_RE = re.compile(r'^last_activity_at:\s*["\']?([^"\'\s\n]+)["\']?\s*$', re.MULTILINE)
+
+# Validates ISO-like timestamps: must start with YYYY-MM-DDTHH:MM:SS.
+_ISO_TS_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+
+
+def _extract_planned_phases(text: str) -> list:
+    """Return the list of phase strings from the `planned_phases:` YAML block.
+
+    Parses raw YAML text without PyYAML (stdlib only).  Each list item is
+    expected to be on its own indented line starting with `- `.
+    Returns an empty list when the block is absent or unparseable.
+    """
+    m = _PLANNED_PHASES_RE.search(text)
+    if not m:
+        return []
+    items = []
+    for line in m.group(1).splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            item = stripped[2:].strip().strip("\"'")
+            if item:
+                items.append(item)
+    return items
+
+
+def _safe_ts(val: str) -> str:
+    """Return *val* if it looks like an ISO timestamp, else '' (sorts last).
+
+    Protects the lexicographic tie-break from malformed values such as
+    'notadate' whose ASCII ordering would incorrectly beat valid ISO strings
+    (e.g. 'n' > '2' in ASCII).
+    """
+    return val if _ISO_TS_RE.match(val) else ""
 
 
 # ---------------------------------------------------------------------------
@@ -194,20 +249,67 @@ def _append_pm_session(manifest: dict, entry: dict) -> dict:
 
 
 def find_active_session(project_dir: Path) -> Path | None:
-    """Return the most-recently-modified .agent-session/<task_id>/ directory.
+    """Return the session directory whose session.yml has current_owner == "pm".
 
-    Prefers the CLAUDE_PROJECT_DIR env var (already resolved into project_dir
-    by resolve_project_root) over the mtime-based heuristic.  The caller passes
-    project_dir from resolve_project_root which already honours CLAUDE_PROJECT_DIR,
-    so this function simply locates the most-recently-modified sub-directory.
+    Selection algorithm (stdlib-only, no PyYAML):
+      1. Iterates every subdirectory under .agent-session/.
+      2. For each candidate, reads session.yml as raw text.
+         FileNotFoundError and other IOErrors are silently skipped.
+      3. Qualifies a session when BOTH conditions hold:
+         a. current_owner field is exactly "pm" (multiline-anchored regex,
+            rejects comments, prefix matches, and typos like "pmx").
+         b. current_phase value is a member of the planned_phases list
+            (actual list extraction, not substring search).
+      4. If multiple sessions qualify, returns the one with the LATEST
+         last_activity_at (ISO 8601 lexicographic comparison).
+         Invalid/missing timestamps sort last so valid timestamps always win.
+      5. If no session qualifies, returns None — costs are NOT attributed
+         to an unknown session (AC-012, AC-013 preserved).
+
+    The mtime-based fallback is intentionally removed: attributing PM session
+    costs to an arbitrary session in multi-feature environments is a data
+    corruption bug (DEBT-002).
     """
     sessions_root = project_dir / ".agent-session"
     if not sessions_root.is_dir():
         return None
-    candidates = [p for p in sessions_root.iterdir() if p.is_dir()]
-    if not candidates:
+
+    qualifying: list[tuple[str, Path]] = []  # (last_activity_at, path)
+
+    for candidate in sessions_root.iterdir():
+        if not candidate.is_dir():
+            continue
+        session_yml = candidate / "session.yml"
+        try:
+            text = session_yml.read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            continue
+
+        # Condition a: current_owner must be exactly "pm" (line-anchored)
+        if not _OWNER_RE.search(text):
+            continue
+
+        # Condition b: current_phase must be a member of planned_phases list
+        phase_match = _PHASE_RE.search(text)
+        if not phase_match:
+            continue
+        current_phase_value = phase_match.group(1)
+        if current_phase_value not in _extract_planned_phases(text):
+            continue
+
+        # Extract last_activity_at for tie-breaking (invalid timestamps sort last)
+        activity_match = _ACTIVITY_RE.search(text)
+        last_activity = activity_match.group(1) if activity_match else ""
+
+        qualifying.append((_safe_ts(last_activity), candidate))
+
+    if not qualifying:
         return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+    # Return session with latest last_activity_at (ISO 8601 lexicographic sort).
+    # _safe_ts() ensures invalid timestamps become "" which sorts before valid ISO strings.
+    qualifying.sort(key=lambda t: t[0], reverse=True)
+    return qualifying[0][1]
 
 
 # ---------------------------------------------------------------------------

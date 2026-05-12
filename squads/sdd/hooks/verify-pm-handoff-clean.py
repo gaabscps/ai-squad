@@ -88,84 +88,99 @@ def _build_markdown_table(matches: list[dict]) -> str:
 
 
 def main() -> int:
+    _output_written = False
     try:
-        payload = json.load(sys.stdin)
-    except json.JSONDecodeError as exc:
-        print(
-            f"verify-pm-handoff-clean: malformed stdin ({exc})", file=sys.stderr
-        )
-        return 0
-
-    # Guard against infinite stop-hook loop.
-    if payload.get("stop_hook_active"):
-        return 0
-
-    project_dir = resolve_project_root(payload)
-
-    # -----------------------------------------------------------------------
-    # AC-003 / NFR-001: wrap scan in try/except + 4.5 s soft budget.
-    # On any exception or timeout → block with reason "scan_failed: <detail>".
-    # Never silently allow on scan error.
-    # -----------------------------------------------------------------------
-    _result: dict = {}
-    _exc: list[BaseException] = []
-
-    def _run_scan() -> None:
         try:
-            # Enumerate working tree files (git ls-files primary, rglob fallback).
-            # Excludes are applied inside enumerate_working_tree_files via _pm_shared.
-            files = enumerate_working_tree_files(project_dir)
+            payload = json.load(sys.stdin)
+        except json.JSONDecodeError as exc:
+            print(
+                f"verify-pm-handoff-clean: malformed stdin ({exc})", file=sys.stderr
+            )
+            _output_written = True  # intentional allow (malformed payload)
+            return 0
 
-            # Grep for debt markers across all enumerated files.
-            # Pass project_dir as root so exempt canonical sources are skipped.
-            matches = grep_debt_markers(files, [_DEBT_PATTERN], root=project_dir)
-            _result["matches"] = matches
-        except Exception as exc:  # noqa: BLE001
-            _exc.append(exc)
+        # Guard against infinite stop-hook loop.
+        if payload.get("stop_hook_active"):
+            _output_written = True  # intentional allow
+            return 0
 
-    scan_thread = threading.Thread(target=_run_scan, daemon=True)
-    scan_thread.start()
-    scan_thread.join(timeout=_SCAN_TIMEOUT_SECS)
+        project_dir = resolve_project_root(payload)
 
-    if scan_thread.is_alive():
-        # Timeout: scan thread is still running — block with scan_failed:timeout.
-        block = {
+        # -----------------------------------------------------------------------
+        # AC-003 / NFR-001: wrap scan in try/except + 4.5 s soft budget.
+        # On any exception or timeout → block with reason "scan_failed: <detail>".
+        # Never silently allow on scan error.
+        # -----------------------------------------------------------------------
+        _result: dict = {}
+        _exc: list[BaseException] = []
+
+        def _run_scan() -> None:
+            try:
+                # Enumerate working tree files (git ls-files primary, rglob fallback).
+                # Excludes are applied inside enumerate_working_tree_files via _pm_shared.
+                files = enumerate_working_tree_files(project_dir)
+
+                # Grep for debt markers across all enumerated files.
+                # Pass project_dir as root so exempt canonical sources are skipped.
+                matches = grep_debt_markers(files, [_DEBT_PATTERN], root=project_dir)
+                _result["matches"] = matches
+            except BaseException as exc:  # noqa: BLE001
+                _exc.append(exc)
+
+        scan_thread = threading.Thread(target=_run_scan, daemon=True)
+        scan_thread.start()
+        scan_thread.join(timeout=_SCAN_TIMEOUT_SECS)
+
+        if scan_thread.is_alive():
+            # Timeout: scan thread is still running — block with scan_failed:timeout.
+            block = {
+                "decision": "block",
+                "reason": "scan_failed: timeout — scan exceeded 4.5 s budget",
+            }
+            print(json.dumps(block))
+            _output_written = True  # intentional block
+            return 1
+
+        if _exc:
+            # Exception raised inside scan thread — block with scan_failed:<err>.
+            block = {
+                "decision": "block",
+                "reason": f"scan_failed: {type(_exc[0]).__name__}",
+            }
+            print(json.dumps(block))
+            _output_written = True  # intentional block
+            return 1
+
+        matches = _result.get("matches", [])
+
+        if not matches:
+            # AC-002: zero matches → allow Stop
+            _output_written = True  # intentional allow
+            return 0
+
+        # AC-001: one or more matches → block with evidence + markdown table reason
+        table = _build_markdown_table(matches)
+        reason = (
+            f"PM handoff blocked: {len(matches)} debt marker(s) found in working tree.\n\n"
+            f"Resolve all markers before emitting the final handoff:\n\n"
+            f"{table}"
+        )
+
+        decision = {
             "decision": "block",
-            "reason": "scan_failed: timeout — scan exceeded 4.5 s budget",
+            "evidence": matches,
+            "reason": reason,
         }
-        print(json.dumps(block))
+        print(json.dumps(decision))
+        _output_written = True
         return 0
-
-    if _exc:
-        # Exception raised inside scan thread — block with scan_failed:<err>.
-        block = {
-            "decision": "block",
-            "reason": f"scan_failed: {_exc[0]}",
-        }
-        print(json.dumps(block))
-        return 0
-
-    matches = _result.get("matches", [])
-
-    if not matches:
-        # AC-002: zero matches → allow Stop
-        return 0
-
-    # AC-001: one or more matches → block with evidence + markdown table reason
-    table = _build_markdown_table(matches)
-    reason = (
-        f"PM handoff blocked: {len(matches)} debt marker(s) found in working tree.\n\n"
-        f"Resolve all markers before emitting the final handoff:\n\n"
-        f"{table}"
-    )
-
-    decision = {
-        "decision": "block",
-        "evidence": matches,
-        "reason": reason,
-    }
-    print(json.dumps(decision))
-    return 0
+    finally:
+        if not _output_written:
+            print(json.dumps({
+                "decision": "block",
+                "reason": "scan_failed: hook terminated unexpectedly",
+            }))
+            sys.exit(1)
 
 
 if __name__ == "__main__":

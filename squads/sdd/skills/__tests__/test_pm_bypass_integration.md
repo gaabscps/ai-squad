@@ -381,23 +381,188 @@ Demonstrates that a crash between step 4.b (session.yml written) and step 4.c
 
 ---
 
+## Scenario 11 — Designer bypass REFUSED — [NEEDS CLARIFICATION] marker present (AC-025)
+
+### Given
+- `session.yml.auto_approved_by` is exactly `"pm"`.
+- `session.yml.current_phase` is `"plan"`.
+- `plan.md` contains at least one unresolved `[NEEDS CLARIFICATION]` marker,
+  e.g.:
+  ```
+  [NEEDS CLARIFICATION] What is the rollback strategy if the new API endpoint
+  fails in production?
+  ```
+- `session.yml.notes` is `[]` (empty list) before the scenario runs.
+- `plan.md` frontmatter `status` is `"draft"`.
+
+### When
+`/designer FEAT-TEST` executes and reaches Step 6.5 (PM-mode approval gate
+check).
+
+### Then
+
+**AC-025 — four assertions (all must hold):**
+
+1. **Bypass refused:** the Skill does NOT approve the artifact.
+   - `plan.md` `status` remains `"draft"` (unchanged).
+   - `plan.md` content is NOT modified by the bypass step.
+
+2. **Escalation record written:** `session.yml.notes` contains an entry
+   matching ALL of:
+   ```yaml
+   kind: pm_escalation
+   phase: "plan"
+   artifact_path: ".agent-session/FEAT-TEST/plan.md"
+   timestamp: <ISO8601 string — present and non-empty>
+   open_questions:
+     - "What is the rollback strategy if the new API endpoint fails in production?"
+   ```
+   The `open_questions` list MUST have one entry per `[NEEDS CLARIFICATION]`
+   block found in `plan.md`.
+
+3. **No AskUserQuestion raised** for the approval gate (bypass step exits after
+   writing the escalation record, without falling through to Step 7).
+
+4. **Escalation note surfaced:** the Skill outputs (to the PM persona / session
+   log): `"Approval blocked — open questions must be resolved before autonomous
+   approval."` (exact canonical text from `shared/concepts/pm-bypass.md`).
+
+**Negative contrast with Scenario 2 (happy path):** the only difference is
+the presence of the `[NEEDS CLARIFICATION]` marker in `plan.md`. All other
+session state is identical. This confirms the marker check is the gate trigger,
+not any other session state.
+
+---
+
+## Scenario 12 — Task-builder bypass REFUSED — [P]-violation in PM-mode (AC-026)
+
+### Given
+- `session.yml.auto_approved_by` is exactly `"pm"`.
+- `session.yml.current_phase` is `"tasks"`.
+- `spec.md` is `status: approved`.
+- `plan.md` is `status: approved`.
+- `tasks.md` contains two `[P]`-marked tasks (`T-010 [P]` and `T-011 [P]`)
+  whose `Files:` sets overlap: both declare `src/payments/processor.ts`.
+- Step 3 (PM-mode branch) inserts a `[NEEDS CLARIFICATION]` marker in `tasks.md`
+  before Step 9:
+  ```
+  [NEEDS CLARIFICATION] [P]-violation: T-010 shares write scope with T-011
+  (src/payments/processor.ts). Remove [P] from one or refactor Files: into
+  disjoint sets.
+  ```
+- `session.yml.notes` is `[]` before the scenario runs.
+
+### When
+`/task-builder FEAT-TEST` executes and reaches Step 9 (PM-mode approval gate
+check).
+
+### Then
+
+**AC-026 — five assertions (all must hold):**
+
+1. **Bypass refused:** the Skill does NOT approve `tasks.md`.
+   - `tasks.md` frontmatter `status` remains `"draft"` (unchanged).
+
+2. **Violation marker persists:** `tasks.md` still contains the string
+   `[NEEDS CLARIFICATION] [P]-violation` inserted by Step 3.
+
+3. **Escalation record written:** `session.yml.notes` contains an entry
+   matching ALL of:
+   ```yaml
+   kind: pm_escalation
+   phase: "tasks"
+   artifact_path: ".agent-session/FEAT-TEST/tasks.md"
+   timestamp: <ISO8601 string — present and non-empty>
+   open_questions:
+     - "[P]-violation: T-010 shares write scope with T-011 (src/payments/processor.ts). Remove [P] from one or refactor Files: into disjoint sets."
+   ```
+
+4. **No AskUserQuestion raised** for the approval gate (exits after escalation
+   record without falling through to human interaction).
+
+5. **Escalation note surfaced:** `"Approval blocked — open questions must be
+   resolved before autonomous approval."` (exact canonical text).
+
+**Marker ownership verified:** the `[NEEDS CLARIFICATION]` was produced by
+Step 3 (task-builder fan-out check), NOT by the bypass step itself. Step 9 is
+consumer-only; it reads markers, does not insert them.
+
+**Negative contrast with Scenario 3 (happy path):** identical session state
+except the `[P]`-violation overlap. Confirms the write-scope conflict check
+is the gate trigger.
+
+---
+
+## Scenario 13 — PM bypass advances current_phase to next planned phase (AC-027)
+
+### Given
+- Session fixture from Setup, with `current_phase: plan`.
+- `planned_phases: [specify, plan, tasks, implementation]` (four-phase list).
+- `spec.md` is `status: approved` (precondition for designer).
+- `plan.md` contains zero `[NEEDS CLARIFICATION]` markers.
+- AC Coverage Map in `plan.md` shows all ACs covered.
+- `session.yml.phase_history` does NOT contain `plan.approved_by`.
+
+### When
+`/designer FEAT-TEST` executes and the PM-mode bypass step (Step 6.5) runs to
+completion (all gates pass).
+
+### Then
+
+**AC-027 — three assertions (all must hold):**
+
+1. **`current_phase` advances to the list-derived next phase:**
+   `session.yml.current_phase` equals `"tasks"` after the bypass step.
+
+   This is the element at index `planned_phases.index("plan") + 1 = 2` in
+   `["specify", "plan", "tasks", "implementation"]`.
+
+2. **NOT hardcoded to `"implementation"`:**
+   If `planned_phases` were `[specify, plan, tasks]` (three-phase, no
+   implementation), the same bypass at `plan` phase MUST advance to `"tasks"`,
+   not `"implementation"`. The advance logic reads `planned_phases` dynamically.
+
+3. **Partial `planned_phases` variant — advance logic is list-lookup, not
+   string-switch:** given `planned_phases: [specify, plan, tasks]` (no
+   `implementation`), a successful `plan` bypass MUST set `current_phase` to
+   `"tasks"` (index 2), not crash, not skip to a hardcoded value.
+
+**Implementation assertion (to verify during qa review):** the bypass step MUST
+NOT contain any expression of the form `current_phase = "implementation"` or
+equivalent string literal. The advance MUST be implemented as:
+```
+next_index = planned_phases.index(current_phase) + 1
+session.current_phase = planned_phases[next_index]
+```
+or semantically equivalent dynamic lookup.
+
+**Contrast with Scenario 1 (specify to plan):** Scenario 1 verifies `specify`
+to `plan`. This scenario verifies `plan` to `tasks`. Together they confirm the
+generic list-lookup pattern across two consecutive transitions, ruling out a
+hardcoded two-entry table.
+
+---
+
 ## Assertions matrix (AC cross-reference)
 
-| Scenario | AC-009 | AC-010 | AC-011 | AC-012 |
-|----------|--------|--------|--------|--------|
-| 1 spec-writer happy path | PASS | PASS | — | — |
-| 2 designer happy path | PASS | PASS | — | — |
-| 3 task-builder happy path | PASS | PASS | — | — |
-| 4 auto_approved_by absent | — | — | PASS | — |
-| 5 NEEDS CLARIFICATION (spec-writer) | — | — | — | PASS |
-| 6 AC-coverage gap (designer) | — | — | — | PASS |
-| 7 [P]-violation (task-builder) | — | — | — | PASS |
-| 8 AC-coverage gap (task-builder) | — | — | — | PASS |
-| 9 re-entry guard | PASS (refused) | — | — | — |
-| 10 partial-write repair | PASS | PASS | — | — |
+| Scenario | AC-009 | AC-010 | AC-011 | AC-012 | AC-025 | AC-026 | AC-027 |
+|----------|--------|--------|--------|--------|--------|--------|--------|
+| 1 spec-writer happy path | PASS | PASS | — | — | — | — | — |
+| 2 designer happy path | PASS | PASS | — | — | — | — | — |
+| 3 task-builder happy path | PASS | PASS | — | — | — | — | — |
+| 4 auto_approved_by absent | — | — | PASS | — | — | — | — |
+| 5 NEEDS CLARIFICATION (spec-writer) | — | — | — | PASS | — | — | — |
+| 6 AC-coverage gap (designer) | — | — | — | PASS | — | — | — |
+| 7 [P]-violation (task-builder) | — | — | — | PASS | — | — | — |
+| 8 AC-coverage gap (task-builder) | — | — | — | PASS | — | — | — |
+| 9 re-entry guard | PASS (refused) | — | — | — | — | — | — |
+| 10 partial-write repair | PASS | PASS | — | — | — | — | — |
+| 11 designer [NEEDS CLARIFICATION] neg | — | — | — | — | PASS | — | — |
+| 12 task-builder [P]-violation neg | — | — | — | — | — | PASS | — |
+| 13 current_phase advance (list-lookup) neg | — | — | — | — | — | — | PASS |
 
-All four ACs (AC-009, AC-010, AC-011, AC-012) are covered by at least two
-scenarios each.
+All ACs (AC-009 through AC-012, AC-025 through AC-027) are covered by at least
+one scenario each; AC-009 through AC-012 are covered by two or more scenarios.
 
 ---
 

@@ -58,14 +58,34 @@ def _run_hook(payload: dict, *, project_dir: str) -> dict:
     return json.loads(stdout)
 
 
-def _make_session_dir(tmp: Path, feature_id: str = "FEAT-004") -> Path:
-    """Create .agent-session/<feature_id>/ with a minimal manifest."""
+def _make_session_dir(
+    tmp: Path,
+    feature_id: str = "FEAT-004",
+    owner: str = "pm",
+    phase: str = "implementation",
+    planned: list | None = None,
+) -> Path:
+    """Create .agent-session/<feature_id>/ with a minimal manifest AND session.yml.
+
+    Writes session.yml so that find_active_session() can qualify (or not) the
+    session based on owner/phase/planned_phases — matching the real runtime layout.
+    """
     session_dir = tmp / ".agent-session" / feature_id
     session_dir.mkdir(parents=True, exist_ok=True)
     manifest = _make_minimal_manifest()
     (session_dir / "dispatch-manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
+    planned_list = planned if planned is not None else ["specify", "plan", "tasks", "implementation"]
+    yml_lines = [
+        f'current_owner: "{owner}"\n',
+        f'current_phase: "{phase}"\n',
+        "planned_phases:\n",
+    ]
+    for p in planned_list:
+        yml_lines.append(f'  - "{p}"\n')
+    yml_lines.append('last_activity_at: "2026-05-11T01:00:00Z"\n')
+    (session_dir / "session.yml").write_text("".join(yml_lines), encoding="utf-8")
     return session_dir
 
 
@@ -403,6 +423,15 @@ class TestManifestMutation(unittest.TestCase):
             (session_dir / "dispatch-manifest.json").write_text(
                 json.dumps(v1_manifest, indent=2), encoding="utf-8"
             )
+            # session.yml required so find_active_session() can qualify the session
+            (session_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T01:00:00Z"\n',
+                encoding="utf-8",
+            )
             payload = {
                 "stop_hook_active": False,
                 "session_id": "pm-v1-test",
@@ -450,44 +479,86 @@ class TestManifestMutation(unittest.TestCase):
 # AC-013 — concurrency / atomic-write race resilience
 # ---------------------------------------------------------------------------
 
+
+def _run_concurrent_writes(n_threads: int, project_dir: str) -> set[str]:
+    """Run n_threads concurrent hook writes against project_dir.
+
+    Uses threading.Barrier(n_threads) so all threads start simultaneously,
+    maximising contention on the flock path.  Returns the set of session_ids
+    found in pm_sessions[] after all threads complete.
+
+    Raises AssertionError if any thread raised an exception.
+    """
+    barrier = threading.Barrier(n_threads)
+    session_ids = [f"pm-concurrent-{i}" for i in range(n_threads)]
+    errors: list[str] = []
+
+    def run_one(session_id: str) -> None:
+        try:
+            barrier.wait(timeout=10)  # synchronise start across all threads
+            payload = {
+                "stop_hook_active": False,
+                "session_id": session_id,
+                "usage": {
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+            }
+            _run_hook(payload, project_dir=project_dir)
+        except Exception as exc:
+            errors.append(f"{session_id}: {exc}")
+
+    threads = [threading.Thread(target=run_one, args=(sid,)) for sid in session_ids]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+
+    assert errors == [], f"Concurrent writes raised errors: {errors}"
+
+    session_dir_root = Path(project_dir) / ".agent-session"
+    # Find the first manifest that was written into
+    for candidate in session_dir_root.iterdir():
+        manifest_path = candidate / "dispatch-manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            return {s["session_id"] for s in manifest.get("pm_sessions", [])}
+    return set()
+
+
 class TestAtomicWrite(unittest.TestCase):
     """Concurrent hook invocations must not corrupt the manifest."""
 
-    def test_concurrent_writes_both_entries_written(self):
-        """Two concurrent hook runs must both append their entries (flock race)."""
+    def test_concurrent_writes_n2_both_entries_written(self):
+        """Two concurrent hook runs (n=2) must both append their entries (flock race)."""
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp = Path(tmp_str)
-            session_dir = _make_session_dir(tmp)
-            errors: list[str] = []
+            _make_session_dir(tmp)
+            ids = _run_concurrent_writes(2, tmp_str)
+            self.assertEqual(ids, {"pm-concurrent-0", "pm-concurrent-1"},
+                             f"n=2: expected both session IDs in manifest, got: {ids}")
 
-            def run_one(session_id: str) -> None:
-                try:
-                    payload = {
-                        "stop_hook_active": False,
-                        "session_id": session_id,
-                        "usage": {"input_tokens": 100, "output_tokens": 50,
-                                   "cache_creation_input_tokens": 0,
-                                   "cache_read_input_tokens": 0},
-                    }
-                    _run_hook(payload, project_dir=tmp_str)
-                except Exception as exc:
-                    errors.append(str(exc))
+    def test_concurrent_writes_n5_all_entries_written(self):
+        """Five concurrent hook runs (n=5) must all append their entries."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            _make_session_dir(tmp)
+            ids = _run_concurrent_writes(5, tmp_str)
+            expected = {f"pm-concurrent-{i}" for i in range(5)}
+            self.assertEqual(ids, expected,
+                             f"n=5: expected all 5 session IDs in manifest, got: {ids}")
 
-            t1 = threading.Thread(target=run_one, args=("pm-concurrent-A",))
-            t2 = threading.Thread(target=run_one, args=("pm-concurrent-B",))
-            t1.start()
-            t2.start()
-            t1.join(timeout=15)
-            t2.join(timeout=15)
-
-            self.assertEqual(errors, [], f"Concurrent run raised errors: {errors}")
-            manifest = json.loads(
-                (session_dir / "dispatch-manifest.json").read_text(encoding="utf-8")
-            )
-            sessions = manifest.get("pm_sessions", [])
-            ids = {s["session_id"] for s in sessions}
-            self.assertEqual(ids, {"pm-concurrent-A", "pm-concurrent-B"},
-                             f"Expected both session IDs in manifest, got: {ids}")
+    def test_concurrent_writes_n10_all_entries_written(self):
+        """Ten concurrent hook runs (n=10) must all append their entries."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            _make_session_dir(tmp)
+            ids = _run_concurrent_writes(10, tmp_str)
+            expected = {f"pm-concurrent-{i}" for i in range(10)}
+            self.assertEqual(ids, expected,
+                             f"n=10: expected all 10 session IDs in manifest, got: {ids}")
 
 
 # ---------------------------------------------------------------------------
@@ -1213,6 +1284,304 @@ class TestBothAbsentBaselineReconfirm(unittest.TestCase):
             result = _run_hook(payload, project_dir=tmp_str)
             self.assertEqual(result.get("decision", "allow"), "allow",
                              "No manifest + no handoff + no usage → must allow")
+
+
+# ---------------------------------------------------------------------------
+# AC-012 / AC-013 — find_active_session() direct unit tests (loop-2 fixes)
+# ---------------------------------------------------------------------------
+
+
+class _FindActiveSessionBase(unittest.TestCase):
+    """Shared setUpClass for find_active_session() unit-test classes.
+
+    Loads capture-pm-usage.py in-process and binds find_active_session to
+    cls._find_active_session so subclasses can call it without subprocess
+    overhead.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import importlib.util as _ilu
+        import sys as _sys
+
+        _hooks_dir = Path(__file__).resolve().parent.parent
+        if str(_hooks_dir) not in _sys.path:
+            _sys.path.insert(0, str(_hooks_dir))
+
+        spec = _ilu.spec_from_file_location(
+            "capture_pm_usage_fas",
+            str(_hooks_dir / "capture-pm-usage.py"),
+        )
+        mod = _ilu.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        cls._find_active_session = staticmethod(mod.find_active_session)
+
+
+class TestFindActiveSession(_FindActiveSessionBase):
+    """Direct tests for find_active_session() logic.
+
+    These tests import the function in-process to exercise the new
+    multiline-anchored owner regex, list-membership planned_phases check,
+    and ISO-validated tie-break (AC-012 + AC-013).
+    """
+
+    def test_pm_owner_session_found(self):
+        """Session with current_owner=pm is returned by find_active_session."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = _make_session_dir(tmp, owner="pm", phase="implementation")
+            result = self._find_active_session(tmp)
+            self.assertIsNotNone(result, "Expected a qualifying session for owner=pm")
+            self.assertEqual(result, session_dir)
+
+    def test_orchestrator_owner_not_found(self):
+        """Session with current_owner=orchestrator is NOT returned (AC-012)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            _make_session_dir(tmp, owner="orchestrator", phase="implementation")
+            result = self._find_active_session(tmp)
+            self.assertIsNone(result, "orchestrator-owned session must not qualify")
+
+    def test_tie_break_latest_activity_wins(self):
+        """Among two pm sessions, the one with the later last_activity_at wins (AC-012)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Earlier session
+            early_dir = tmp / ".agent-session" / "FEAT-early"
+            early_dir.mkdir(parents=True)
+            (early_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T01:00:00Z"\n',
+                encoding="utf-8",
+            )
+            # Later session
+            late_dir = tmp / ".agent-session" / "FEAT-late"
+            late_dir.mkdir(parents=True)
+            (late_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T12:00:00Z"\n',
+                encoding="utf-8",
+            )
+            result = self._find_active_session(tmp)
+            self.assertEqual(result, late_dir, "Latest last_activity_at must win tie-break")
+
+    def test_phase_not_in_planned_phases_not_found(self):
+        """Session where current_phase is not a member of planned_phases is excluded (AC-013)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            _make_session_dir(
+                tmp,
+                owner="pm",
+                phase="specify",
+                planned=["implementation"],  # "specify" NOT in planned
+            )
+            result = self._find_active_session(tmp)
+            self.assertIsNone(
+                result,
+                "Session where current_phase not in planned_phases must not qualify",
+            )
+
+    def test_malformed_timestamp_sorts_last(self):
+        """Malformed last_activity_at must not beat a valid ISO timestamp (AC-012)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            # Session with VALID timestamp
+            valid_dir = tmp / ".agent-session" / "FEAT-valid-ts"
+            valid_dir.mkdir(parents=True)
+            (valid_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T06:00:00Z"\n',
+                encoding="utf-8",
+            )
+            # Session with MALFORMED timestamp (lexicographically "z..." > "2...")
+            bad_dir = tmp / ".agent-session" / "FEAT-bad-ts"
+            bad_dir.mkdir(parents=True)
+            (bad_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "zzz-not-a-date"\n',
+                encoding="utf-8",
+            )
+            result = self._find_active_session(tmp)
+            self.assertEqual(
+                result,
+                valid_dir,
+                "Valid ISO timestamp must beat malformed timestamp in tie-break",
+            )
+
+    def test_owner_regex_no_false_positive_prefix(self):
+        """current_owner: pmx must NOT match (no trailing word boundary guard needed via anchor)."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = tmp / ".agent-session" / "FEAT-prefix"
+            session_dir.mkdir(parents=True)
+            (session_dir / "session.yml").write_text(
+                'current_owner: "pmx"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T01:00:00Z"\n',
+                encoding="utf-8",
+            )
+            result = self._find_active_session(tmp)
+            self.assertIsNone(result, 'current_owner: "pmx" must not qualify as pm')
+
+    def test_owner_regex_no_false_positive_comment(self):
+        """A YAML comment '# current_owner: pm' must not qualify the session."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            session_dir = tmp / ".agent-session" / "FEAT-comment"
+            session_dir.mkdir(parents=True)
+            (session_dir / "session.yml").write_text(
+                '# current_owner: "pm"\n'       # comment — must not match
+                'current_owner: "orchestrator"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T01:00:00Z"\n',
+                encoding="utf-8",
+            )
+            result = self._find_active_session(tmp)
+            self.assertIsNone(result, "YAML comment must not qualify session as pm-owned")
+
+
+# ---------------------------------------------------------------------------
+# AC-011 / AC-012 / AC-013 — find_active_session T-007 logic (dispatch d-084)
+# ---------------------------------------------------------------------------
+
+
+class TestFindActiveSessionT007(_FindActiveSessionBase):
+    """T-007 owner-based selection: AC-011, AC-012, AC-013.
+
+    These three tests pin the three branches of the new find_active_session
+    logic introduced in T-007:
+
+      AC-011 — only the session with current_owner=="pm" qualifies,
+               regardless of filesystem mtime order.
+      AC-012 — when multiple pm sessions exist, last_activity_at tiebreak
+               selects the most recent.
+      AC-013 — when no session has current_owner=="pm", returns None.
+    """
+
+    # -- AC-011 ----------------------------------------------------------------
+
+    def test_only_pm_owner_returned_regardless_of_mtime(self):
+        """AC-011: two sessions, only one current_owner==pm → that one returned.
+
+        The non-pm session intentionally has a newer filesystem mtime so the
+        test would fail if the implementation fell back to mtime ordering.
+        """
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+
+            # Non-pm session — orchestrator owner
+            other_dir = tmp / ".agent-session" / "FEAT-other"
+            other_dir.mkdir(parents=True)
+            (other_dir / "session.yml").write_text(
+                'current_owner: "orchestrator"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T23:59:00Z"\n',  # newer timestamp
+                encoding="utf-8",
+            )
+
+            # pm session — older timestamp
+            pm_dir = tmp / ".agent-session" / "FEAT-pm"
+            pm_dir.mkdir(parents=True)
+            (pm_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T01:00:00Z"\n',  # older timestamp
+                encoding="utf-8",
+            )
+
+            result = self._find_active_session(tmp)
+            self.assertEqual(
+                result,
+                pm_dir,
+                "AC-011: only the pm-owned session must be returned, "
+                f"regardless of mtime; got {result}",
+            )
+
+    # -- AC-012 ----------------------------------------------------------------
+
+    def test_two_pm_sessions_last_activity_at_tiebreak(self):
+        """AC-012: two pm sessions with different last_activity_at → more recent wins."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+
+            # Older pm session
+            early_dir = tmp / ".agent-session" / "FEAT-pm-early"
+            early_dir.mkdir(parents=True)
+            (early_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T08:00:00Z"\n',
+                encoding="utf-8",
+            )
+
+            # Newer pm session
+            late_dir = tmp / ".agent-session" / "FEAT-pm-late"
+            late_dir.mkdir(parents=True)
+            (late_dir / "session.yml").write_text(
+                'current_owner: "pm"\n'
+                'current_phase: "implementation"\n'
+                "planned_phases:\n"
+                '  - "implementation"\n'
+                'last_activity_at: "2026-05-11T20:00:00Z"\n',
+                encoding="utf-8",
+            )
+
+            result = self._find_active_session(tmp)
+            self.assertEqual(
+                result,
+                late_dir,
+                "AC-012: session with later last_activity_at must be returned; "
+                f"got {result}",
+            )
+
+    # -- AC-013 ----------------------------------------------------------------
+
+    def test_no_pm_owner_returns_none(self):
+        """AC-013: when no session has current_owner==pm, find_active_session returns None."""
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+
+            # Two sessions, neither owned by pm
+            for feat_id, owner in [("FEAT-dev", "dev"), ("FEAT-orch", "orchestrator")]:
+                d = tmp / ".agent-session" / feat_id
+                d.mkdir(parents=True)
+                (d / "session.yml").write_text(
+                    f'current_owner: "{owner}"\n'
+                    'current_phase: "implementation"\n'
+                    "planned_phases:\n"
+                    '  - "implementation"\n'
+                    'last_activity_at: "2026-05-11T10:00:00Z"\n',
+                    encoding="utf-8",
+                )
+
+            result = self._find_active_session(tmp)
+            self.assertIsNone(
+                result,
+                "AC-013: no pm-owned session present → find_active_session must return None; "
+                f"got {result}",
+            )
 
 
 if __name__ == "__main__":

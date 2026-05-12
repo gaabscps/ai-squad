@@ -68,6 +68,25 @@ For every `outputs/<dispatch_id>.json`: its `role` and `task_id` must match the 
 **Check 4 — Pipeline-stage coverage per task.**
 For every task that ended in state `done`: the corresponding output packets must include AT LEAST ONE `dev` (status `done`), AT LEAST ONE `code-reviewer` (status `done`), AT LEAST ONE `logic-reviewer` (status `done`), AND AT LEAST ONE `qa` (status `done`). Missing stage → finding `severity: blocker, audit_finding_kind: pipeline_stage_skipped`. (Tasks ending in `pending_human` are exempt from this check — incomplete by design.)
 
+**Check 4a — Reviewer `needs_review` gate (AC-009, AC-010).**
+Before emitting `bypass_detected` or `pipeline_stage_skipped` for a reviewer dispatch whose `status: needs_review`, apply this gate:
+
+1. Locate all qa dispatches in `actual_dispatches[]` for the SAME `task_id`.
+2. Determine ordering: prefer `started_at` timestamp comparison (ISO 8601 parse); fall back to lexicographic `dispatch_id` order as tie-break when timestamps are absent or unparseable.
+3. **If a qa dispatch exists that (a) has `status: done` AND (b) was started AFTER the reviewer dispatch:** mark `reviewer_done: true` for this task. Do NOT emit `bypass_detected` or `pipeline_stage_skipped` for the reviewer stage — the combination `needs_review + qa done` is treated as equivalent to a passing review.
+4. **If no such qa dispatch exists (no qa `done` after the reviewer `needs_review`):** mark `reviewer_done: false`. Emit one finding per offending reviewer dispatch:
+   ```
+   severity: minor
+   audit_finding_kind: incomplete_review
+   ref: dispatch-manifest.json#actual_dispatches[<dispatch_id>]
+   rationale: "reviewer <dispatch_id> returned needs_review but no subsequent qa done dispatch found for task <task_id>"
+   ```
+   Do NOT emit `bypass_detected` for this case — `incomplete_review` is a non-blocking advisory.
+
+> **Multi-loop clarification:** When a task has `needs_review` reviewer dispatches across multiple loops, the rule is satisfied if ANY `status: done` QA dispatch for the same task_id exists with `started_at` after the LATEST `needs_review` reviewer dispatch for that task_id. Earlier qa-done dispatches from prior loops do NOT satisfy a later needs_review.
+
+The `bypass_detected` blocker_kind is reserved ONLY for tasks where NEITHER `status: done` NOR the `needs_review + qa done` pattern is satisfied for the reviewer stage.
+
 **Check 5 — AC closure by qa.**
 Aggregate `ac_coverage` from every `qa` Output Packet. Every AC ID in `tasks.md`'s `AC covered:` fields (across all done tasks) must appear as a key in some qa packet's `ac_coverage`. Missing AC → finding `severity: blocker, audit_finding_kind: ac_not_validated`.
 
@@ -104,13 +123,15 @@ rationale: "Usage capture failed for dispatch <dispatch_id>: <reason>"
 ```
 If the file does not exist, this check passes silently.
 
-**Check 10 — PM gate violations (AC-017, AC-020).**
+**Check 10 — PM gate violations (AC-017, AC-020, AC-021).**
 *Precondition:* skip this check entirely when `dispatch-manifest.json.pm_sessions[]` is absent or empty (non-PM run — AC-020).
 
 When `pm_sessions[]` is populated: read `session.yml` (located at `.agent-session/<task_id>/session.yml`). **If `session.yml` is missing or unreadable** (any I/O or parse error), immediately emit `status: escalate, blocker_kind: contract_violation` with rationale `"session.yml missing or unreadable at <path>"` — do not continue to sub-steps below.
 
+**Pre-FEAT-004 session guard (AC-021):** If `session.yml.notes` is absent (key not present) or is not a list, skip Check 10 entirely — this is a pre-FEAT-004 session that predates the `pm_decision` notes schema. Do NOT emit any finding — absence of notes in a pre-FEAT-004 session is not a violation.
+
 Iterate every key in `session.yml.phase_history`. For each phase entry where `approved_by == "pm"`:
-1. Identify the artifact path the phase produced (the file recorded in `phase_history.<phase>.artifact_path`).
+1. Identify the artifact path the phase produced (the file recorded in `phase_history.<phase>.artifact_path`). **If `artifact_path` is null, absent, or an empty string `""` (AC-020):** log a warning and skip this phase entry — do NOT attempt string matching against a null or empty path (would cause TypeError or false match). Continue to the next phase entry.
 2. Scan `session.yml.notes` for all `pm_decision` YAML list items where `phase` matches the current phase key AND `artifact_path` equals the phase artifact path (exact string match). From the candidates collected by this `artifact_path` match, apply the timestamp constraint as follows:
    - **If `phase_history.<phase>.approved_at` is present and parses as valid ISO 8601:** filter candidates to those whose `timestamp` also parses as valid ISO 8601 and falls within ±60 seconds of `approved_at`. If multiple candidates remain after this filter, use the one with the LATEST (maximum) `timestamp`.
    - **If `phase_history.<phase>.approved_at` is absent:** skip the ±60s filter entirely (fail-open). Any candidate that matched phase + `artifact_path` is accepted. Additionally emit one `minor` finding per phase:
@@ -149,7 +170,14 @@ Collect all findings across all failing phases — do NOT short-circuit on the f
 
 When `pm_sessions[]` is populated:
 1. Read `session.yml.pm_cost_cap_usd`. If the field is absent or `null`, skip the budget check entirely and do NOT emit a finding — cap is opt-in only (AC-019). PM total cost still surfaces in the agentops report as an informational metric via the `## Cost by PM session` section (not this check's responsibility).
-2. If `pm_cost_cap_usd` is explicitly set to a value that is not null AND is a number (including `0` — an explicit cap of `0` means any cost over $0 is a violation): compute `total_cost = sum(pm_sessions[].usage.cost_usd)`. If `total_cost > pm_cost_cap_usd`, emit one finding:
+2. If `pm_cost_cap_usd` is explicitly set to a value that is not null AND is a number (including `0` — an explicit cap of `0` means any cost over $0 is a violation): compute `total_cost` using the defensive sum (AC-019):
+   ```python
+   total_cost = sum(
+       v if isinstance(v := (s.get("usage") or {}).get("cost_usd"), (int, float)) else 0
+       for s in pm_sessions if s is not None
+   )
+   ```
+   This guards against: `s` being `None` in the array, `usage` key absent, `cost_usd` key absent, `cost_usd` being `None`, and `cost_usd` being a non-numeric value — all treated as `0` rather than propagating through arithmetic. If `total_cost > pm_cost_cap_usd`, emit one finding:
 ```
 severity: major
 audit_finding_kind: pm_cost_cap_exceeded
@@ -237,7 +265,7 @@ Run this check **as part of** the Phase 4 sweep, **after** role-specific Output 
   - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
   - `escalate` — audit cannot run (manifest unreadable, outputs dir missing); orchestrator escalates to human
 - `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the 11 kinds below>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
-  - Universal kinds (Checks 1–9): `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `pm_session_not_captured`, `usage_not_captured`, `usage_capture_failed`, `warnings_file_corrupt`
+  - Universal kinds (Checks 1–9): `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `pm_session_not_captured`, `usage_not_captured`, `usage_capture_failed`, `warnings_file_corrupt`, `incomplete_review`
   - PM-mode kinds (Checks 10–11, emitted only when `pm_sessions[]` populated): `pm_gate_violations` (blocker/major/minor), `pm_cost_cap_exceeded` (major)
 - `evidence[]`: pointers to manifest entries and output packet files inspected
 - `notes`: ≤80 chars (schema constraint); brief pointer only — e.g. "Phase 4 gaps: see findings[N].note for full list"

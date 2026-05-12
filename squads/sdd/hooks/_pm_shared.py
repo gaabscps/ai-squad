@@ -11,6 +11,7 @@ Python 3.8+. No external dependencies (stdlib only).
 from __future__ import annotations
 
 import fcntl
+import fnmatch
 import json
 import os
 import re
@@ -47,7 +48,13 @@ _DEBT_MARKER_EXEMPT_PATHS: tuple[str, ...] = (
     "squads/sdd/skills/pm/",
     "squads/sdd/hooks/verify-pm-handoff-clean.py",
     "squads/sdd/hooks/_pm_shared.py",
-    "shared/concepts/pm-bypass.md",
+    # Avoid false positives when /pm runs on the ai-squad repo itself.
+    "docs/",
+    "shared/concepts/",
+    "squads/sdd/skills/",
+    "squads/sdd/hooks/__tests__/",
+    "squads/sdd/agents/__tests__/",
+    "squads/sdd/skills/__tests__/",
 )
 
 
@@ -185,11 +192,14 @@ def _is_exempt(file_path: Path, root: Path) -> bool:
     macOS symlinked tmp directories (``/var → /private/var``).
     """
     try:
-        rel = str(file_path.resolve().relative_to(root.resolve()))
+        rel = file_path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return False
     for prefix in _DEBT_MARKER_EXEMPT_PATHS:
-        if rel == prefix or rel.startswith(prefix):
+        if "*" in prefix or "?" in prefix:
+            if fnmatch.fnmatch(rel, prefix):
+                return True
+        elif rel == prefix or rel.startswith(prefix):
             return True
     return False
 
