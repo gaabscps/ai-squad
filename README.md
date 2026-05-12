@@ -87,7 +87,7 @@ The audit-agent ensures the pipeline wasn't bypassed — every task must produce
 - ✅ Dev task success rate (first-try vs looped)
 - ✅ Escalation rate (healthy band: < 10%)
 - ✅ Reviewer findings density (critical / major / minor)
-- ✅ Token usage and estimated cost per dispatch (when hooks are wired)
+- ✅ Token usage and estimated cost per dispatch — by model tier (Opus / Sonnet / Haiku) and by role
 - ✅ Wall-clock duration per phase
 
 After any SDD session, run `npx @ai-squad/agentops report` to generate `docs/agentops/index.html` with the full breakdown.
@@ -96,24 +96,45 @@ After any SDD session, run `npx @ai-squad/agentops report` to generate `docs/age
 
 ## Install
 
-**Requirements:** Node ≥ 18, Python 3.8+ on `PATH`. You use **Claude Code**, **Cursor**, or **Kiro** as the agent host — or any combination.
+**Requirements:** Node ≥ 18, Python 3.8+ on `PATH`. Works with **Claude Code**, **Cursor**, or **Kiro** as the agent host.
 
 ### npm (recommended)
 
 ```bash
+# Once per machine — installs the CLI and the report engine:
 npm i -g @ai-squad/cli @ai-squad/agentops
 
-ai-squad deploy                    # all squads → ~/.claude/   (Claude Code)
-# or: ai-squad deploy --squad sdd
-# or: ai-squad deploy --cursor     # also mirror hooks to ~/.cursor/
+# Once per project where you want ai-squad available:
+cd <your-project>
+ai-squad deploy
 ```
 
-After deploy, start with `/spec-writer "<your pitch>"` or `/discovery-lead "<your problem signal>"` in any project.
+After deploy:
+
+- **Skills + agents** → `~/.claude/{skills,agents}/` (shared across all your projects)
+- **Hooks** → `<your-project>/.claude/hooks/` (per-project, auto-added to `.gitignore`)
+
+Start with `/spec-writer "<your pitch>"` or `/discovery-lead "<your problem signal>"` in any deployed project.
+
+> **Why hooks per-project?** Hooks write cost, AC closure, and audit data into `.agent-session/`, and your agentops reports read from the same place. Shipping them next to the data they produce means the report always reflects the hook version that ran — no version drift, no guessing. It also lets different projects run different ai-squad versions side by side, and works in CI without a pre-seeded `$HOME`.
+
+### Generate reports
 
 ```bash
-# After running an SDD pipeline
+# After any SDD or Discovery session:
 npx @ai-squad/agentops report      # writes docs/agentops/index.html
 ```
+
+### Upgrading
+
+```bash
+npm i -g @ai-squad/cli@latest
+
+# In each project where ai-squad is deployed:
+cd <project> && ai-squad deploy --hooks-only
+```
+
+Skills + agents auto-update on any full `ai-squad deploy`. The `--hooks-only` shortcut skips that step when only the hooks need refreshing.
 
 ### From source (contributors / Cursor / Kiro)
 
@@ -227,7 +248,7 @@ squads/
   sdd/              🚢 SDD squad (Specify → Plan → Tasks → Build)
     skills/         4 conversational Skills
     agents/         6 autonomous Subagents (incl. audit-agent)
-    hooks/          7 Python hooks
+    hooks/          12 Python hooks (deployed per-project to <repo>/.claude/hooks/)
 packages/
   cli/              @ai-squad/cli — `ai-squad deploy` CLI
   agentops/         @ai-squad/agentops — session reports
