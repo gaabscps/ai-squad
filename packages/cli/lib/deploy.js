@@ -1,23 +1,32 @@
 /**
- * deploy — port of tools/deploy.sh in pure Node.js (ESM, stdlib only).
+ * deploy — install ai-squad components in two scopes:
+ *   - Skills + agents → ~/.claude/{skills,agents}/ (user-global, Claude Code
+ *     discovery via Skills user-level path)
+ *   - Hooks → <cwd>/.claude/hooks/ (per-repo, referenced via
+ *     $CLAUDE_PROJECT_DIR/.claude/hooks/X.py in subagent/skill frontmatter)
  *
- * Copies bundled squad components from packages/cli/components/<squad>/
- * into ~/.claude/{skills,agents,hooks}/ (flat — Claude Code has no
- * per-squad namespace; names must be globally unique within the bundle).
+ * Rationale: hooks are operational, low-trust scripts that should be
+ * (a) inspectable in the consuming repo, (b) versioned together with
+ * the agentops data they emit, and (c) deployable in CI without a
+ * pre-seeded $HOME. Skills+agents are declarative prompt content and
+ * can stay user-global without ergonomic loss.
  *
- * Hook scripts get chmod +x. Length warnings emitted for skills > 300 lines
- * and agents > 150 lines (system prompt budget for fan-out subagents).
+ * Hook scripts get chmod +x. The per-repo hook dir is appended to the
+ * repo's .gitignore (idempotent) so deployed scripts don't pollute git
+ * history; users re-run `ai-squad deploy` whenever they update the CLI.
  *
  * Cursor mirror (--cursor): copies *.py hooks to ~/.cursor/hooks/ai-squad/
- * and merges <squad>/hooks/cursor-hooks.json into ~/.cursor/hooks.json
- * (additive, deduped by command path).
+ * (still global — Cursor lacks per-project hook config) and merges
+ * <squad>/hooks/cursor-hooks.json into ~/.cursor/hooks.json (additive,
+ * deduped by command path).
  */
-import { chmod, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { appendFile, chmod, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 const SKILL_LINE_CAP = 300;
 const AGENT_LINE_CAP = 150;
+const GITIGNORE_BLOCK = '\n# ai-squad per-repo hook install (managed by `ai-squad deploy`)\n.claude/hooks/\n';
 
 async function exists(p) {
   try {
@@ -61,28 +70,23 @@ async function checkLength(file, cap, label) {
   }
 }
 
-async function deployClaudeCode({ componentsRoot, squads }) {
+async function deployClaudeCodeGlobal({ componentsRoot, squads }) {
   const home = homedir();
   const skillsDst = join(home, '.claude', 'skills');
   const agentsDst = join(home, '.claude', 'agents');
-  const hooksDst = join(home, '.claude', 'hooks');
 
   await mkdir(skillsDst, { recursive: true });
   await mkdir(agentsDst, { recursive: true });
-  await mkdir(hooksDst, { recursive: true });
 
-  console.log('ai-squad deploy (Claude Code)');
-  console.log(`  squads:  ${squads.join(', ')}`);
+  console.log('ai-squad deploy — Skills + Agents (user-global)');
   console.log(`  skills:  -> ${skillsDst}  (cap: ${SKILL_LINE_CAP} lines)`);
   console.log(`  agents:  -> ${agentsDst}  (cap: ${AGENT_LINE_CAP} lines)`);
-  console.log(`  hooks:   -> ${hooksDst}   (Python 3 stdlib; chmod +x preserved)`);
   console.log('');
 
   for (const squad of squads) {
     console.log(`[squad: ${squad}]`);
     const squadRoot = join(componentsRoot, squad);
 
-    // Skills (each is a directory with skill.md + optional resources)
     const skillsSrc = join(squadRoot, 'skills');
     for (const skill of await listDirs(skillsSrc)) {
       const src = join(skillsSrc, skill);
@@ -94,7 +98,6 @@ async function deployClaudeCode({ componentsRoot, squads }) {
       await cp(src, dst, { recursive: true });
     }
 
-    // Agents (flat *.md files)
     const agentsSrc = join(squadRoot, 'agents');
     for (const agentFile of await listFiles(agentsSrc, '.md')) {
       const src = join(agentsSrc, agentFile);
@@ -104,9 +107,21 @@ async function deployClaudeCode({ componentsRoot, squads }) {
       await checkLength(src, AGENT_LINE_CAP, agentFile);
       await cp(src, dst);
     }
+  }
+}
 
-    // Hooks (flat *.py files; chmod +x)
-    const hooksSrc = join(squadRoot, 'hooks');
+async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
+  const hooksDst = join(repoRoot, '.claude', 'hooks');
+  await mkdir(hooksDst, { recursive: true });
+
+  console.log('');
+  console.log('ai-squad deploy — Hooks (per-repo)');
+  console.log(`  hooks:   -> ${hooksDst}   (Python 3 stdlib; chmod +x preserved)`);
+  console.log('');
+
+  for (const squad of squads) {
+    console.log(`[squad: ${squad}]`);
+    const hooksSrc = join(componentsRoot, squad, 'hooks');
     for (const hookFile of await listFiles(hooksSrc, '.py')) {
       const src = join(hooksSrc, hookFile);
       const dst = join(hooksDst, hookFile);
@@ -117,8 +132,24 @@ async function deployClaudeCode({ componentsRoot, squads }) {
     }
   }
 
-  console.log('');
-  console.log('Done. ai-squad available in Claude Code.');
+  await ensureGitignore(repoRoot);
+}
+
+async function ensureGitignore(repoRoot) {
+  const gitignorePath = join(repoRoot, '.gitignore');
+  let existing = '';
+  try {
+    existing = await readFile(gitignorePath, 'utf8');
+  } catch {
+    // Gitignore absent — create it.
+  }
+  // Idempotent: skip if the managed block (or a manually-added match) already
+  // covers `.claude/hooks/`.
+  if (/^\s*\.claude\/hooks\/?\s*$/m.test(existing)) {
+    return;
+  }
+  await appendFile(gitignorePath, GITIGNORE_BLOCK, 'utf8');
+  console.log(`  [gitignore] appended .claude/hooks/ to ${gitignorePath}`);
 }
 
 async function deployCursor({ componentsRoot, squads }) {
@@ -180,7 +211,7 @@ async function deployCursor({ componentsRoot, squads }) {
   console.log('Done. ai-squad available in Cursor.');
 }
 
-export async function runDeploy({ pkgRoot, squads = [], cursor = false }) {
+export async function runDeploy({ pkgRoot, squads = [], cursor = false, repoRoot, globalOnly = false, hooksOnly = false }) {
   const componentsRoot = join(pkgRoot, 'components');
 
   if (!(await isDir(componentsRoot))) {
@@ -207,7 +238,25 @@ export async function runDeploy({ pkgRoot, squads = [], cursor = false }) {
     target = available;
   }
 
-  await deployClaudeCode({ componentsRoot, squads: target });
+  const repoRootResolved = repoRoot ?? process.cwd();
+
+  if (!hooksOnly) {
+    await deployClaudeCodeGlobal({ componentsRoot, squads: target });
+  }
+
+  if (!globalOnly) {
+    await deployHooksLocal({ componentsRoot, squads: target, repoRoot: repoRootResolved });
+  }
+
+  console.log('');
+  if (globalOnly) {
+    console.log('Done. Skills+agents installed globally. (skipped hooks — --global-only)');
+  } else if (hooksOnly) {
+    console.log(`Done. Hooks installed to ${repoRootResolved}/.claude/hooks/. (skipped skills+agents — --hooks-only)`);
+  } else {
+    console.log(`Done. Skills+agents in ~/.claude/, hooks in ${repoRootResolved}/.claude/hooks/.`);
+  }
+
   if (cursor) {
     await deployCursor({ componentsRoot, squads: target });
   }

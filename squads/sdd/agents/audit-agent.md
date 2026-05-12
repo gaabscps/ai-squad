@@ -11,15 +11,15 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/stamp-session-id.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
           timeout: 5
   Stop:
     - hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/verify-output-packet.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"
           timeout: 5
         - type: command
-          command: "python3 $HOME/.claude/hooks/capture-subagent-usage.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"
           timeout: 5
 ---
 
@@ -202,7 +202,7 @@ Run this sweep **after** the 11 reconciliation checks and **before** emitting th
 3. **If a file is found, re-validate it via the hook:**
    Run:
    ```
-   python3 squads/sdd/hooks/verify-output-packet.py --check-only <path>
+   python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" --check-only <path>
    ```
    Require exit 0. On non-zero exit the hook prints a structured JSON error to stdout — parse that JSON to extract the `error` field. Record a gap entry: `dispatch_id=<id> role=<role> — <error field from hook output>`.
 

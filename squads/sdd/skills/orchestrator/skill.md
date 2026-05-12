@@ -6,22 +6,22 @@ hooks:
     - matcher: "Edit|Write|MultiEdit"
       hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/guard-session-scope.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/guard-session-scope.py"
           timeout: 5
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/block-git-write.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/block-git-write.py"
           timeout: 5
     - matcher: "Task"
       hooks:
         - type: command
-          command: python3 "$CLAUDE_PROJECT_DIR/squads/sdd/hooks/verify-tier-calibration.py"
+          command: python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-tier-calibration.py"
           timeout: 5
   Stop:
     - hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/verify-audit-dispatch.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py"
           timeout: 5
 ---
 

@@ -6,9 +6,9 @@ hooks:
     - matcher: ""
       hooks:
         - type: command
-          command: python3 "$CLAUDE_PROJECT_DIR/squads/sdd/hooks/verify-pm-handoff-clean.py"
+          command: python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py"
         - type: command
-          command: python3 "$CLAUDE_PROJECT_DIR/squads/sdd/hooks/capture-pm-usage.py"
+          command: python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py"
           # runs after verify-pm-handoff-clean (debt-check first, capture second)
 ---
 

@@ -17,13 +17,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const args = { squads: [], cursor: false, force: false };
+  const args = { squads: [], cursor: false, force: false, globalOnly: false, hooksOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--squad' || a === '-s') {
       args.squads.push(argv[++i]);
     } else if (a === '--cursor') {
       args.cursor = true;
+    } else if (a === '--global-only') {
+      args.globalOnly = true;
+    } else if (a === '--hooks-only') {
+      args.hooksOnly = true;
+    } else if (a === '--repo-root') {
+      args.repoRoot = argv[++i];
     } else if (a === '--force' || a === '-f') {
       args.force = true;
     } else if (a === '--help' || a === '-h') {
@@ -40,22 +46,29 @@ function printUsage() {
   console.log(`ai-squad — Spec-Driven Development squads for Claude Code
 
 Usage:
-  ai-squad deploy [options]            Install squads to ~/.claude/
+  ai-squad deploy [options]            Install squads (skills+agents global, hooks per-repo)
   ai-squad help                        Show this help
 
 Options for deploy:
   --squad NAME, -s NAME    Deploy only the named squad (repeatable). Default: all.
   --cursor                 Also sync Cursor hooks to ~/.cursor/.
+  --global-only            Skip per-repo hook install (only deploy skills+agents).
+  --hooks-only             Skip global skills+agents install (only deploy hooks to current repo).
+  --repo-root PATH         Target repo for hook install (default: cwd).
   --force, -f              Overwrite existing components without prompting.
 
-Examples:
-  ai-squad deploy                      # all squads to Claude Code
-  ai-squad deploy --squad sdd          # only sdd
-  ai-squad deploy --cursor             # all squads + Cursor
+Deploy layout:
+  ~/.claude/skills/<skill>/             — user-global, shared across all repos
+  ~/.claude/agents/<agent>.md           — user-global
+  <repo>/.claude/hooks/<hook>.py        — per-repo, gitignored, referenced via
+                                          $CLAUDE_PROJECT_DIR/.claude/hooks/<X>.py
 
-After deploy, components are available globally: skills/agents in ~/.claude/skills,
-~/.claude/agents; Python hooks in ~/.claude/hooks (chmod +x). Subagent frontmatter
-references hooks via $HOME/.claude/hooks/<name>.py — no per-project setup.
+Examples:
+  ai-squad deploy                      # full install into current repo
+  ai-squad deploy --squad sdd          # only the sdd squad
+  ai-squad deploy --cursor             # full install + Cursor mirror
+  ai-squad deploy --global-only        # CI/dotfiles flow — skip per-repo hooks
+  cd <consumer-repo> && ai-squad deploy --hooks-only   # re-sync hooks only
 `);
 }
 

@@ -11,15 +11,15 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/stamp-session-id.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
           timeout: 5
   Stop:
     - hooks:
         - type: command
-          command: "python3 $HOME/.claude/hooks/verify-output-packet.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"
           timeout: 5
         - type: command
-          command: "python3 $HOME/.claude/hooks/capture-subagent-usage.py"
+          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"
           timeout: 5
 ---
 

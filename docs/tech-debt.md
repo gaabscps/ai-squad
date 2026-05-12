@@ -31,7 +31,7 @@ Catálogo de débitos técnicos identificados durante a execução das features.
 | [DEBT-010](#debt-010) | Test | Race de 2 threads sem Barrier em capture-pm-usage tests | P3 | S |
 | [DEBT-011](#debt-011) | Test | Cenários de integração under-asserted: designer/task-builder negative paths | P3 | M |
 | [DEBT-012](#debt-012) | Design | Cache cross-dispatch é arquiteturalmente limitado por fan-out | P3 | L |
-| [DEBT-013](#debt-013) | Infra | `$HOME/.claude/hooks/` defasado vs repo — sem sync mechanism | P1 | S |
+| ~~[DEBT-013](#debt-013)~~ | Infra | ~~`$HOME/.claude/hooks/` defasado vs repo~~ — **RESOLVIDO** em @ai-squad/cli 0.2.0 (per-repo hooks) | P1 | S |
 
 ---
 
@@ -318,10 +318,11 @@ Compartilhar exigiria unificar dev/reviewer/qa em uma única conversa, o que des
 
 ---
 
-### DEBT-013
+### DEBT-013 — RESOLVIDO (2026-05-12, @ai-squad/cli 0.2.0)
 
 **`$HOME/.claude/hooks/` defasado vs `squads/sdd/hooks/` — sem sync mechanism**
 
+- **Resolução:** Per-repo hook install via `ai-squad deploy`. Component frontmatter migrado para `$CLAUDE_PROJECT_DIR/.claude/hooks/`. Skills+agents continuam globais.
 - **Origem:** investigação de custos pós-FEAT-004 (2026-05-12)
 - **Arquivo:** `$HOME/.claude/hooks/capture-subagent-usage.py` (e outros)
 - **Prioridade:** P1
@@ -348,7 +349,7 @@ Os Subagents referenciam hooks via `$HOME/.claude/hooks/<nome>.py` no frontmatte
 
 Ordem sugerida de resolução independente:
 
-1. **DEBT-013** — P1 deploy gap que torna fixes recentes (AC-009/014) silenciosamente inativos
+1. ~~**DEBT-013**~~ — **RESOLVIDO em @ai-squad/cli 0.2.0**
 2. **DEBT-001** — P1 bug funcional que bloqueia uso real do ai-squad em si mesmo
 3. **DEBT-005** — P1 infra gap que degrada todo o pipeline (começa pela Opção A)
 4. **DEBT-006** — P2 desbloqueador: remove false-positives no audit-agent
@@ -357,6 +358,6 @@ Ordem sugerida de resolução independente:
 7. **DEBT-007** — P3 sync rápido entre Skills e canônico
 8. **DEBT-004 + DEBT-008 + DEBT-009** — P3 polish, qualquer ordem
 9. **DEBT-010 + DEBT-011** — P3 test hygiene, atacar junto
-10. **DEBT-012** — P3 só atacar depois de medir cache real pós-DEBT-013
+10. **DEBT-012** — P3 só atacar depois de medir cache real ≥3 sessões pós-DEBT-013
 
 > Cada item é independente e pode virar uma task isolada dentro de uma FEAT-005 ou ser atacado diretamente como hotfix dependendo do impacto.
