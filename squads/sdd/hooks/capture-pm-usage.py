@@ -368,7 +368,11 @@ def find_active_session(project_dir: Path) -> Path | None:
 
 
 def main() -> int:
-    _allow = {"decision": "allow"}
+    # Implicit allow for Stop hooks is an empty JSON object. Claude Code rejects
+    # {"decision": "allow"} because the `decision` field only accepts
+    # "approve" | "block"; "allow" is exclusive to `permissionDecision`
+    # (PreToolUse). Empty object = continue without instruction.
+    _allow: dict = {}
 
     # ---------- parse stdin --------------------------------------------------
     try:

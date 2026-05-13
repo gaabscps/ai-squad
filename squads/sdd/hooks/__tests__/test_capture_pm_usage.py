@@ -472,7 +472,9 @@ class TestManifestMutation(unittest.TestCase):
             if stdout:
                 parsed = json.loads(stdout)  # Must not raise
                 self.assertIsInstance(parsed, dict)
-                self.assertEqual(parsed.get("decision"), "allow")
+                # Implicit allow = empty dict (Claude Code rejects
+                # {"decision": "allow"}; decision only accepts approve|block).
+                self.assertNotIn("decision", parsed)
 
 
 # ---------------------------------------------------------------------------

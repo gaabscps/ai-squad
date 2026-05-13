@@ -602,7 +602,8 @@ def _verify_tier_calibration_for_task(
     if session_dir is None:
         # No session dir available — cannot verify.  Fail open (allow) so
         # dispatches outside a formal .agent-session context are not blocked.
-        return {"decision": "allow"}
+        # Empty dict = implicit allow (Claude Code rejects {"decision":"allow"}).
+        return {}
 
     # Step 2: read Tier from tasks.md (authoritative).
     task_tier = _read_task_tier(task_id, session_dir)
@@ -652,7 +653,7 @@ def _verify_tier_calibration_for_task(
 
     if canonical is None:
         # Unknown role or tier — cannot verify; fail open.
-        return {"decision": "allow"}
+        return {}
 
     canonical_model, canonical_effort = canonical
 
@@ -692,7 +693,7 @@ def _verify_tier_calibration_for_task(
     # Skipped when either is absent (AC-006 fallback path).
     if model and effort:
         if model == canonical_model and effort == canonical_effort:
-            return {"decision": "allow"}
+            return {}
 
         expected_str = f"{canonical_model}, {canonical_effort}"
         got_str = f"{model}, {effort}"
@@ -704,7 +705,7 @@ def _verify_tier_calibration_for_task(
             ),
         }
 
-    return {"decision": "allow"}
+    return {}
 
 
 # ---------------------------------------------------------------------------

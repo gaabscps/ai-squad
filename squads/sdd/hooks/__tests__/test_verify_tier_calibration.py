@@ -736,7 +736,7 @@ subagent_type: {subagent_type}
     def test_correct_calibration_dev_l1_t4_allows(self):
         """sonnet+high for dev L1 T4 → canonical match → allow."""
         result = self._run_verify("T-009", "sonnet", "high", "T4", "dev")
-        self.assertEqual(result["decision"], "allow", f"Unexpected block: {result}")
+        self.assertNotIn("decision", result, f"Unexpected block: {result}")
 
     def test_incorrect_calibration_dev_l1_t4_blocks(self):
         """opus+high for dev L1 T4 → canonical is sonnet+high → block."""
@@ -754,7 +754,7 @@ subagent_type: {subagent_type}
     def test_correct_calibration_dev_l1_t1_haiku_high(self):
         """haiku+high for dev L1 T1 → canonical match → allow."""
         result = self._run_verify("T-001", "haiku", "high", "T1", "dev")
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_mismatch_dev_l1_t1_sonnet_blocks(self):
         """sonnet+high for dev L1 T1 → canonical is haiku+high → block."""
@@ -773,27 +773,27 @@ subagent_type: {subagent_type}
         session_dir, _ = _write_temp_files("T-001", "T4", dispatches)
         result = self._run_verify("T-001", "opus", "high", "T4", "dev",
                                   dispatches=dispatches, session_dir=session_dir)
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_code_reviewer_t3_sonnet_medium_allows(self):
         """sonnet+medium for code-reviewer T3 → canonical match → allow."""
         result = self._run_verify("T-001", "sonnet", "medium", "T3", "code-reviewer")
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_logic_reviewer_t4_opus_high_allows(self):
         """opus+high for logic-reviewer T4 → canonical match → allow."""
         result = self._run_verify("T-001", "opus", "high", "T4", "logic-reviewer")
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_qa_t4_sonnet_high_allows(self):
         """sonnet+high for qa T4 → canonical match → allow."""
         result = self._run_verify("T-001", "sonnet", "high", "T4", "qa")
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_qa_t1_haiku_high_allows(self):
         """haiku+high for qa T1 → canonical match → allow."""
         result = self._run_verify("T-001", "haiku", "high", "T1", "qa")
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
 
 # ===========================================================================
@@ -1132,7 +1132,7 @@ class TestAC005ManifestMalformedAndL2Block(unittest.TestCase):
             session_dir=session_dir,
         )
         # No prior dispatches → dev L1; sonnet+medium for T2 is canonical → allow
-        self.assertEqual(result["decision"], "allow", f"Unexpected block: {result}")
+        self.assertNotIn("decision", result, f"Unexpected block: {result}")
 
     def test_malformed_manifest_blocks(self):
         """Manifest exists but contains invalid JSON → block with manifest_malformed."""
@@ -1240,7 +1240,7 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
         result = self._run_verify_with_tool_model(
             "T-001", "T1", "qa", tool_model=None,
         )
-        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+        self.assertNotIn("decision", result, f"Got: {result}")
 
     def test_tool_model_empty_string_blocks_with_missing_reason(self):
         """tool_model='' (param omitted by orchestrator) → block: task_tool_model_missing."""
@@ -1274,14 +1274,14 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
         result = self._run_verify_with_tool_model(
             "T-001", "T1", "qa", tool_model="haiku",
         )
-        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+        self.assertNotIn("decision", result, f"Got: {result}")
 
     def test_tool_model_case_insensitive(self):
         """Uppercase tool_model should normalize → 'HAIKU' matches canonical 'haiku'."""
         result = self._run_verify_with_tool_model(
             "T-001", "T1", "qa", tool_model="HAIKU",
         )
-        self.assertEqual(result["decision"], "allow", f"Got: {result}")
+        self.assertNotIn("decision", result, f"Got: {result}")
 
     def test_tool_model_mismatch_dev_l1_t2(self):
         """dev L1 T2 canonical=sonnet, tool_model=opus → block."""
@@ -1296,7 +1296,7 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
         result = self._run_verify_with_tool_model(
             "T-001", "T3", "dev", tool_model="sonnet",
         )
-        self.assertEqual(result["decision"], "allow")
+        self.assertNotIn("decision", result)
 
     def test_tool_model_with_workpacket_compare_both_must_match(self):
         """Work Packet model+effort populated AND tool_model populated → both checked.
@@ -1312,7 +1312,7 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
             subagent_type="qa", prompt=prompt,
             tool_model="haiku", session_dir=session_dir,
         )
-        self.assertEqual(ok["decision"], "allow")
+        self.assertNotIn("decision", ok)
 
         # tool_model wrong, WP right → block on tool_model
         bad_tool = _verify_tier_calibration_for_task(

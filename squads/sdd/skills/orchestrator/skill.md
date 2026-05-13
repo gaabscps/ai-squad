@@ -21,7 +21,7 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py"
+          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py"'
           timeout: 5
 ---
 
@@ -32,6 +32,31 @@ The Skill that runs the autonomous Implementation Pipeline. Dispatches the 6 Sub
 **Sole writer invariant:** in Phase 4, the orchestrator is the only Skill that writes `session.yml`. Subagents return Output Packets; the orchestrator reads them, merges state, and atomically rewrites `session.yml` (tmp + rename). This eliminates concurrent-write races without file locks (Buck2's single-coordinator pattern).
 
 **Non-edit invariant (issue #1 mitigation):** the orchestrator MUST NOT edit any consumer-repo source file. Its only writes are to `.agent-session/<task_id>/` (manifest, inputs, session.yml). All source edits flow through `dev` Subagent dispatches. The `audit-agent` (step 8 below) verifies this mechanically before handoff.
+
+## Preflight: verify ai-squad hooks installed (RUN BEFORE ANYTHING ELSE)
+
+Phase 4 dispatches subagents whose PreToolUse/PostToolUse/Stop hooks live in `$CLAUDE_PROJECT_DIR/.claude/hooks/`. PreToolUse hooks (`guard-session-scope`, `block-git-write`, `verify-tier-calibration`) are **not** wrapped fail-open — a missing file there would still crash. Stop hooks are wrapped fail-open as defense in depth, but missing them blinds the audit-agent and usage capture. Refuse to proceed without them.
+
+As your **first action**, run this Bash check exactly once per fresh invocation:
+
+```sh
+required="verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py"
+missing=""
+for f in $required; do
+  [ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/$f" ] || missing="$missing $f"
+done
+if [ -n "$missing" ]; then
+  printf 'MISSING_HOOKS:%s\n' "$missing"
+  printf 'Run in this repo: ai-squad deploy --hooks-only  (or: npx @ai-squad/cli deploy --hooks-only)\n'
+  exit 1
+fi
+echo "hooks-ok"
+```
+
+- `hooks-ok` → proceed to "Refuse when" section below.
+- `MISSING_HOOKS:` → **STOP immediately**, surface the exact missing list and the deploy command to the human/PM. Never start dispatching subagents without these hooks. Do not invent workarounds.
+
+Skip this check on `--resume` after the first turn of the same Session has confirmed it.
 
 ## When to invoke
 - `/orchestrator FEAT-NNN` — fresh start of Phase 4.

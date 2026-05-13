@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — 2026-05-13
+
+### Bug fixes
+
+- **Stop hooks emitiam `{"decision": "allow"}` — JSON rejeitado pelo Claude Code (Issue #3)**
+  O Claude Code v2.1.140+ valida output de hook contra um schema estrito: `decision` aceita apenas `"approve" | "block"`. O valor `"allow"` é exclusivo de `permissionDecision` (PreToolUse), não de `decision`. Vários hooks ai-squad emitiam `{"decision": "allow"}` em caminhos de "fail-open" (allow continuar), causando `Hook JSON output validation failed` no transcript e, em alguns casos, interrupção do fluxo. Corrigido em `capture-pm-usage.py` (5 sites de output) e `verify-tier-calibration.py` (4 returns internos). A forma canônica de implicit allow agora é `{}` (empty JSON object), sempre schema-válido.
+
+- **`/pm` e `/orchestrator` entravam em loop infinito em repos sem hooks per-repo instalados (Issue #3 parte 2)**
+  Quando o consumer repo não tinha `.claude/hooks/` populado (deploy nunca rodado), os Stop hooks chamavam `python3` em arquivos inexistentes. O `python3` retornava exit code 2 (`No such file or directory`), o Claude Code interpretava como "Stop bloqueado", tentava finalizar de novo, e travava em loop. Duas correções combinadas:
+  - **Wrapper resiliente em todos os Stop hooks** (15 commands em 8 arquivos — `pm`, `orchestrator`, 6 subagents): `command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/X.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/X.py"'`. Se o arquivo existe, o exit code do `python3` propaga (bloqueios legítimos preservados). Se ausente, `exit 0` = fail-open. `PreToolUse`/`PostToolUse` intencionalmente não foram envolvidos (silenciar `block-git-write` ou `guard-session-scope` seria uma armadilha de segurança).
+  - **Pre-flight check em `/pm` e `/orchestrator`**: antes de qualquer ação, o agente roda um bash que valida a presença dos hooks esperados em `$CLAUDE_PROJECT_DIR/.claude/hooks/`. Se algum faltar, aborta com `MISSING_HOOKS: ...` + `Run: ai-squad deploy --hooks-only`. Evita degradação silenciosa de observabilidade quando o deploy foi esquecido.
+
 ## 0.3.0 — 2026-05-12
 
 ### Bug fixes

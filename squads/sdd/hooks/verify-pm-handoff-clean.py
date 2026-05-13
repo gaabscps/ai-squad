@@ -17,8 +17,10 @@ Output JSON contract (Claude Code hook):
 When blocking: reason is a markdown table (NFR-003) listing every match as
   | file:line | marker | snippet |
 
-When allowing: emits {} (empty stdout — Claude Code treats empty stdout as
-implicit allow; explicit {"decision":"allow"} is also accepted).
+When allowing: emits {} (empty JSON object — Claude Code treats it as implicit
+allow). Never emit {"decision":"allow"} — the Stop schema rejects "allow" as a
+decision value (only "approve" | "block" are valid; "allow" is exclusive to
+permissionDecision on PreToolUse).
 
 Honors `stop_hook_active` to avoid infinite blocking loops.
 
