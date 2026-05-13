@@ -23,17 +23,23 @@ The `/pm` pipeline relies on Stop / PreToolUse / PostToolUse hooks resolved rela
 As your **first action**, run this Bash check exactly once:
 
 ```sh
+# Resolve repo root robustly. Claude Code does not always export
+# $CLAUDE_PROJECT_DIR into Bash tool calls (only into hook subshells), so
+# falling back to git rev-parse / pwd avoids false-positive "MISSING_HOOKS".
+repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+hooks_dir="$repo_root/.claude/hooks"
 required="verify-pm-handoff-clean.py capture-pm-usage.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py"
 missing=""
 for f in $required; do
-  [ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/$f" ] || missing="$missing $f"
+  [ -f "$hooks_dir/$f" ] || missing="$missing $f"
 done
 if [ -n "$missing" ]; then
   printf 'MISSING_HOOKS:%s\n' "$missing"
+  printf 'Checked under: %s\n' "$hooks_dir"
   printf 'Run in this repo: ai-squad deploy --hooks-only  (or: npx @ai-squad/cli deploy --hooks-only)\n'
   exit 1
 fi
-echo "hooks-ok"
+echo "hooks-ok (under $hooks_dir)"
 ```
 
 - If output is `hooks-ok` → proceed.
