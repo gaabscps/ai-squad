@@ -217,6 +217,9 @@ export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
       loop,
       pmNote,
     };
+    if (typeof raw.task_id === 'string' && raw.task_id.length > 0) {
+      dispatchEntry.taskId = raw.task_id;
+    }
     if (usage !== undefined) {
       dispatchEntry.usage = attachCostUsd(usage);
     }

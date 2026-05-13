@@ -100,6 +100,13 @@ export function makeProgram(): Command {
           // eslint-disable-next-line no-console
           console.log('[agentops] Hook already present.');
         }
+        // eslint-disable-next-line no-console
+        console.log(
+          '[agentops] note: for the full SDD framework (Python pipeline guards + ' +
+            'subagent usage capture + tier-calibration enforcement), run ' +
+            '`ai-squad deploy` from @ai-squad/cli — it covers this hook and the ' +
+            'rest in one step.',
+        );
       } catch (err) {
         if (err instanceof SyntaxError) {
           process.stderr.write(`[agentops] error: malformed settings file: ${err.message}\n`);

@@ -33,16 +33,19 @@ import { mergeFiles, mergeAcs, mergeTasks } from './merge';
 export function aggregateBatchesFromSession(session: Session): BatchData[] {
   if (session.dispatches.length === 0) return [];
 
-  // Build lookup: batchId → pipeline entry (for title, acScope, tasksCovered)
+  // Build lookup: groupKey → pipeline entry (for title, acScope, tasksCovered).
+  // Pipeline entries may be keyed by batchId (legacy) or taskId (current SDD manifests).
   const pipelineByBatch = new Map<string, (typeof session.expectedPipeline)[0]>();
   for (const entry of session.expectedPipeline) {
     if (entry.batchId) pipelineByBatch.set(entry.batchId, entry);
+    if (entry.taskId) pipelineByBatch.set(entry.taskId, entry);
   }
 
-  // Group dispatches by batchId
+  // Group dispatches by taskId when present (current manifests), falling back to
+  // extractBatchId(dispatchId) for legacy manifests and virtual dispatches.
   const batchMap = new Map<string, typeof session.dispatches>();
   for (const dispatch of session.dispatches) {
-    const batchId = extractBatchId(dispatch.dispatchId);
+    const batchId = dispatch.taskId ?? extractBatchId(dispatch.dispatchId);
     if (!batchMap.has(batchId)) batchMap.set(batchId, []);
     batchMap.get(batchId)!.push(dispatch);
   }
@@ -120,14 +123,29 @@ export function aggregateBatchesFromSession(session: Session): BatchData[] {
 
       // Dispatch row
       const loop = dispatch.loop;
-      dispatchRows.push({
+      const row: BatchDispatchRow = {
         dispatchId: dispatch.dispatchId,
         role: dispatch.role,
         loop,
         durationMs: typeof durationMsDispatch === 'number' ? durationMsDispatch : null,
         totalTokens: typeof totalTokens === 'number' ? totalTokens : null,
         status: dispatch.status,
-      });
+      };
+      // Report rule: real data only.
+      // - model: from usage.model (what actually ran). tier_calibration.model
+      //   records the *requested* model and can diverge from the runtime
+      //   (Claude Code may ignore the param), so it's not authoritative here.
+      // - effort: from tier_calibration.effort. There is no post-hoc effort
+      //   reported by the runtime, so the dispatch-time config IS the data.
+      const actualModel = dispatch.usage?.model;
+      if (actualModel && actualModel !== 'unknown') {
+        row.model = actualModel;
+      }
+      if (dispatch.tierCalibration?.effort) row.effort = dispatch.tierCalibration.effort;
+      const dispatchCost =
+        dispatch.usage?.cost_usd !== undefined ? asNumber(dispatch.usage.cost_usd) : null;
+      if (dispatchCost !== null) row.costUsd = dispatchCost;
+      dispatchRows.push(row);
 
       // Max loop
       const loopNum = loop ?? 0;

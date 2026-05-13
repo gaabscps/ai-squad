@@ -42,6 +42,7 @@ function makeSession(
       loop: d.loop ?? null,
       pmNote: d.pmNote ?? null,
       usage: d.usage,
+      ...(d.taskId !== undefined ? { taskId: d.taskId } : {}),
     })),
     acs: [],
     qaResults: [],
@@ -237,3 +238,112 @@ describe('aggregateBatchesFromSession — FEAT-001 BATCH-A like fixture', () => 
 });
 
 // Title fallback tests (AC-001) are in aggregator-cost-and-pipeline.test.ts
+
+// ---------------------------------------------------------------------------
+// Tests: task-id grouping (current SDD manifest format)
+// ---------------------------------------------------------------------------
+
+describe('aggregateBatchesFromSession — task-id grouping (d-T-NNN-role-lN dispatches)', () => {
+  const pipeline: Session['expectedPipeline'] = [
+    {
+      taskId: 'T-001',
+      title: 'Foundational hook',
+      acScope: ['NFR-003'],
+      tasksCovered: ['T-001'],
+      requiredRoles: ['dev', 'code-reviewer', 'qa'],
+    },
+    {
+      taskId: 'T-002',
+      title: 'Item component',
+      acScope: ['AC-004', 'AC-005'],
+      tasksCovered: ['T-002'],
+      requiredRoles: ['dev', 'code-reviewer', 'qa'],
+    },
+  ];
+
+  const session = makeSession(
+    [
+      {
+        dispatchId: 'd-T-001-dev-l1',
+        role: 'dev',
+        status: 'done',
+        startedAt: '2026-05-13T00:00:00.000Z',
+        completedAt: '2026-05-13T00:10:00.000Z',
+        loop: 1,
+        taskId: 'T-001',
+      },
+      {
+        dispatchId: 'd-T-001-code-reviewer-l1',
+        role: 'code-reviewer',
+        status: 'done',
+        startedAt: '2026-05-13T00:11:00.000Z',
+        loop: 1,
+        taskId: 'T-001',
+      },
+      {
+        dispatchId: 'd-T-002-dev-l1',
+        role: 'dev',
+        status: 'done',
+        startedAt: '2026-05-13T00:20:00.000Z',
+        completedAt: '2026-05-13T00:30:00.000Z',
+        loop: 1,
+        taskId: 'T-002',
+      },
+      {
+        dispatchId: 'd-T-002-qa-l1',
+        role: 'qa',
+        status: 'done',
+        startedAt: '2026-05-13T00:31:00.000Z',
+        loop: 1,
+        taskId: 'T-002',
+      },
+    ],
+    pipeline,
+  );
+
+  let result: ReturnType<typeof aggregateBatchesFromSession>;
+
+  beforeAll(() => {
+    result = aggregateBatchesFromSession(session);
+  });
+
+  it('produces one batch per task (not collapsed into D-T)', () => {
+    expect(result).toHaveLength(2);
+    expect(result.map((b) => b.batchId)).toEqual(['T-001', 'T-002']);
+  });
+
+  it('looks up titles from expectedPipeline by taskId', () => {
+    expect(result[0]?.title).toBe('Foundational hook');
+    expect(result[1]?.title).toBe('Item component');
+  });
+
+  it('keeps each task’s dispatches together (T-001 has 2, T-002 has 2)', () => {
+    expect(result[0]?.dispatches).toHaveLength(2);
+    expect(result[1]?.dispatches).toHaveLength(2);
+  });
+
+  it('falls back to extractBatchId when dispatch.taskId is absent (legacy manifest)', () => {
+    const legacy = makeSession(
+      [
+        {
+          dispatchId: 'd-T-003-dev-l1',
+          role: 'dev',
+          status: 'done',
+          startedAt: '2026-05-13T01:00:00.000Z',
+          loop: 1,
+        },
+        {
+          dispatchId: 'd-T-004-dev-l1',
+          role: 'dev',
+          status: 'done',
+          startedAt: '2026-05-13T01:10:00.000Z',
+          loop: 1,
+        },
+      ],
+      [],
+    );
+    const out = aggregateBatchesFromSession(legacy);
+    expect(out.map((b) => b.batchId)).toEqual(['T-003', 'T-004']);
+  });
+});
+

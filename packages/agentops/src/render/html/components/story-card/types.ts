@@ -14,6 +14,16 @@ export interface BatchDispatchRow {
   durationMs: number | null;
   totalTokens: number | null;
   status: DispatchStatus;
+  /** From usage.model — what actually ran. Undefined when no usage was captured. */
+  model?: string;
+  /**
+   * From tier_calibration.effort — the effort parameter the orchestrator
+   * dispatched with. There is no "actual effort" reported back from the model
+   * runtime, so this is the only real signal for the effort dimension.
+   */
+  effort?: string;
+  /** From usage.cost_usd — undefined when the dispatch has no captured usage. */
+  costUsd?: number;
 }
 
 /** Replaces the legacy BatchData from ../story-card.ts (deleted in T-016). */

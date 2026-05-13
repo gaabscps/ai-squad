@@ -3,6 +3,15 @@ import path from 'path';
 
 import type { ClaudeHookEntry, ClaudeSettings } from './types';
 
+/**
+ * Stop hook — invokes `agentops capture` after a session, which regenerates
+ * the HTML report from `.agent-session/<task_id>/` artifacts.
+ *
+ * NOTE: For the full SDD framework (hooks + subagent usage capture + tier
+ * calibration enforcement), prefer `ai-squad deploy` from @ai-squad/cli —
+ * it covers this hook plus the Python pipeline guards in one step. This
+ * command remains for standalone agentops use cases.
+ */
 export const HOOK_COMMAND = 'npx @ai-squad/agentops capture';
 
 /**
@@ -63,7 +72,7 @@ async function detectWorktreeMainRoot(cwd: string): Promise<string | null> {
 
 /**
  * Read + merge + write a single settings file idempotently.
- * Returns true if the hook was actually inserted (new install), false if already present.
+ * Returns true if the Stop hook was newly inserted, false if already present.
  */
 async function installHookToSettings(settingsPath: string): Promise<boolean> {
   let settings: ClaudeSettings = {};
@@ -78,15 +87,10 @@ async function installHookToSettings(settingsPath: string): Promise<boolean> {
   }
 
   if (!settings.hooks) settings.hooks = {};
-  if (!settings.hooks.Stop) settings.hooks.Stop = [];
-
-  const stopHooks = settings.hooks.Stop;
-
-  // Idempotency check
+  const stopHooks = (settings.hooks.Stop ??= []);
   if (stopHooks.some((h: ClaudeHookEntry) => h.hooks?.some((c) => c.command === HOOK_COMMAND))) {
     return false;
   }
-
   stopHooks.push({ matcher: '', hooks: [{ type: 'command', command: HOOK_COMMAND }] });
 
   const dir = path.dirname(settingsPath);

@@ -31,13 +31,35 @@ describe('computeBatchState', () => {
     expect(computeBatchState(dispatches)).toBe('done');
   });
 
-  // AC-002 table (b): all done, loops > 0 → done-retried
-  it('returns done-retried when all dispatches done but loop > 0 present', () => {
+  // AC-002 table (b): all done, max loop > 1 → done-retried
+  it('returns done-retried when all dispatches done but loop > 1 present', () => {
     const dispatches = [
       d('dev', 'done', { loop: null }),
       d('dev', 'done', { loop: 2 }),
       d('code-reviewer', 'done', { loop: null }),
       d('qa', 'done', { loop: null }),
+    ];
+    expect(computeBatchState(dispatches)).toBe('done-retried');
+  });
+
+  // Current SDD format: loop = 1 is L1 (first attempt), not a retry
+  it('returns done (not done-retried) when all dispatches done at loop = 1 only', () => {
+    const dispatches = [
+      d('dev', 'done', { loop: 1 }),
+      d('code-reviewer', 'done', { loop: 1 }),
+      d('logic-reviewer', 'done', { loop: 1 }),
+      d('qa', 'done', { loop: 1 }),
+    ];
+    expect(computeBatchState(dispatches)).toBe('done');
+  });
+
+  // Current SDD format: loop reaches 2 → retried
+  it('returns done-retried when any dispatch reaches loop = 2', () => {
+    const dispatches = [
+      d('dev', 'done', { loop: 1 }),
+      d('code-reviewer', 'done', { loop: 1 }),
+      d('dev', 'done', { loop: 2 }),
+      d('qa', 'done', { loop: 2 }),
     ];
     expect(computeBatchState(dispatches)).toBe('done-retried');
   });

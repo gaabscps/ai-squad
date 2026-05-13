@@ -5,7 +5,7 @@
  */
 
 import { escape } from '../../../shared/escape';
-import { formatDuration, truncate } from '../format';
+import { formatCost, formatDuration, truncate } from '../format';
 import type { BatchData } from '../types';
 
 const PATH_MAX = 60;
@@ -69,7 +69,14 @@ function renderAcsCovered(batch: BatchData): string {
   );
 }
 
-/** AC-016: Pipeline trace table — role | dispatch_id | loop | duration | tokens | status */
+/**
+ * AC-016: Pipeline trace table — role | dispatch_id | loop | model | effort | duration | tokens | cost | status
+ *
+ * Sources:
+ *   - model: usage.model (post-hoc, what actually ran)
+ *   - effort: tier_calibration.effort (dispatch-time config — only signal for effort)
+ *   - duration/tokens/cost: usage (post-hoc runtime measurement)
+ */
 function renderPipelineTrace(batch: BatchData): string {
   const count = batch.dispatches.length;
   const rows = batch.dispatches
@@ -77,10 +84,17 @@ function renderPipelineTrace(batch: BatchData): string {
       const role = escape(d.role);
       const dispId = escape(truncate(d.dispatchId, DISPATCH_ID_MAX));
       const loop = d.loop !== null ? String(d.loop) : '—';
+      const model = d.model ? escape(d.model) : '—';
+      const effort = d.effort ? escape(d.effort) : '—';
       const duration = formatDuration(d.durationMs);
       const tokens = d.totalTokens !== null ? String(d.totalTokens) : '—';
+      const cost = formatCost(d.costUsd ?? null);
       const status = escape(d.status);
-      return `<tr><td>${role}</td><td>${dispId}</td><td>${loop}</td><td>${duration}</td><td>${tokens}</td><td>${status}</td></tr>`;
+      return (
+        `<tr><td>${role}</td><td>${dispId}</td><td>${loop}</td>` +
+        `<td>${model}</td><td>${effort}</td>` +
+        `<td>${duration}</td><td>${tokens}</td><td>${cost}</td><td>${status}</td></tr>`
+      );
     })
     .join('');
 
@@ -88,7 +102,7 @@ function renderPipelineTrace(batch: BatchData): string {
     `<details>` +
     `<summary>Pipeline trace (${count} dispatches)</summary>` +
     `<table class="story-card__pipeline-trace">` +
-    `<thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>duration</th><th>tokens</th><th>status</th></tr></thead>` +
+    `<thead><tr><th>role</th><th>dispatch_id</th><th>loop</th><th>model</th><th>effort</th><th>duration</th><th>tokens</th><th>cost</th><th>status</th></tr></thead>` +
     `<tbody>${rows}</tbody>` +
     `</table>` +
     `</details>`

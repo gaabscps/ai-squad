@@ -22,9 +22,13 @@ export interface DispatchLike {
  *   - escalate present                     → 'escalated'
  *   - blocked present AND all-last-by-role done → 'done-retried'  (AC-004 AUDIT-AGENT case)
  *   - blocked present (unresolved)         → 'blocked'
- *   - needs_review filtered out (AC-003), all terminal done, loops > 0 → 'done-retried'
- *   - all terminal done, loops == 0        → 'done'
+ *   - needs_review filtered out (AC-003), all terminal done, max loop > 1 → 'done-retried'
+ *   - all terminal done, max loop <= 1     → 'done'
  *   - otherwise                            → 'running'
+ *
+ * Retry threshold: loop = 1 is the first attempt (current SDD orchestrator
+ * format: `d-T-NNN-role-l1`). Legacy fixtures use loop = null for L1 and
+ * loop = N (N >= 2) for retries. Both agree that "retried" means max loop > 1.
  */
 export function computeBatchState(dispatches: DispatchLike[]): BatchState {
   if (dispatches.length === 0) return 'running';
@@ -52,7 +56,7 @@ export function computeBatchState(dispatches: DispatchLike[]): BatchState {
 
   if (terminal.every((d) => d.status === 'done')) {
     const loops = Math.max(0, ...dispatches.map((d) => d.loop ?? 0));
-    return loops > 0 ? 'done-retried' : 'done';
+    return loops > 1 ? 'done-retried' : 'done';
   }
 
   return 'running';

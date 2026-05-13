@@ -143,6 +143,12 @@ export interface Session {
     outputPacket: Record<string, unknown> | null;
     loop: number | null;
     pmNote: string | null;
+    /**
+     * Task ID this dispatch belongs to, from dispatch-manifest.json actual_dispatches[].task_id.
+     * Used by the story-card aggregator to group dispatches into per-task cards.
+     * Undefined for legacy manifests (pre-task_id) or virtual dispatches (pm-orchestrator).
+     */
+    taskId?: string;
     /** Per-dispatch token usage from <usage> annotation (FEAT-003+). Optional for back-compat. */
     usage?: Usage;
     /**
@@ -272,6 +278,7 @@ export interface ClaudeHookEntry {
 export interface ClaudeSettings {
   hooks?: {
     Stop?: ClaudeHookEntry[];
+    SubagentStop?: ClaudeHookEntry[];
     [key: string]: ClaudeHookEntry[] | undefined;
   };
 }

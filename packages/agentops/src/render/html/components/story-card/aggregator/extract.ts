@@ -77,14 +77,26 @@ export function firstNSentences(text: string, n: number): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Extracts BATCH-X from a dispatch id like "feat-005-batch-b-dev" → "BATCH-B".
- * Fallback for non-batch dispatchIds: uses the first two dash-separated segments
- * uppercased (e.g. "pm-orchestrator" → "PM-ORCHESTRATOR").
+ * Derives a grouping key from a dispatch id. Used only as a fallback when
+ * Session.dispatches[].taskId is absent (legacy manifests or virtual dispatches).
+ *
+ * Recognised forms, in priority order:
+ *   1. "feat-005-batch-b-dev" → "BATCH-B"            (legacy batch slug)
+ *   2. "d-T-001-dev-l1"        → "T-001"             (task dispatch)
+ *   3. "d-audit-agent"         → "audit-agent"       (singleton audit)
+ *   4. "pm-orchestrator-<id>"  → "pm-orchestrator"   (virtual PM session)
+ *   5. fallback: first two dash-separated segments uppercased
  */
 export function extractBatchId(dispatchId: string): string {
-  const match = /batch-([a-z0-9]+)/i.exec(dispatchId);
-  if (match?.[1]) return `BATCH-${match[1].toUpperCase()}`;
-  // Non-batch dispatchId: produce a stable synthetic key from first 2 segments
+  const batchMatch = /batch-([a-z0-9]+)/i.exec(dispatchId);
+  if (batchMatch?.[1]) return `BATCH-${batchMatch[1].toUpperCase()}`;
+
+  const taskMatch = /^d-(T-\d+)(?:-|$)/i.exec(dispatchId);
+  if (taskMatch?.[1]) return taskMatch[1].toUpperCase();
+
+  if (/^d-audit-agent(?:-|$)/i.test(dispatchId)) return 'audit-agent';
+  if (/^pm-orchestrator(?:-|$)/i.test(dispatchId)) return 'pm-orchestrator';
+
   return dispatchId.split('-').slice(0, 2).join('-').toUpperCase();
 }
 
@@ -92,34 +104,80 @@ export function extractBatchId(dispatchId: string): string {
 // Per-output-packet data extraction
 // ---------------------------------------------------------------------------
 
+/**
+ * Reads files_changed from an Output Packet.
+ *
+ * Accepts two schema variants:
+ *   - Structured: [{ path, action, tasks_covered }]
+ *   - Path-only:  ["path/to/file.ts", ...]
+ *
+ * For the path-only form, action defaults to "changed" and tasksCovered falls
+ * back to the packet's own task_id (single-element array) when present.
+ */
 export function extractFilesChanged(op: Record<string, unknown>): FileEntry[] {
   const raw = op.files_changed;
   if (!Array.isArray(raw)) return [];
+  const ownTaskId = asString(op.task_id);
+  const fallbackTasksCovered = ownTaskId ? [ownTaskId] : [];
   const result: FileEntry[] = [];
   for (const item of raw) {
+    if (typeof item === 'string') {
+      if (item.length === 0) continue;
+      result.push({ path: item, action: 'changed', tasksCovered: fallbackTasksCovered });
+      continue;
+    }
     if (!isRecord(item)) continue;
     const path = asString(item.path);
     if (!path) continue;
     const action = asString(item.action) ?? 'changed';
     const tasksCovered = asStringArray(item.tasks_covered);
-    result.push({ path, action, tasksCovered });
+    result.push({
+      path,
+      action,
+      tasksCovered: tasksCovered.length > 0 ? tasksCovered : fallbackTasksCovered,
+    });
   }
   return result;
 }
 
+/**
+ * Reads AC coverage from an Output Packet.
+ *
+ * Accepts two schema variants:
+ *   - ac_evidence: { "AC-001": "free-form evidence string", ... }
+ *   - ac_coverage: { "AC-001": ["E-AC001-001", "E-AC001-002"], ... } (qa packet)
+ *
+ * ac_evidence wins when both are present; ac_coverage entries are flattened
+ * into an evidence string by joining the evidence IDs.
+ */
 export function extractAcsCovered(op: Record<string, unknown>): AcEntry[] {
-  const raw = op.ac_evidence;
-  if (!isRecord(raw)) return [];
   const result: AcEntry[] = [];
-  for (const [id, evidence] of Object.entries(raw)) {
-    const ev = asString(evidence) ?? '';
-    result.push({ id, evidence: ev });
+  const evidenceMap = isRecord(op.ac_evidence) ? op.ac_evidence : null;
+  if (evidenceMap) {
+    for (const [id, evidence] of Object.entries(evidenceMap)) {
+      result.push({ id, evidence: asString(evidence) ?? '' });
+    }
+    return result;
+  }
+  const coverageMap = isRecord(op.ac_coverage) ? op.ac_coverage : null;
+  if (coverageMap) {
+    for (const [id, evidenceIds] of Object.entries(coverageMap)) {
+      const ids = asStringArray(evidenceIds);
+      result.push({ id, evidence: ids.join(', ') });
+    }
   }
   return result;
 }
 
+/**
+ * Reads task coverage from an Output Packet.
+ * Falls back to the packet's own task_id when tasks_covered is missing.
+ */
 export function extractTasksCovered(op: Record<string, unknown>): string[] {
-  return asStringArray(op.tasks_covered);
+  const fromArray = asStringArray(op.tasks_covered);
+  if (fromArray.length > 0) return fromArray;
+  const ownTaskId = asString(op.task_id);
+  return ownTaskId ? [ownTaskId] : [];
 }
 
 /** Extracts first 2 sentences of summary_for_reviewers from an output packet. */
