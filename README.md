@@ -149,6 +149,88 @@ cd ai-squad
 
 ---
 
+## ⚡ Running `/pm` on Sonnet 4.6 with bypass — high-throughput, lower cost
+
+The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without your input. Pairing it with **Sonnet 4.6** (instead of the default Opus 4.7) and **bypass-permissions mode** removes both the per-turn approval friction and the higher-tier model cost.
+
+> **Bypass mode**: a Claude Code flag that auto-approves every tool call (file edit, shell command, network request) instead of pausing to ask you. The agent runs flat out.
+
+### How to start the session
+
+```bash
+# In the project where ai-squad is deployed:
+claude --model claude-sonnet-4-6 --dangerously-skip-permissions
+
+# Then, inside the session:
+/pm "<your pitch>"
+```
+
+You must pass `--dangerously-skip-permissions` **at session start** — it cannot be enabled mid-session. The `--model` flag pins the top-level orchestrator to Sonnet 4.6; subagents follow their canonical Tier × Loop table (Haiku for cheap tiers, Sonnet/Opus where the work warrants it), so you still get the right model for each task — just without the Opus 4.7 floor.
+
+### Trade-off at a glance
+
+<table>
+<tr>
+<th align="left">🎯 What you gain</th>
+<th align="left">⚠️ What you give up</th>
+</tr>
+<tr valign="top">
+<td>
+
+- **~5× lower token cost** vs Opus 4.7 baseline
+- **Faster turns** — Sonnet 4.6 latency is materially lower
+- **Zero approval prompts** for the full multi-hour pipeline
+- **Hands-off**: spec → plan → tasks → code → handoff, untouched
+
+</td>
+<td>
+
+- The agent **executes anything** on its tool allowlist without asking
+- A hallucinated `Bash` command **runs** instead of being shown to you first
+- Network calls (npm install, package fetches) **proceed** unprompted
+- Mistakes manifest as committed-to-disk state, not as a "should I?" prompt
+
+</td>
+</tr>
+</table>
+
+### What ai-squad already defends against
+
+The pipeline was designed for autonomous operation from day one. Bypass mode doesn't relax these guardrails — they fire mechanically regardless of permission mode:
+
+| 🛡️ Mitigation | What it stops |
+|---|---|
+| **`block-git-write`** (PreToolUse) | Refuses `git commit`, `git push`, `git reset --hard`, force pushes from inside the pipeline. The handoff is always a `git diff` you review and commit. |
+| **`guard-session-scope`** (PreToolUse) | Refuses Edit/Write outside the active session's declared `scope_files`. Stops a `dev` from "drive-by" edits in unrelated files. |
+| **`verify-output-packet`** (Stop) | Refuses to close a subagent dispatch without a schema-valid Output Packet. No silent success. |
+| **`verify-tier-calibration`** (PreToolUse `Task`) | Refuses to dispatch a subagent on the wrong model/effort. Stops cost blow-ups from Opus-on-Haiku-task misfires. |
+| **`verify-audit-dispatch`** (Stop, orchestrator) | Refuses to emit the final handoff if any dispatch is missing from the manifest. |
+| **`audit-agent`** (read-only, pre-handoff) | Mechanically reconciles every claimed dispatch against `outputs/` before the orchestrator is allowed to hand off. Detects bypass-by-fabrication. |
+| **Per-task loop caps** | After 3 rounds without convergence, the task escalates to `blocker-specialist` instead of looping forever. |
+| **Tool allowlists per role** | `code-reviewer`, `logic-reviewer`, `audit-agent` are **read-only by tool config** — they can't write source even if asked. `qa` writes only to `.agent-session/<id>/qa/`. |
+
+### Residual risks — read this before you turn it on
+
+Defense-in-depth narrows the blast radius. It doesn't eliminate it:
+
+> ⚠️ **`dev` has `Bash` access.** It can run `npm install`, `pip install`, `curl`, build scripts, and arbitrary shell within the project directory. A hallucinated dependency or a poisoned package gets installed. There is no allowlist of "safe" Bash commands — only `git` writes are blocked.
+>
+> ⚠️ **Scope is enforced inside the project dir.** Hooks gate `$CLAUDE_PROJECT_DIR`. A `Bash` command can still touch your home directory, your `~/.ssh/`, or anywhere else the OS allows. Bypass mode does not sandbox the filesystem.
+>
+> ⚠️ **Network requests proceed silently.** Pulling docs, packages, or remote configs is not gated. Treat sessions like you'd treat a contractor with shell access.
+>
+> ⚠️ **Hallucinated specs ship as real code.** If `spec-writer` invents a requirement, the pipeline will faithfully implement it. The four conversational phases (Specify / Plan / Tasks) exist specifically so you read these artifacts — `/pm` collapses that into one trust decision at the start.
+>
+> ⚠️ **Cost can still escalate.** Sonnet 4.6 is cheaper per token, but the pipeline runs longer and dispatches more subagents under autonomous operation. Watch `npx @ai-squad/agentops report` after each session.
+
+**Recommended posture:**
+
+- Use bypass + Sonnet 4.6 for **well-scoped features** where the spec is unambiguous and the codebase is well-tested
+- Run inside a **dedicated git worktree** (`git worktree add ../<repo>-pm <branch>`) so the diff is reviewable in isolation
+- Keep **`/pm` off** for security-sensitive work, migrations, or anything touching production credentials — fall back to the interactive `/spec-writer → /designer → /task-builder → /orchestrator` flow with default permissions
+
+---
+
 ## Quick Reference
 
 ### 🎯 Discovery
