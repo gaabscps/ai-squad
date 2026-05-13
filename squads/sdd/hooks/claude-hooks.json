@@ -1,0 +1,98 @@
+{
+  "_comment": "Canonical Claude Code hook registrations for the SDD pipeline. Consumed by `ai-squad deploy` (packages/cli/lib/deploy.js) and merged idempotently into <repo>/.claude/settings.local.json. Distinct from cursor-hooks.json (Cursor format). Each Python command uses a fail-open guard so partial installs don't break sessions; $CLAUDE_PROJECT_DIR resolves at runtime.",
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-git-write.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-git-write.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-session-scope.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-session-scope.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-reviewer-write-path.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-reviewer-write-path.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-tier-calibration.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-tier-calibration.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py\""
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\""
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\""
+          },
+          {
+            "type": "command",
+            "command": "npx @ai-squad/agentops capture"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py\""
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

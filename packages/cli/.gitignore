@@ -1,2 +1,5 @@
 components/
 *.tgz
+
+# ai-squad per-repo hook install (managed by `ai-squad deploy`)
+.claude/hooks/

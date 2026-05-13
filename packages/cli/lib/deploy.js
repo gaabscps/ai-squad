@@ -133,6 +133,138 @@ async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
   }
 
   await ensureGitignore(repoRoot);
+  await registerClaudeCodeHooks({ componentsRoot, squads, repoRoot });
+}
+
+/**
+ * Merge each squad's claude-hooks.json into <repo>/.claude/settings.local.json.
+ * Dedup by command string per event. Idempotent — re-running adds nothing if
+ * everything is already present.
+ *
+ * Without this step the Python hooks live on disk but are never invoked by
+ * Claude Code: only the orchestrator/pm Skills' frontmatter wire a subset,
+ * and that scope is too narrow for guards like verify-tier-calibration to
+ * fire reliably across all dispatch contexts.
+ */
+async function registerClaudeCodeHooks({ componentsRoot, squads, repoRoot }) {
+  const settingsPath = join(repoRoot, '.claude', 'settings.local.json');
+  let settings = {};
+  if (await exists(settingsPath)) {
+    try {
+      settings = JSON.parse(await readFile(settingsPath, 'utf8'));
+    } catch (err) {
+      console.error(`  [WARN] could not parse ${settingsPath}: ${err.message}`);
+      console.error('  [WARN] skipping Claude Code hook registration to avoid clobbering it.');
+      return;
+    }
+  }
+  settings.hooks ??= {};
+
+  let totalAdded = 0;
+  for (const squad of squads) {
+    const claudeHooksPath = join(componentsRoot, squad, 'hooks', 'claude-hooks.json');
+    if (!(await exists(claudeHooksPath))) continue;
+
+    let squadConfig;
+    try {
+      squadConfig = JSON.parse(await readFile(claudeHooksPath, 'utf8'));
+    } catch (err) {
+      console.error(`  [WARN] could not parse ${claudeHooksPath}: ${err.message}`);
+      continue;
+    }
+
+    for (const [eventName, eventEntries] of Object.entries(squadConfig.hooks || {})) {
+      settings.hooks[eventName] ??= [];
+      for (const entry of eventEntries) {
+        const bucket = findOrCreateMatcherBucket(settings.hooks[eventName], entry.matcher ?? '');
+        const { hooks, changes } = mergeBucketHooks(bucket.hooks, entry.hooks ?? []);
+        bucket.hooks = hooks;
+        for (const note of changes) {
+          console.log(`  [${note.kind} hook]   ${eventName} (${entry.matcher || '*'}): ${note.command}`);
+          totalAdded += 1;
+        }
+      }
+    }
+  }
+
+  if (totalAdded === 0) {
+    console.log(`  [settings] no new hook registrations needed (${settingsPath})`);
+    return;
+  }
+
+  await mkdir(join(repoRoot, '.claude'), { recursive: true });
+  await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+  console.log(`  [settings] wrote ${totalAdded} hook update(s) in ${settingsPath}`);
+}
+
+/**
+ * Merge a desired set of hooks into an existing bucket, keyed by `extractHookId`.
+ * Collapses duplicate existing entries (defensive against past mis-merges),
+ * upgrades stale forms to the desired form, and appends genuinely new hooks.
+ *
+ * Returns the new hooks array and a list of changes for logging.
+ */
+function mergeBucketHooks(existingHooks, desiredHooks) {
+  const result = [];
+  const indexById = new Map();
+  for (const h of existingHooks) {
+    const id = extractHookId(h.command);
+    if (!indexById.has(id)) {
+      indexById.set(id, result.length);
+      result.push(h);
+    }
+    // else: silently drop duplicate-of-same-id within existing
+  }
+
+  const changes = [];
+  for (const h of desiredHooks) {
+    const id = extractHookId(h.command);
+    if (indexById.has(id)) {
+      const idx = indexById.get(id);
+      if (result[idx].command !== h.command) {
+        result[idx] = h;
+        changes.push({ kind: 'migrate', command: h.command });
+      }
+    } else {
+      indexById.set(id, result.length);
+      result.push(h);
+      changes.push({ kind: 'register', command: h.command });
+    }
+  }
+
+  return { hooks: result, changes };
+}
+
+/**
+ * Derive a stable identity for a hook command so we can dedup across cosmetic
+ * differences (e.g. plain `python3 X.py` vs `[ -f X.py ] || exit 0; python3 X.py`).
+ *
+ *   "python3 ...verify-tier-calibration.py"         → "py:verify-tier-calibration.py"
+ *   "[ -f X ] || exit 0; python3 X"                 → "py:<basename>"
+ *   "npx @ai-squad/agentops capture"                → "npx:@ai-squad/agentops:capture"
+ *   anything else                                    → "raw:<full command>"
+ */
+function extractHookId(command) {
+  const pyMatch = /([\w.-]+\.py)/.exec(command);
+  if (pyMatch) return `py:${pyMatch[1]}`;
+  const npxMatch = /npx\s+(@?[\w/-]+)\s+(\S+)/.exec(command);
+  if (npxMatch) return `npx:${npxMatch[1]}:${npxMatch[2]}`;
+  return `raw:${command}`;
+}
+
+/**
+ * For a given event-array (e.g. settings.hooks.PreToolUse), find the entry
+ * matching `matcher`. Create one if none exists. Returns a reference whose
+ * `hooks[]` array can be appended to.
+ */
+function findOrCreateMatcherBucket(eventArray, matcher) {
+  let bucket = eventArray.find((b) => (b.matcher ?? '') === matcher);
+  if (!bucket) {
+    bucket = { matcher, hooks: [] };
+    eventArray.push(bucket);
+  }
+  bucket.hooks ??= [];
+  return bucket;
 }
 
 async function ensureGitignore(repoRoot) {
