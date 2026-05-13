@@ -28,9 +28,13 @@ As your **first action**, run this Bash check exactly once:
 # falling back to git rev-parse / pwd avoids false-positive "MISSING_HOOKS".
 repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 hooks_dir="$repo_root/.claude/hooks"
-required="verify-pm-handoff-clean.py capture-pm-usage.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py"
+# Use positional parameters ($@) for POSIX-safe iteration. A bare `for f in
+# $required` only word-splits in bash; zsh keeps the variable as a single
+# string and the loop fires once with the whole list concatenated. Setting
+# positional parameters makes the iteration shell-agnostic.
+set -- verify-pm-handoff-clean.py capture-pm-usage.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py
 missing=""
-for f in $required; do
+for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
 done
 if [ -n "$missing" ]; then

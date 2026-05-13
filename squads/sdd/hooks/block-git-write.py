@@ -2,12 +2,19 @@
 """
 ai-squad PreToolUse hook — block-git-write.
 
-Wired to the orchestrator Skill's frontmatter. Fires on every Bash call.
-Denies any git write operation (commit, add, reset, push, checkout to a different
-ref, etc.) — the human reviews and commits after the pipeline handoff.
+Purpose: enforce the "no git writes from orchestrator" invariant — the human
+         reviews and commits after the pipeline handoff.
 
-Read-only git commands (status, diff, log, show, rev-parse, branch with no args)
-are allowed for state inspection.
+Mechanism: `ai-squad deploy` registers this hook globally under
+           PreToolUse(Bash). To preserve the intended orchestrator-only
+           scoping, the hook detects the currently active Skill by scanning
+           the transcript JSONL for the latest
+           `Base directory for this skill: .../skills/<name>` marker. Only
+           enforces the rule when the active Skill is `orchestrator`.
+
+Default: allow. Main session, other skills, and subagents may run any git
+         command. This protects callers (including the human dogfooding the
+         framework) from spurious blocks.
 
 Pure stdlib. Python 3.8+.
 """
@@ -21,6 +28,37 @@ if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
 from hook_runtime import shell_command, tool_input_dict
+
+_SKILL_MARKER_PATTERN = re.compile(
+    r"[Bb]ase directory for this [Ss]kill:\s*\S*?/skills/([A-Za-z0-9_-]+)"
+)
+_TRANSCRIPT_TAIL_BYTES = 256 * 1024  # 256 KiB tail is enough for the latest skill marker
+
+
+def _detect_active_skill(payload: dict) -> str | None:
+    """Return the slug of the most recently activated Skill, or None if unknown.
+
+    Mirror of the helper in guard-session-scope.py. If a third hook needs
+    this, lift into hook_runtime.py.
+    """
+    tp = payload.get("transcript_path") or payload.get("agent_transcript_path")
+    if not isinstance(tp, str) or not tp:
+        return None
+    transcript_path = Path(tp)
+    try:
+        with transcript_path.open("rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            start = max(0, size - _TRANSCRIPT_TAIL_BYTES)
+            fh.seek(start)
+            tail = fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return None
+
+    matches = _SKILL_MARKER_PATTERN.findall(tail)
+    if not matches:
+        return None
+    return matches[-1]
 
 GIT_WRITE_VERBS = {
     "add", "rm", "mv",
@@ -79,6 +117,15 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except json.JSONDecodeError as exc:
         print(f"block-git-write: malformed stdin ({exc})", file=sys.stderr)
+        return 0
+
+    if not isinstance(payload, dict):
+        return 0
+
+    # Only enforce when the active Skill is the orchestrator. If we can't
+    # identify the active skill, allow — the invariant is orchestrator-specific.
+    active_skill = _detect_active_skill(payload)
+    if active_skill != "orchestrator":
         return 0
 
     tool_input = tool_input_dict(payload)

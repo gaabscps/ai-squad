@@ -2,16 +2,25 @@
 """
 ai-squad PreToolUse hook — guard-session-scope.
 
-Wired to the orchestrator Skill's frontmatter. Fires on every Edit/Write/MultiEdit
-the orchestrator attempts. Denies the call if the target path is outside
-`.agent-session/<task_id>/` — the orchestrator's only legitimate write surface.
+Purpose: enforce the orchestrator non-edit invariant — source-file edits must
+         flow through `dev` Subagent dispatches, never through orchestrator
+         direct Edit/Write/MultiEdit.
 
-Mechanical enforcement of the orchestrator non-edit invariant: source files
-flow through `dev` Subagent dispatches only.
+Mechanism: `ai-squad deploy` registers this hook globally under
+           PreToolUse(Edit|Write|MultiEdit). To preserve the intended scoping
+           (orchestrator Skill only), the hook detects the currently active
+           Skill by scanning the transcript JSONL for the latest
+           `Base directory for this skill: .../skills/<name>` marker that
+           Claude Code emits when a Skill is invoked.
+
+Default: allow. Only enforce the `.agent-session/` rule when the active Skill
+         is positively identified as `orchestrator`. This protects the main
+         session, other skills, and subagents from spurious blocks.
 
 Pure stdlib. Python 3.8+.
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -21,6 +30,44 @@ if str(_HOOKS_DIR) not in sys.path:
 
 from hook_runtime import edit_target_path, resolve_project_root, tool_input_dict
 
+_SKILL_MARKER_PATTERN = re.compile(
+    r"[Bb]ase directory for this [Ss]kill:\s*\S*?/skills/([A-Za-z0-9_-]+)"
+)
+_TRANSCRIPT_TAIL_BYTES = 256 * 1024  # 256 KiB tail is enough for the latest skill marker
+
+
+def _detect_active_skill(payload: dict) -> str | None:
+    """Return the slug of the most recently activated Skill, or None if unknown.
+
+    Scans the tail of the JSONL transcript for the canonical Claude Code
+    Skill-activation marker `Base directory for this skill: .../skills/<name>`.
+    The LAST occurrence wins — a session may load multiple skills in sequence,
+    and only the most recent one defines the current scope.
+
+    Returns None when:
+      - transcript_path missing or not a string
+      - transcript file unreadable
+      - no skill marker found in the scanned tail
+    """
+    tp = payload.get("transcript_path") or payload.get("agent_transcript_path")
+    if not isinstance(tp, str) or not tp:
+        return None
+    transcript_path = Path(tp)
+    try:
+        with transcript_path.open("rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            start = max(0, size - _TRANSCRIPT_TAIL_BYTES)
+            fh.seek(start)
+            tail = fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return None
+
+    matches = _SKILL_MARKER_PATTERN.findall(tail)
+    if not matches:
+        return None
+    return matches[-1]
+
 
 def main() -> int:
     try:
@@ -28,6 +75,15 @@ def main() -> int:
     except json.JSONDecodeError as exc:
         # Malformed stdin — fail open (don't block) but log to stderr for debugging.
         print(f"guard-session-scope: malformed stdin ({exc})", file=sys.stderr)
+        return 0
+
+    if not isinstance(payload, dict):
+        return 0
+
+    # Only enforce when the active Skill is the orchestrator. If we can't
+    # identify the active skill, allow — the invariant is orchestrator-specific.
+    active_skill = _detect_active_skill(payload)
+    if active_skill != "orchestrator":
         return 0
 
     tool_input = tool_input_dict(payload)

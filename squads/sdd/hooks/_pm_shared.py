@@ -51,10 +51,16 @@ _DEBT_MARKER_EXEMPT_PATHS: tuple[str, ...] = (
     # Avoid false positives when /pm runs on the ai-squad repo itself.
     "docs/",
     "shared/concepts/",
+    "shared/templates/",
     "squads/sdd/skills/",
     "squads/sdd/hooks/__tests__/",
     "squads/sdd/agents/__tests__/",
     "squads/sdd/skills/__tests__/",
+    # Documentation files routinely cite debt-marker tokens as text.
+    "CHANGELOG.md",
+    "README.md",
+    "packages/*/CHANGELOG.md",
+    "packages/*/README.md",
 )
 
 
