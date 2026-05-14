@@ -240,6 +240,14 @@ def _try_append_warning(session_dir: Path, task_id: str, reason: str, source: st
 
 
 def find_active_session(project_dir: Path) -> Path | None:
+    """Pick the most-recently-modified .agent-session/<task_id> directory.
+
+    This mtime heuristic is the fallback path used only when correlation by
+    session_id (`find_session_dir_by_session_id`) yields nothing. It is fragile
+    when multiple session dirs coexist — stale sibling dirs whose mtime gets
+    bumped (file reads, IDE indexing, parallel pipelines) can shadow the
+    truly-active session. Prefer the session_id correlation when possible.
+    """
     sessions_root = project_dir / ".agent-session"
     if not sessions_root.is_dir():
         return None
@@ -247,6 +255,39 @@ def find_active_session(project_dir: Path) -> Path | None:
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def find_session_dir_by_session_id(project_dir: Path, session_id: str) -> tuple[Path, Path] | None:
+    """Locate the session dir whose `outputs/d-*.json` contains an Output Packet
+    stamped with `_session_id == session_id`.
+
+    Returns `(session_dir, packet_path)` on match, else None. This is the
+    authoritative correlation path — robust against stale sibling dirs and
+    parallel-pipeline interference where mtime ordering is misleading.
+
+    The Output Packet's `_session_id` is stamped by `stamp-session-id.py`
+    (PostToolUse) immediately after the subagent's Write of the packet, so it
+    is present by the time this Stop hook runs in the common path. When the
+    stamp is absent (MultiEdit, transcript-only writes, etc.), this function
+    returns None and the caller falls back to mtime + transcript scanning.
+    """
+    sessions_root = project_dir / ".agent-session"
+    if not sessions_root.is_dir() or not session_id:
+        return None
+    for session_dir in sessions_root.iterdir():
+        if not session_dir.is_dir():
+            continue
+        outputs_dir = session_dir / "outputs"
+        if not outputs_dir.is_dir():
+            continue
+        for pkt in outputs_dir.glob("d-*.json"):
+            try:
+                data = json.loads(pkt.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict) and data.get("_session_id") == session_id:
+                return session_dir, pkt
+    return None
 
 
 def find_packet_by_session(outputs_dir: Path, session_id: str) -> Path | None:
@@ -493,7 +534,21 @@ def main() -> int:
     transcript_path_str = payload.get("transcript_path")
 
     project_dir = resolve_project_root(payload)
-    session_dir = find_active_session(project_dir)
+
+    # Authoritative correlation: locate the session dir via the Output Packet
+    # whose _session_id matches this subagent's session. This avoids the
+    # find_active_session mtime-heuristic failure mode where a stale sibling
+    # dir (older feature, prior pipeline) shadows the truly-active session.
+    session_dir: Path | None = None
+    packet_path: Path | None = None
+    if isinstance(session_id, str) and session_id:
+        sid_match = find_session_dir_by_session_id(project_dir, session_id)
+        if sid_match is not None:
+            session_dir, packet_path = sid_match
+
+    # Fallback: mtime heuristic (legacy path).
+    if session_dir is None:
+        session_dir = find_active_session(project_dir)
     if session_dir is None:
         return 0
 
@@ -517,8 +572,11 @@ def main() -> int:
     if not manifest_path.exists():
         return 0
 
-    outputs_dir = session_dir / "outputs"
-    packet_path = find_packet_by_session(outputs_dir, session_id)
+    # If session_id correlation already located the packet, reuse it; otherwise
+    # fall back to scanning the (now-resolved) session_dir's outputs dir.
+    if packet_path is None:
+        outputs_dir = session_dir / "outputs"
+        packet_path = find_packet_by_session(outputs_dir, session_id)
 
     dispatch_id: str | None = None
     packet_data: dict | None = None

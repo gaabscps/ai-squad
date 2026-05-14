@@ -319,6 +319,88 @@ class TestFallbackCorrelation(unittest.TestCase):
             )["actual_dispatches"][0]
             self.assertEqual(entry["usage"]["input_tokens"], 100)
 
+    def test_session_id_correlation_beats_mtime_picking_wrong_dir(self):
+        """Regression for Bug 2 (capture firing parcial / null usage).
+
+        Setup: two session dirs (FEAT-A + FEAT-B). Only FEAT-B holds the Output
+        Packet stamped with this subagent's session_id. FEAT-A is touched LAST
+        so the legacy mtime heuristic would pick it. The hook must still locate
+        FEAT-B via _session_id correlation and update its manifest.
+        """
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            sessions = tmp / ".agent-session"
+
+            # FEAT-A: stale dir, no relevant packet.
+            feat_a = sessions / "FEAT-A"
+            (feat_a / "outputs").mkdir(parents=True)
+            (feat_a / "dispatch-manifest.json").write_text(
+                json.dumps({"actual_dispatches": []}), encoding="utf-8"
+            )
+
+            # FEAT-B: the truly-active session — holds the stamped packet.
+            feat_b = sessions / "FEAT-B"
+            (feat_b / "outputs").mkdir(parents=True)
+            (feat_b / "dispatch-manifest.json").write_text(
+                json.dumps({
+                    "actual_dispatches": [{
+                        "dispatch_id": "d-T-001-dev-l1",
+                        "task_id": "T-001",
+                        "role": "dev",
+                        "started_at": "2026-05-11T05:00:00Z",
+                        "completed_at": "2026-05-11T05:05:00Z",
+                        "status": "done",
+                    }],
+                }), encoding="utf-8",
+            )
+            (feat_b / "outputs" / "d-T-001-dev-l1.json").write_text(
+                json.dumps({
+                    "dispatch_id": "d-T-001-dev-l1",
+                    "status": "done",
+                    "_session_id": "subagent-feat-b",
+                }), encoding="utf-8",
+            )
+
+            # Now bump FEAT-A's mtime so mtime-picking would pick it. Anything
+            # that touches the dir (file create, mkdir) bumps it.
+            (feat_a / ".touch").write_text("", encoding="utf-8")
+
+            transcript = tmp / "transcript.jsonl"
+            _write_jsonl(transcript, [
+                _user_turn_with_workpacket("d-T-001-dev-l1"),
+                {
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-6",
+                        "usage": {
+                            "input_tokens": 42,
+                            "output_tokens": 7,
+                            "cache_creation_input_tokens": 0,
+                            "cache_read_input_tokens": 0,
+                        },
+                    },
+                },
+            ])
+            payload = {
+                "stop_hook_active": False,
+                "session_id": "subagent-feat-b",
+                "transcript_path": str(transcript),
+            }
+            rc = _run_hook_subprocess(payload, str(tmp))
+            self.assertEqual(rc, 0)
+
+            # FEAT-B's manifest must have usage populated.
+            feat_b_entry = json.loads(
+                (feat_b / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )["actual_dispatches"][0]
+            self.assertEqual(feat_b_entry["usage"]["input_tokens"], 42)
+
+            # FEAT-A's manifest must be untouched.
+            feat_a_doc = json.loads(
+                (feat_a / "dispatch-manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(feat_a_doc["actual_dispatches"], [])
+
 
 # ===========================================================================
 # Bookkeeping-gap auto-creation
