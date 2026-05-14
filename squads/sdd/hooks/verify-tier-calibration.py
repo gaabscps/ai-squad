@@ -405,6 +405,49 @@ def _read_task_tier(task_id: str, session_dir: Path) -> str | None:
     try:
         current_mtime = tasks_path.stat().st_mtime
     except (OSError, FileNotFoundError):
+        # HOTFIX FEAT-006: fall back to the "1 dir per feature" convention.
+        # The session_dir/<task_id>/tasks.md path (per-task convention) does not
+        # exist. Identify the owning session by finding the dispatch-manifest.json
+        # whose expected_pipeline references this task_id, then read THAT
+        # session's tasks.md. This prevents cross-session contamination — older
+        # sessions (FEAT-001..N) may have unrelated tasks reusing the same T-XXX
+        # numbering. Only triggers for T-XXX task_ids; FEAT-NNN inputs preserve
+        # original path. NOTE(FEAT-007): replace with proper session_id-based
+        # resolution that gets the session_id directly from the Work Packet.
+        if re.match(r"^T-\d+$", task_id):
+            # T-XXX numbering is reused across features (FEAT-001 and FEAT-006 may
+            # both have ## T-001 sections). Pick the manifest by recency: the
+            # session actively being dispatched will have the most recently
+            # modified dispatch-manifest.json (orchestrator appends entry
+            # immediately before each Task tool call).
+            owning_manifests: list[tuple[float, Path]] = []
+            for manifest_path in session_dir.glob("*/dispatch-manifest.json"):
+                try:
+                    doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError, ValueError):
+                    continue
+                expected = doc.get("expected_pipeline") or []
+                if not isinstance(expected, list):
+                    continue
+                if not any(
+                    isinstance(e, dict) and e.get("task_id") == task_id
+                    for e in expected
+                ):
+                    continue
+                try:
+                    mtime = manifest_path.stat().st_mtime
+                except OSError:
+                    continue
+                owning_manifests.append((mtime, manifest_path))
+            for _mtime, manifest_path in sorted(owning_manifests, reverse=True):
+                feat_tasks_path = manifest_path.parent / "tasks.md"
+                try:
+                    content = feat_tasks_path.read_text(encoding="utf-8", errors="replace")
+                except (OSError, IOError):
+                    continue
+                tier = _extract_tier_for_task(content, task_id)
+                if tier is not None:
+                    return tier
         return None
 
     cached = _tier_cache.get(tasks_path_str)
@@ -541,10 +584,44 @@ def _load_manifest_dispatches(
       - ("malformed", "<err>")  when a manifest file EXISTS but JSON is invalid or
                                 actual_dispatches is not a list — caller MUST block.
     """
-    for candidate in (
+    # Primary candidates: the two historical paths (per-task and root-of-session-dir).
+    primary_candidates = [
         session_dir / "dispatch-manifest.json",
         session_dir / task_id / "dispatch-manifest.json",
-    ):
+    ]
+
+    # HOTFIX FEAT-006: also scan per-feature manifests under session_dir/*/dispatch-manifest.json
+    # for the "1 dir per feature" convention. T-XXX numbering is reused across features, so
+    # pick fallback candidates by mtime (most recent first) — the active session's manifest is
+    # always the freshest one. Cross-session contamination is further guarded below via the
+    # _is_referencing_task check. Only triggers for T-XXX task_ids.
+    # NOTE(FEAT-007): replace with proper session_id-based resolution.
+    fallback_candidates: list[Path] = []
+    if re.match(r"^T-\d+$", task_id):
+        scored: list[tuple[float, Path]] = []
+        for cand in session_dir.glob("*/dispatch-manifest.json"):
+            if cand in primary_candidates:
+                continue
+            try:
+                scored.append((cand.stat().st_mtime, cand))
+            except OSError:
+                continue
+        fallback_candidates = [p for _m, p in sorted(scored, reverse=True)]
+
+    def _is_referencing_task(doc: dict) -> bool:
+        expected = doc.get("expected_pipeline") or []
+        if isinstance(expected, list):
+            for entry in expected:
+                if isinstance(entry, dict) and entry.get("task_id") == task_id:
+                    return True
+        dispatches = doc.get("actual_dispatches") or []
+        if isinstance(dispatches, list):
+            for entry in dispatches:
+                if isinstance(entry, dict) and entry.get("task_id") == task_id:
+                    return True
+        return False
+
+    for candidate in primary_candidates:
         if candidate.exists():
             try:
                 doc = json.loads(candidate.read_text(encoding="utf-8"))
@@ -556,6 +633,21 @@ def _load_manifest_dispatches(
             if not isinstance(dispatches, list):
                 return ("malformed", "actual_dispatches is not a list")
             return dispatches
+
+    for candidate in fallback_candidates:
+        try:
+            doc = json.loads(candidate.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, ValueError):
+            continue  # skip malformed fallback candidates; do not block on cross-session noise
+        if not isinstance(doc, dict) or not _is_referencing_task(doc):
+            continue
+        dispatches = doc.get("actual_dispatches")
+        if dispatches is None:
+            return []
+        if not isinstance(dispatches, list):
+            return ("malformed", "actual_dispatches is not a list")
+        return dispatches
+
     return _MANIFEST_MISSING
 
 
