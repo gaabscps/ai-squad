@@ -1,7 +1,6 @@
 ---
 name: qa
 description: Validates one task's implementation against the Spec's acceptance criteria. Runs the feature, executes scenarios, reports pass/fail per criterion. Last gate before the task is marked `done`. Required to populate `ac_coverage` in the Output Packet.
-model: sonnet
 tools: Read, Bash, Grep, Write
 effort: medium
 fan_out: true

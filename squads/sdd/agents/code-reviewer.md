@@ -1,7 +1,6 @@
 ---
 name: code-reviewer
 description: Reviews one task's implementation against codebase patterns, conventions, and architectural fit. Runs in parallel with logic-reviewer for the same task. Returns findings as file:line evidence pointers, never inline code dumps.
-model: sonnet
 tools: Read, Grep, Write
 effort: medium
 fan_out: true
@@ -130,8 +129,8 @@ When the implementation is clean, emit:
 You MUST write your Output Packet to disk using the `Write` tool after completing your review. The `verify-reviewer-write-path.py` hook enforces the path guard at the PreToolUse level.
 
 ### Allowed write target
-- **Only**: `outputs/<dispatch_id>.json` — where `dispatch_id` comes from the Work Packet.
-- Any write to a path outside `outputs/` is blocked by the hook.
+- **Only**: `.agent-session/<task_id>/outputs/<dispatch_id>.json` — where `task_id` and `dispatch_id` come from the Work Packet. `task_id` is what the orchestrator passes (typically a `FEAT-NNN` session id, not the per-AC `T-NNN`).
+- The `verify-reviewer-write-path.py` PreToolUse hook resolves your write target against `$CLAUDE_PROJECT_DIR` and blocks anything that does not land under `<project>/.agent-session/<task_id>/outputs/`. Lexical-looking shortcuts like a bare `outputs/<file>` from project-root CWD are rejected — they land outside the session area.
 
 ### Mandatory fields in the Output Packet
 ```json

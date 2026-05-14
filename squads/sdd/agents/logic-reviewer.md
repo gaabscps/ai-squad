@@ -1,7 +1,6 @@
 ---
 name: logic-reviewer
 description: Reviews one task's implementation against the Spec for behavioral gaps — edge cases, missing flows, partial-failure paths, race conditions, broken invariants. Runs in parallel with code-reviewer for the same task. Writes Output Packet to outputs/ only.
-model: opus
 tools: Read, Grep, Write
 effort: high
 fan_out: true
@@ -152,8 +151,8 @@ When all ACs are satisfied and no gaps remain:
 Always emit `"usage": null`. The `capture-subagent-usage.py` Stop hook reads token usage from the Claude API response envelope and populates `usage.cost_usd` post-completion. Never include `cost_usd` or `cost_source` as top-level fields — schema `additionalProperties: false` rejects them.
 
 ### Allowed write target
-- **Only**: `outputs/<dispatch_id>.json` — where `dispatch_id` comes from the Work Packet.
-- Any write outside `outputs/` is blocked by the `verify-reviewer-write-path.py` PreToolUse hook.
+- **Only**: `.agent-session/<task_id>/outputs/<dispatch_id>.json` — where `task_id` and `dispatch_id` come from the Work Packet. `task_id` is what the orchestrator passes (typically a `FEAT-NNN` session id, not the per-AC `T-NNN`).
+- The `verify-reviewer-write-path.py` PreToolUse hook resolves your write target against `$CLAUDE_PROJECT_DIR` and blocks anything that does not land under `<project>/.agent-session/<task_id>/outputs/`. Lexical-looking shortcuts like a bare `outputs/<file>` from project-root CWD are rejected — they land outside the session area.
 
 ### Non-overwrite rule (AC-008)
 BEFORE writing, use the `Read` tool on `outputs/<dispatch_id>.json`:
@@ -180,5 +179,5 @@ Orchestrator can dispatch multiple `logic-reviewer` instances across parallel ta
 ## Parallel with
 `code-reviewer` (same diff, same task) — independent isolated contexts, no coordination. The Google-style dimension split prevents overlap.
 
-## Why opus (not sonnet)
-Detecting behavioral edge cases, race conditions, and invariant breaks needs strong reasoning. This is the Subagent where Opus pays the most (see `shared/concepts/effort.md`).
+## Model / effort selection
+This Role's run-model is selected by the orchestrator from the canonical Tier × Loop table (`shared/concepts/effort.md`) — sonnet for T1/T2/T3, opus for T4. The Task tool `model` parameter is the source of truth; this agent's frontmatter intentionally omits `model:` so it can never compete with the per-dispatch calibration.

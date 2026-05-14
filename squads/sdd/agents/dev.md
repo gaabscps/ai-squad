@@ -1,7 +1,6 @@
 ---
 name: dev
 description: Implements one task from `tasks.md` against the approved Spec and Plan. Consumes a Work Packet (with `task_id`, `ac_scope`, `scope_files`), produces an Output Packet with evidence pointers (files changed, tests added). Per-task loop caps enforced by orchestrator.
-model: sonnet
 tools: Read, Edit, Write, Bash, Grep
 effort: high
 fan_out: true
