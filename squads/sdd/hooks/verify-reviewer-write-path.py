@@ -25,6 +25,23 @@ import re
 import sys
 from pathlib import Path
 
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+try:
+    from hook_runtime import resolve_project_root
+except ImportError:
+    def resolve_project_root(payload):  # type: ignore[no-redef]
+        env = os.environ.get("CLAUDE_PROJECT_DIR", "").strip()
+        if env:
+            return Path(env).resolve()
+        if isinstance(payload, dict):
+            cwd = payload.get("cwd")
+            if cwd:
+                return Path(str(cwd)).resolve()
+        return Path(os.getcwd()).resolve()
+
 _TRANSCRIPT_SCAN_LIMIT = 80
 _REVIEWER_SUBAGENT_PATTERN = re.compile(
     r"subagent_type:\s*[\"']?(code-reviewer|logic-reviewer)\b"
@@ -46,17 +63,38 @@ def _validate_payload(payload: object) -> tuple[str, str | None]:
     return file_path, None
 
 
-def _is_inside_outputs(file_path: str) -> bool:
-    """Return True iff the normalized path is contained within `outputs/`.
+def _is_inside_outputs(file_path: str, project_root: Path) -> bool:
+    """Return True iff *file_path* resolves to a location under
+    `<project_root>/.agent-session/<task_id>/outputs/<file>`.
+
+    Resolution rules:
+    - Relative paths are resolved against project_root (subagent CWD).
+    - Absolute paths are normalized in place.
+    - Symlinks/`..` traversal collapse via os.path.normpath.
 
     Defends against:
-    - `outputs/../secrets`       (normpath collapses ..)
-    - `outputs/../../etc/passwd` (first component must be "outputs")
-    - bare `outputs/` without a filename (requires at least one more component)
+    - Bare `outputs/foo.json` from project-root CWD (lands at
+      `<project_root>/outputs/foo.json`, OUTSIDE `.agent-session/`).
+    - `outputs/../../etc/passwd` (path traversal).
+    - Absolute writes to anywhere outside the session output area.
     """
-    norm = Path(os.path.normpath(file_path))
-    parts = norm.parts
-    return len(parts) >= 2 and parts[0] == "outputs"
+    p = Path(file_path)
+    if p.is_absolute():
+        candidate_str = os.path.realpath(str(p))
+    else:
+        candidate_str = os.path.realpath(str(project_root / p))
+    candidate = Path(candidate_str)
+
+    sessions_root = Path(os.path.realpath(str(project_root / ".agent-session")))
+    try:
+        rel = candidate.relative_to(sessions_root)
+    except ValueError:
+        return False
+
+    parts = rel.parts
+    # Expected shape: <task_id>/outputs/<file>[/...] — task_id is anything
+    # non-empty; outputs must be the immediate second segment.
+    return len(parts) >= 3 and parts[1] == "outputs"
 
 
 def _detect_reviewer_context(payload: dict) -> bool:
@@ -135,10 +173,14 @@ def main() -> int:
         }))
         return 0
 
-    if not _is_inside_outputs(file_path):
+    project_root = resolve_project_root(payload)
+    if not _is_inside_outputs(file_path, project_root):
         print(json.dumps({
             "decision": "block",
-            "reason": f"reviewer write blocked: path '{file_path}' is outside outputs/",
+            "reason": (
+                f"reviewer write blocked: path '{file_path}' does not resolve "
+                f"under '{project_root}/.agent-session/<task_id>/outputs/'"
+            ),
         }))
         return 0
 

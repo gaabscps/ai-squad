@@ -72,10 +72,14 @@ class TestVerifyReviewerWritePath(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def _payload(self, file_path, *, transcript_path=None, omit_tool_input=False, omit_file_path=False):
+    def _payload(self, file_path, *, transcript_path=None, omit_tool_input=False, omit_file_path=False, cwd=None):
         body = {
             "tool_name": "Write",
             "transcript_path": transcript_path if transcript_path is not None else self.reviewer_transcript,
+            # cwd anchors relative-path resolution and the `.agent-session/<task_id>/outputs/`
+            # shape check. Defaults to the test tmp dir so tests can use paths like
+            # ".agent-session/T-001/outputs/d-007.json" against an isolated root.
+            "cwd": cwd if cwd is not None else str(self.tmp_path),
         }
         if not omit_tool_input:
             tool_input = {} if omit_file_path else {"file_path": file_path}
@@ -130,7 +134,7 @@ class TestVerifyReviewerWritePath(unittest.TestCase):
         payload = self._payload("squads/sdd/agents/code-reviewer.md")
         result, code = _run_hook(payload)
         self.assertEqual(result.get("decision"), "block")
-        self.assertIn("outside outputs/", result.get("reason", ""))
+        self.assertIn("outputs/", result.get("reason", ""))
         self.assertEqual(code, 0)
 
     def test_block_path_absolute_outside_outputs(self):
@@ -146,19 +150,39 @@ class TestVerifyReviewerWritePath(unittest.TestCase):
         self.assertEqual(code, 0)
 
     # ------------------------------------------------------------------
-    # Allow: writes inside outputs/
+    # Allow: writes resolving under <project>/.agent-session/<task_id>/outputs/
     # ------------------------------------------------------------------
 
     def test_allow_path_inside_outputs(self):
-        payload = self._payload("outputs/d-007.json")
+        payload = self._payload(".agent-session/T-001/outputs/d-007.json")
         result, code = _run_hook(payload)
         self.assertEqual(result, {})
         self.assertEqual(code, 0)
 
     def test_allow_path_inside_outputs_nested(self):
-        payload = self._payload("outputs/sub/d-007.json")
+        payload = self._payload(".agent-session/T-001/outputs/sub/d-007.json")
         result, code = _run_hook(payload)
         self.assertEqual(result, {})
+        self.assertEqual(code, 0)
+
+    def test_allow_absolute_path_inside_session_outputs(self):
+        """Absolute path landing under <project>/.agent-session/<task_id>/outputs/ → allow."""
+        abs_path = str(self.tmp_path / ".agent-session" / "T-001" / "outputs" / "d-007.json")
+        payload = self._payload(abs_path)
+        result, code = _run_hook(payload)
+        self.assertEqual(result, {})
+        self.assertEqual(code, 0)
+
+    def test_block_bare_outputs_relative_from_project_root(self):
+        """Bare 'outputs/<file>' from project-root CWD lands OUTSIDE .agent-session/ → block.
+
+        Bug fix: the previous hook allowed this lexically, letting reviewer
+        writes escape the session output area whenever their CWD wasn't the
+        session dir.
+        """
+        payload = self._payload("outputs/d-007.json")
+        result, code = _run_hook(payload)
+        self.assertEqual(result.get("decision"), "block")
         self.assertEqual(code, 0)
 
     # ------------------------------------------------------------------
@@ -227,7 +251,7 @@ class TestVerifyReviewerWritePath(unittest.TestCase):
         self.assertEqual(result.get("decision"), "block")
 
     def test_allow_outputs_nested_deep(self):
-        payload = self._payload("outputs/sub/dir/d-007.json")
+        payload = self._payload(".agent-session/T-001/outputs/sub/dir/d-007.json")
         result, code = _run_hook(payload)
         self.assertEqual(result, {})
 
