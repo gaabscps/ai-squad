@@ -1,10 +1,18 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "ai-squad/shared/schemas/output-packet.schema.json",
   "title": "ai-squad Output Packet",
   "description": "Canonical structural contract for Output Packets emitted by all Subagents across squads. SDD Phase 4 Subagents: dev, code-reviewer, logic-reviewer, qa, blocker-specialist, audit-agent. Discovery Phase 2 Subagents: codebase-mapper, risk-analyst. Subagents self-validate against this schema before atomic write; orchestrator (per squad) re-validates on read and adds semantic checks (paths exist, status enum matches Role's allowed transitions). Role-specific fields are top-level optional with description noting which Role(s) may emit them.",
   "type": "object",
-  "required": ["spec_id", "dispatch_id", "role", "status", "summary", "evidence", "usage"],
+  "required": [
+    "spec_id",
+    "dispatch_id",
+    "role",
+    "status",
+    "summary",
+    "evidence",
+    "usage"
+  ],
   "additionalProperties": false,
   "properties": {
     "spec_id": {
@@ -19,14 +27,26 @@
     "role": {
       "type": "string",
       "enum": [
-        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist", "audit-agent",
-        "codebase-mapper", "risk-analyst"
+        "dev",
+        "code-reviewer",
+        "logic-reviewer",
+        "qa",
+        "blocker-specialist",
+        "audit-agent",
+        "codebase-mapper",
+        "risk-analyst",
+        "committer"
       ],
-      "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch"
+      "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch. 'committer' added FEAT-006: auto-commit Subagent dispatched post-Phase-4 handoff."
     },
     "status": {
       "type": "string",
-      "enum": ["done", "needs_review", "blocked", "escalate"]
+      "enum": [
+        "done",
+        "needs_review",
+        "blocked",
+        "escalate"
+      ]
     },
     "blocker_kind": {
       "type": "string",
@@ -34,13 +54,15 @@
     },
     "missing_for": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "qa-specific: AC ids that could not be reached when blocker_kind is missing_test_for_ac"
     },
     "summary": {
       "type": "string",
       "maxLength": 200,
-      "description": "One-line summary, past tense, ≤ 120 chars (see output-packet.md summary format rules)"
+      "description": "One-line summary, past tense, \u2264 120 chars (see output-packet.md summary format rules)"
     },
     "notes": {
       "type": "string",
@@ -51,15 +73,29 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "kind"],
+        "required": [
+          "id",
+          "kind"
+        ],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
           "kind": {
             "type": "string",
             "enum": [
-              "file", "command", "test", "log", "url", "absence",
-              "user_signal", "competitor_observation", "metric_benchmark", "expert_judgment", "code_evidence"
+              "file",
+              "command",
+              "test",
+              "log",
+              "url",
+              "absence",
+              "user_signal",
+              "competitor_observation",
+              "metric_benchmark",
+              "expert_judgment",
+              "code_evidence"
             ],
             "description": "SDD kinds: file | command | test | log | url | absence. Discovery kinds: user_signal | competitor_observation | metric_benchmark | expert_judgment | code_evidence | absence (shared). Each kind defines its own additional fields via additionalProperties: true."
           }
@@ -71,23 +107,51 @@
       "description": "code-reviewer / logic-reviewer findings. Discovery's risk findings live at top level (risk_category/verdict/risk_severity/rationale).",
       "items": {
         "type": "object",
-        "required": ["id", "severity"],
+        "required": [
+          "id",
+          "severity"
+        ],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
           "severity": {
             "type": "string",
-            "enum": ["info", "warning", "error", "critical", "major", "blocker", "minor"]
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "critical",
+              "major",
+              "blocker",
+              "minor"
+            ]
           },
-          "rationale": { "type": "string", "maxLength": 120 },
+          "rationale": {
+            "type": "string",
+            "maxLength": 120
+          },
           "dimension": {
             "type": "string",
-            "enum": ["design", "style", "naming", "comments", "complexity"],
+            "enum": [
+              "design",
+              "style",
+              "naming",
+              "comments",
+              "complexity"
+            ],
             "description": "code-reviewer findings ONLY"
           },
           "gap_kind": {
             "type": "string",
-            "enum": ["edge_case", "missing_flow", "partial_failure", "race", "invariant"],
+            "enum": [
+              "edge_case",
+              "missing_flow",
+              "partial_failure",
+              "race",
+              "invariant"
+            ],
             "description": "logic-reviewer findings ONLY"
           },
           "audit_finding_kind": {
@@ -108,7 +172,7 @@
               "pm_gate_violations",
               "pm_cost_cap_exceeded"
             ],
-            "description": "audit-agent findings ONLY — reconciliation gap categories from the 11 canonical checks (see agents/audit-agent.md). PM-mode kinds (pm_gate_violations, pm_cost_cap_exceeded) emitted only when pm_sessions[] is populated."
+            "description": "audit-agent findings ONLY \u2014 reconciliation gap categories from the 11 canonical checks (see agents/audit-agent.md). PM-mode kinds (pm_gate_violations, pm_cost_cap_exceeded) emitted only when pm_sessions[] is populated."
           }
         }
       }
@@ -117,19 +181,38 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["kind", "summary"],
+        "required": [
+          "kind",
+          "summary"
+        ],
         "additionalProperties": true,
         "properties": {
-          "kind": { "type": "string" },
-          "summary": { "type": "string" },
-          "ac_refs": { "type": "array", "items": { "type": "string" } },
-          "suggested_resolution_paths": { "type": "array", "items": { "type": "string" } }
+          "kind": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "ac_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggested_resolution_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     "files_changed": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "dev-only: paths actually edited; orchestrator verifies subset of Work Packet's scope_files"
     },
     "ac_coverage": {
@@ -137,7 +220,9 @@
       "patternProperties": {
         "^(FEAT|DISC)-\\d{3,}/AC-\\d{3,}$": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false,
@@ -145,17 +230,31 @@
     },
     "risk_category": {
       "type": "string",
-      "enum": ["value", "usability", "feasibility", "viability"],
+      "enum": [
+        "value",
+        "usability",
+        "feasibility",
+        "viability"
+      ],
       "description": "risk-analyst-only: which Cagan Big Risk this dispatch investigated"
     },
     "verdict": {
       "type": "string",
-      "enum": ["validated", "refuted", "inconclusive", "N/A"],
+      "enum": [
+        "validated",
+        "refuted",
+        "inconclusive",
+        "N/A"
+      ],
       "description": "risk-analyst-only: investigation outcome. inconclusive triggers gate; N/A requires rationale (1 sentence) explaining why this risk does not apply."
     },
     "risk_severity": {
       "type": "string",
-      "enum": ["low", "medium", "high"],
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
       "description": "risk-analyst-only: 3-level scale canonical in Product/PM (Asana, SVPG). Distinct from findings[].severity (dev/reviewer use, 6-level)."
     },
     "rationale": {
@@ -167,12 +266,22 @@
       "description": "risk-analyst-only: leap-of-faith items that remain unvalidated after this investigation (Torres assumption mapping). Surface to discovery-synthesizer in Phase 3.",
       "items": {
         "type": "object",
-        "required": ["id", "summary"],
+        "required": [
+          "id",
+          "summary"
+        ],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string" },
-          "summary": { "type": "string" },
-          "validation_path": { "type": "string", "description": "How this assumption could be validated (user interview, benchmark, expert review)" }
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "validation_path": {
+            "type": "string",
+            "description": "How this assumption could be validated (user interview, benchmark, expert review)"
+          }
         }
       }
     },
@@ -181,22 +290,43 @@
       "description": "codebase-mapper-only: C4 Level 2 containers (apps/services in scope). Each item carries name, technology, responsibility, and relationships.",
       "items": {
         "type": "object",
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "additionalProperties": true,
         "properties": {
-          "name": { "type": "string" },
-          "technology": { "type": "string" },
-          "responsibility": { "type": "string" },
+          "name": {
+            "type": "string"
+          },
+          "technology": {
+            "type": "string"
+          },
+          "responsibility": {
+            "type": "string"
+          },
           "relationships": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["target", "direction"],
+              "required": [
+                "target",
+                "direction"
+              ],
               "additionalProperties": true,
               "properties": {
-                "target": { "type": "string" },
-                "direction": { "type": "string", "enum": ["uses", "used_by"] },
-                "protocol": { "type": "string" }
+                "target": {
+                  "type": "string"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "uses",
+                    "used_by"
+                  ]
+                },
+                "protocol": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -206,29 +336,69 @@
     "next_role": {
       "type": "string",
       "enum": [
-        "dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist", "audit-agent",
-        "codebase-mapper", "risk-analyst"
+        "dev",
+        "code-reviewer",
+        "logic-reviewer",
+        "qa",
+        "blocker-specialist",
+        "audit-agent",
+        "codebase-mapper",
+        "risk-analyst",
+        "committer"
       ],
       "description": "Optional hint; orchestrator decides actual routing"
     },
     "usage": {
       "description": "Per-dispatch token usage, populated by capture-subagent-usage.py Stop hook. Required for all roles except pm-orchestrator. Set to null when emitting; hook fills it in.",
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["total_tokens", "tool_uses", "duration_ms", "model"],
+          "required": [
+            "total_tokens",
+            "tool_uses",
+            "duration_ms",
+            "model"
+          ],
           "additionalProperties": true,
           "properties": {
-            "total_tokens": { "type": "integer", "minimum": 0 },
-            "tool_uses": { "type": "integer", "minimum": 0 },
-            "duration_ms": { "type": "integer", "minimum": 0 },
-            "model": { "type": "string" },
-            "input_tokens": { "type": "integer", "minimum": 0 },
-            "output_tokens": { "type": "integer", "minimum": 0 },
-            "cache_creation_input_tokens": { "type": "integer", "minimum": 0 },
-            "cache_read_input_tokens": { "type": "integer", "minimum": 0 },
-            "cost_usd": { "type": "number", "minimum": 0 }
+            "total_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_uses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "model": {
+              "type": "string"
+            },
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_creation_input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_read_input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_usd": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         }
       ]

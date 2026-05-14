@@ -139,7 +139,7 @@ describe('enrich', () => {
     });
   });
 
-  it('normaliseDispatches: skips entries with invalid role or status', () => {
+  it('normaliseDispatches: buckets invalid-status entries into unknown_status with warning; drops invalid-role entries (AC-008)', () => {
     const raw: RawSession = {
       taskId: 'FEAT-INVALID',
       sessionYml: {
@@ -151,27 +151,27 @@ describe('enrich', () => {
       manifest: {
         expected_pipeline: [],
         actual_dispatches: [
-          // invalid role
+          // invalid role → dropped (unknown_role — no bucket possible)
           {
             dispatch_id: 'd1',
             role: 'not-a-role',
             status: 'done',
             started_at: '2026-01-01T00:00:00Z',
           },
-          // invalid status
+          // invalid status, valid role → bucketed as unknown_status (AC-008)
           {
             dispatch_id: 'd2',
             role: 'dev',
             status: 'invalid-status',
             started_at: '2026-01-01T00:00:00Z',
           },
-          // missing dispatch_id
+          // missing dispatch_id → dropped (guard fails)
           {
             role: 'dev',
             status: 'done',
             started_at: '2026-01-01T00:00:00Z',
           },
-          // non-object entry
+          // non-object entry → dropped
           'not-an-object',
         ],
       },
@@ -180,7 +180,10 @@ describe('enrich', () => {
       sessionDirPath: '/tmp/fake',
     };
     const session = enrich(raw);
-    expect(session.dispatches).toHaveLength(0);
+    // d2 (invalid-status + valid-role) must appear in unknown_status bucket (AC-008)
+    expect(session.dispatches).toHaveLength(1);
+    expect(session.dispatches[0]!.dispatchId).toBe('d2');
+    expect(session.dispatches[0]!.status).toBe('unknown_status');
   });
 
   it('normaliseDispatches: skips entries missing dispatch_id or started_at', () => {

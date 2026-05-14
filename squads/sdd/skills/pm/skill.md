@@ -118,8 +118,28 @@ After /task-builder produces `tasks.md`, add a `**Tier:** TX` line to every task
 3. **Phase 2.** Invoke `/designer FEAT-NNN`. Apply the **Plan gate**. Same answer-inline rule.
 4. **Phase 3.** Invoke `/task-builder FEAT-NNN`. Apply the **Tasks gate**. **Additionally:** add the `Tier:` line to every task per the classification table. Same answer-inline rule.
 5. **Phase 4.** Invoke `/orchestrator FEAT-NNN`. The orchestrator reads each task's `Tier:` and applies the canonical Tier × Loop model/effort table to every Work Packet. You do NOT re-classify per dispatch.
+5.5. **Auto-commit** (only when `verdict == done`). See **Step 5.5 — Auto-commit** below.
 6. **Monitor.** As Output Packets return, sanity-check each one against the **Output Packet sniff test** (below). Do not micromanage — let the reviewers and audit-agent do their job — but flag any output that smells like a workaround.
 7. **Final review.** On orchestrator handoff: re-read every Output Packet, `git diff --stat`, and grep the working tree for `TODO`, `FIXME`, `xfail`, `@skip`, `// XXX`, `pending`, mock-only paths claiming pass. If anything surfaces, surface it in your final handoff — do NOT silently accept.
+
+### Step 5.5 — Auto-commit (only when verdict == done)
+
+After `/orchestrator` returns the handoff:
+
+1. Read `.agent-session/<task_id>/handoff.md` and extract `verdict`.
+2. If `verdict != "done"` → SKIP this step entirely; proceed to Step 6 (Monitor). AC-019.
+3. If `verdict == "done"`:
+   a. Aggregate `ac_scope` from all dev Output Packets in `.agent-session/<task_id>/outputs/`.
+   b. Aggregate `files_changed` from same (excluding paths within `.agent-session/`).
+   c. Dispatch the `committer` Subagent via Task tool with:
+      - `subagent_type: "committer"`
+      - `model: "haiku"`  (NFR-002: cheap model required)
+      - `effort: "low"`
+      - Work Packet body: `{ task_id, feature_name, ac_scope, files_changed }`
+   d. Wait for the Output Packet:
+      - `status: done` + `evidence.commit_sha` present → log the SHA, continue to Step 6.
+      - `status: done` + `notes.skipped_reason: "nothing-to-commit"` → log "nothing to commit", continue to Step 6. AC-018.
+      - `status: blocked` → **SURFACE the error to the user** (do NOT silently proceed); include `evidence.git_stderr` and `evidence.git_status_before` in the message; ABORT Phase 4 wrap-up. AC-020.
 
 ## Output Packet sniff test (per dispatch return)
 

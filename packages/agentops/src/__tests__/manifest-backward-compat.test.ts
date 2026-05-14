@@ -17,6 +17,7 @@ import path from 'path';
 
 import { normaliseDispatches } from '../enrich/dispatches';
 import { normalisePmSessions } from '../enrich/pm-sessions';
+import { isDispatchStatus, VALID_STATUSES } from '../enrich/guards';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -131,23 +132,23 @@ describe('FEAT-002 backward-compat (schema_version 1, 62 dispatches)', () => {
 //
 // FEAT-003 has real usage (sonnet-4-6, total_tokens per dispatch) but no cost_usd
 // fields — the parser's attachCostUsd computes them via the 70/30 split assumption.
-// Expected total: sum over 10 dispatches × sonnet pricing.
+// Expected total: sum over ALL 10 dispatches × sonnet pricing.
 // Pricing: input=3$/MTok output=15$/MTok, 70/30 split.
 // Dispatches:
-//   dev-T-001-loop1:           111612 tokens
-//   code-reviewer-T-001-loop1:  66690 tokens (status 'needs_changes' → filtered by isDispatchStatus)
-//   logic-reviewer-T-001-loop1: 74761 tokens (status 'needs_changes' → filtered)
-//   dev-T-001-loop2:           131196 tokens
-//   code-reviewer-T-001-loop2:  16231 tokens
-//   logic-reviewer-T-001-loop2: 39293 tokens (status 'needs_changes' → filtered)
-//   dev-T-001-loop3:            31007 tokens
-//   logic-reviewer-T-001-loop3: 16831 tokens
-//   qa-T-001-loop1:             64188 tokens
-//   audit-AUDIT-loop1:          44517 tokens
+//   dev-T-001-loop1:           111612 tokens  (done)
+//   code-reviewer-T-001-loop1:  66690 tokens  (needs_changes — canonical per AC-003/FEAT-006)
+//   logic-reviewer-T-001-loop1: 74761 tokens  (needs_changes — canonical)
+//   dev-T-001-loop2:           131196 tokens  (done)
+//   code-reviewer-T-001-loop2:  16231 tokens  (done)
+//   logic-reviewer-T-001-loop2: 39293 tokens  (needs_changes — canonical)
+//   dev-T-001-loop3:            31007 tokens  (done)
+//   logic-reviewer-T-001-loop3: 16831 tokens  (done)
+//   qa-T-001-loop1:             64188 tokens  (done)
+//   audit-AUDIT-loop1:          44517 tokens  (blocked)
 //
-// Note: dispatches with status 'needs_changes' are NOT in VALID_STATUSES
-// (only: done|needs_review|blocked|escalate|partial) — they are dropped by
-// normaliseDispatches. The 7 dispatches with valid statuses are counted.
+// FEAT-006 (AC-003): 'needs_changes' is now part of the canonical VALID_STATUSES enum
+// (8 canonical values: pending|running|done|needs_review|needs_changes|blocked|escalate|failed).
+// All 10 dispatches are accepted by isDispatchStatus; none are dropped.
 // ---------------------------------------------------------------------------
 
 describe('FEAT-003 backward-compat (schema_version 1, real usage, pm_sessions: [])', () => {
@@ -176,16 +177,17 @@ describe('FEAT-003 backward-compat (schema_version 1, real usage, pm_sessions: [
     expect(normalisePmSessions(manifest)).toEqual([]);
   });
 
-  it('valid dispatch entries present (dispatches with recognised statuses only, AC-014)', () => {
-    // Of the 10 raw entries, 3 carry status 'needs_changes' which is not in
-    // VALID_STATUSES — normaliseDispatches drops them. 7 valid dispatches remain.
+  it('all 10 dispatch entries present — needs_changes is now canonical (AC-003, FEAT-006)', () => {
+    // FEAT-006: 'needs_changes' added to canonical VALID_STATUSES enum.
+    // All 10 FEAT-003 dispatches (including the 3 needs_changes reviewers) are accepted.
     const dispatches = normaliseDispatches(manifest);
-    expect(dispatches).toHaveLength(7);
+    expect(dispatches).toHaveLength(10);
   });
 
-  it('dispatch IDs of valid entries all present (AC-014: no data loss on parse)', () => {
+  it('dispatch IDs of all 10 entries present (AC-014: no data loss on parse)', () => {
     const dispatches = normaliseDispatches(manifest);
     const ids = dispatches.map((d) => d.dispatchId);
+    // 7 non-needs_changes dispatches
     expect(ids).toContain('dev-T-001-loop1');
     expect(ids).toContain('dev-T-001-loop2');
     expect(ids).toContain('dev-T-001-loop3');
@@ -193,6 +195,10 @@ describe('FEAT-003 backward-compat (schema_version 1, real usage, pm_sessions: [
     expect(ids).toContain('logic-reviewer-T-001-loop3');
     expect(ids).toContain('qa-T-001-loop1');
     expect(ids).toContain('audit-AUDIT-loop1');
+    // 3 needs_changes dispatches — now also accepted (AC-003)
+    expect(ids).toContain('code-reviewer-T-001-loop1');
+    expect(ids).toContain('logic-reviewer-T-001-loop1');
+    expect(ids).toContain('logic-reviewer-T-001-loop2');
   });
 
   it('cost_usd computed for every valid dispatch (usage data present → non-zero costs)', () => {
@@ -204,14 +210,15 @@ describe('FEAT-003 backward-compat (schema_version 1, real usage, pm_sessions: [
     }
   });
 
-  it('aggregate cost_usd matches prior total (within floating-point tolerance)', () => {
-    // Expected: sum of valid dispatch costs using 70/30 split on sonnet-4-6 pricing.
+  it('aggregate cost_usd matches total across all 10 dispatches (within floating-point tolerance)', () => {
+    // FEAT-006: all 10 dispatches (including 3 needs_changes) are now accepted.
+    // Expected: sum of ALL 10 dispatch costs using 70/30 split on sonnet-4-6 pricing.
     // Computed externally:
-    //   valid tokens: 111612 + 131196 + 16231 + 31007 + 16831 + 64188 + 44517 = 415582
-    //   cost = (415582 * 0.7 * 3 + 415582 * 0.3 * 15) / 1_000_000
-    //        = (872722.2 + 1870119) / 1_000_000
-    //        = 2742841.2 / 1_000_000 = 2.7428412
-    const EXPECTED_TOTAL_USD = 2.742841;
+    //   all tokens: 111612 + 66690 + 74761 + 131196 + 16231 + 39293 + 31007 + 16831 + 64188 + 44517 = 596326
+    //   cost = (596326 * 0.7 * 3 + 596326 * 0.3 * 15) / 1_000_000
+    //        = (1252284.6 + 2683467) / 1_000_000
+    //        = 3935751.6 / 1_000_000 = 3.9357516
+    const EXPECTED_TOTAL_USD = 3.935752;
     const actual = sumDispatchCost(manifest);
     expect(actual).toBeCloseTo(EXPECTED_TOTAL_USD, 4); // 4 decimal places
   });
@@ -219,6 +226,58 @@ describe('FEAT-003 backward-compat (schema_version 1, real usage, pm_sessions: [
 
 // ---------------------------------------------------------------------------
 // Cross-fixture: schema additive safety — new fields in v2 don't break v1 parse
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// AC-003 / AC-013 — canonical enum coverage: isDispatchStatus accepts all 8
+// canonical values and rejects non-canonical values (FEAT-006 ground truth).
+// ---------------------------------------------------------------------------
+
+describe('isDispatchStatus — canonical enum coverage (AC-003, AC-013)', () => {
+  it('VALID_STATUSES contains exactly 8 canonical values', () => {
+    expect(VALID_STATUSES).toHaveLength(8);
+  });
+
+  it('all 8 canonical statuses are accepted by isDispatchStatus (AC-003)', () => {
+    const expected = [
+      'pending',
+      'running',
+      'done',
+      'needs_review',
+      'needs_changes',
+      'blocked',
+      'escalate',
+      'failed',
+    ];
+    for (const status of expected) {
+      expect(isDispatchStatus(status)).toBe(true);
+    }
+  });
+
+  it('non-canonical values are rejected by isDispatchStatus (AC-013)', () => {
+    const nonCanonical = [
+      'completed',   // plausible false positive — must be rejected
+      'success',
+      'error',
+      'partial',     // deprecated; not in active enum
+      'cancelled',
+      '',
+    ];
+    for (const status of nonCanonical) {
+      expect(isDispatchStatus(status)).toBe(false);
+    }
+  });
+
+  it('non-string values are rejected by isDispatchStatus', () => {
+    expect(isDispatchStatus(null)).toBe(false);
+    expect(isDispatchStatus(undefined)).toBe(false);
+    expect(isDispatchStatus(42)).toBe(false);
+    expect(isDispatchStatus({})).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schema additive safety: new v2 fields absent in v1 → safe defaults
 // ---------------------------------------------------------------------------
 
 describe('schema additive safety: new v2 fields absent in v1 → safe defaults', () => {

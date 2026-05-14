@@ -19,6 +19,7 @@
  * 14. PM notes log
  */
 
+import type { DispatchWarning } from '../../enrich/dispatches';
 import type { Insight, Metrics, RepoHealth, Session } from '../../types';
 
 import { renderCostBreakdownFull } from './cost-breakdown';
@@ -39,18 +40,21 @@ import { renderPerDispatchTable } from './per-dispatch-table';
 import { renderPmNotesLog } from './pm-notes';
 import { renderRepoHealthSnapshot } from './repo-health-snapshot';
 import { renderTimeline } from './timeline';
+import { renderDispatchWarnings } from '../report';
 
 /**
  * Renders a complete per-flow Markdown report with all 14 sections.
  *
- * @param metrics    - Computed metrics for the session.
- * @param insights   - Insight rules output.
- * @param generatedAt - ISO timestamp string for the "Generated at" line.
- * @param featureName - Human-readable feature name.
- * @param currentPhase - Current pipeline phase.
- * @param session    - Optional full session for rich sections (per-dispatch, per-AC, timeline, PM notes).
- * @param repoHealth - Optional repo health snapshot (AC-028).
- * @param pmWarnings - Optional PM session capture warnings (AC-007); surfaced in header.
+ * @param metrics          - Computed metrics for the session.
+ * @param insights         - Insight rules output.
+ * @param generatedAt      - ISO timestamp string for the "Generated at" line.
+ * @param featureName      - Human-readable feature name.
+ * @param currentPhase     - Current pipeline phase.
+ * @param session          - Optional full session for rich sections (per-dispatch, per-AC, timeline, PM notes).
+ * @param repoHealth       - Optional repo health snapshot (AC-028).
+ * @param pmWarnings       - Optional PM session capture warnings (AC-007); surfaced in header.
+ * @param dispatchWarnings - Optional dispatch normalisation warnings (FEAT-006 T-009 / AC-007, AC-008);
+ *                          renders ## Warnings section when non-empty.
  */
 export function renderFlowReport(
   metrics: Metrics,
@@ -61,6 +65,7 @@ export function renderFlowReport(
   session?: Session,
   repoHealth?: RepoHealth | null,
   pmWarnings?: PmSessionWarning[],
+  dispatchWarnings?: DispatchWarning[],
 ): string {
   const sections: string[] = [];
 
@@ -121,6 +126,13 @@ export function renderFlowReport(
   // 14. PM notes log (requires session)
   if (session) {
     sections.push(renderPmNotesLog(session));
+  }
+
+  // 15. Dispatch warnings — FEAT-006 T-009 (AC-007, AC-008).
+  // Rendered only when dispatchWarnings is non-empty; omitted entirely when empty or undefined.
+  const warningsSection = renderDispatchWarnings(dispatchWarnings);
+  if (warningsSection !== null) {
+    sections.push(warningsSection);
   }
 
   // Token cost — forward pmSessions and pmWarnings so AC-006/AC-007 paths are reachable.

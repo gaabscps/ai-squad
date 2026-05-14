@@ -1,12 +1,62 @@
 /**
  * Dispatch normalisation, QA results aggregation, and output packet attachment.
+ *
+ * FEAT-006 T-008 (AC-005..010): warn-on-unknown + deprecation handling.
+ * The silent drop at the original line 140 is replaced by structured warning
+ * emission. normaliseDispatchesWithWarnings is the new primary API; the legacy
+ * normaliseDispatches delegates to it for backward compatibility.
  */
 
 import { ANTHROPIC_PRICING_2026 } from '../constants';
 import { computeUsageCost } from '../measure/cost';
 import type { RawSession, Session, TierCalibration, Usage } from '../types';
+import { VALID_ROLES, VALID_STATUSES, DEPRECATED_STATUSES } from '../canonical-statuses';
 
 import { isRecord, isArray, isRole, isDispatchStatus, isQaStatus, isUsage, isTierCalibration } from './guards';
+
+// ---------------------------------------------------------------------------
+// Warning types (FEAT-006 T-008 / AC-007)
+// ---------------------------------------------------------------------------
+
+/** Emitted when a dispatch_id references a role string not in VALID_ROLES.
+ *  The dispatch is dropped — no bucket possible. */
+export interface UnknownRoleWarning {
+  kind: 'unknown_role';
+  dispatch_id: string;
+  task_id: string;
+  role: string;
+  valid: readonly string[];
+}
+
+/** Emitted when the role is valid but the status string is not in VALID_STATUSES
+ *  and not in DEPRECATED_STATUSES. The dispatch is placed in the 'unknown_status'
+ *  bucket to preserve count (AC-009). */
+export interface UnknownStatusWarning {
+  kind: 'unknown_status';
+  dispatch_id: string;
+  task_id: string;
+  role: string;
+  status: string;
+  valid: readonly string[];
+}
+
+/** Emitted when status === 'partial' (or any future deprecated value).
+ *  The dispatch is processed normally (AC-010). */
+export interface DeprecatedStatusWarning {
+  kind: 'deprecated_status';
+  dispatch_id: string;
+  task_id: string;
+  status: string;
+  note: string;
+}
+
+export type DispatchWarning = UnknownRoleWarning | UnknownStatusWarning | DeprecatedStatusWarning;
+
+/** Return shape of normaliseDispatchesWithWarnings. */
+export interface NormaliseDispatchesResult {
+  dispatches: Session['dispatches'];
+  warnings: DispatchWarning[];
+}
 
 const INPUT_RATIO = 0.7;
 const OUTPUT_RATIO = 0.3;
@@ -122,23 +172,103 @@ function buildBackfillLookup(manifest: Record<string, unknown>): Map<string, Usa
   return lookup;
 }
 
-export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
-  if (!isRecord(manifest)) return [];
+/**
+ * Normalise actual_dispatches from a manifest with full warning emission.
+ *
+ * FEAT-006 T-008 (AC-005..010):
+ * - Unknown role     → UnknownRoleWarning + dispatch dropped (AC-007, AC-009)
+ * - Unknown status   → UnknownStatusWarning + dispatch placed in 'unknown_status'
+ *                      bucket (AC-007, AC-008, AC-009)
+ * - Deprecated status (e.g. "partial") → DeprecatedStatusWarning + dispatch
+ *                      processed normally (AC-010)
+ * - Canonical status → processed as before (AC-006)
+ */
+export function normaliseDispatchesWithWarnings(manifest: unknown): NormaliseDispatchesResult {
+  if (!isRecord(manifest)) return { dispatches: [], warnings: [] };
   const actualDispatches = manifest.actual_dispatches;
-  if (!isArray(actualDispatches)) return [];
+  if (!isArray(actualDispatches)) return { dispatches: [], warnings: [] };
 
   // AC-022: build backfill lookup so dispatches without real usage can fall back
   const backfillLookup = buildBackfillLookup(manifest);
+  const warnings: DispatchWarning[] = [];
 
   const subagentDispatches = actualDispatches.flatMap((raw): Session['dispatches'] => {
     if (!isRecord(raw)) return [];
     const role = raw.role;
     const status = raw.status;
-    const dispatchId = raw.dispatch_id;
+    const dispatchId = typeof raw.dispatch_id === 'string' ? raw.dispatch_id : '(unknown)';
+    const taskId = typeof raw.task_id === 'string' ? raw.task_id : '';
     const startedAt = raw.started_at;
 
-    if (!isRole(role) || !isDispatchStatus(status)) return [];
-    if (typeof dispatchId !== 'string' || typeof startedAt !== 'string') {
+    // --- Role validation (AC-007 unknown_role) ---
+    if (!isRole(role)) {
+      warnings.push({
+        kind: 'unknown_role',
+        dispatch_id: dispatchId,
+        task_id: taskId,
+        role: typeof role === 'string' ? role : String(role),
+        valid: VALID_ROLES,
+      });
+      return []; // drop — no bucket possible for unknown role
+    }
+
+    // From here: role is valid. Check status.
+    const statusStr = typeof status === 'string' ? status : String(status);
+
+    // --- Deprecated status (AC-010, AC-005) ---
+    const isDeprecated = typeof status === 'string' && (DEPRECATED_STATUSES as string[]).includes(status);
+    if (isDeprecated) {
+      warnings.push({
+        kind: 'deprecated_status',
+        dispatch_id: dispatchId,
+        task_id: taskId,
+        status: statusStr,
+        note: `deprecated; will be removed in vNext+1`,
+      });
+      // Fall through to process normally — effective status is the deprecated value
+    } else if (!isDispatchStatus(status)) {
+      // --- Unknown status (AC-007, AC-008) ---
+      warnings.push({
+        kind: 'unknown_status',
+        dispatch_id: dispatchId,
+        task_id: taskId,
+        role: role as string,
+        status: statusStr,
+        valid: VALID_STATUSES,
+      });
+      // Place in unknown_status bucket (AC-008) — startedAt required
+      if (typeof raw.dispatch_id !== 'string' || typeof startedAt !== 'string') return [];
+      // Build minimal dispatch entry with status='unknown_status'
+      const completedAt = typeof raw.completed_at === 'string' ? raw.completed_at : null;
+      const loop =
+        typeof raw.loop === 'number'
+          ? raw.loop
+          : typeof raw.review_loop === 'number'
+            ? raw.review_loop
+            : null;
+      const pmNote = typeof raw.pm_note === 'string' ? raw.pm_note : null;
+      const unknownEntry: Session['dispatches'][number] = {
+        dispatchId,
+        role: role as Session['dispatches'][number]['role'],
+        status: 'unknown_status' as Session['dispatches'][number]['status'],
+        startedAt,
+        completedAt,
+        outputPacket: null,
+        loop,
+        pmNote,
+      };
+      if (typeof raw.task_id === 'string' && raw.task_id.length > 0) {
+        unknownEntry.taskId = raw.task_id;
+      }
+      return [unknownEntry];
+    }
+
+    // --- dispatch_id / startedAt guard ---
+    // dispatchId was set above: raw.dispatch_id if string, else '(unknown)'.
+    // If raw.dispatch_id was not a string, it would equal '(unknown)' — but the
+    // actual raw.dispatch_id would be undefined/non-string, so the equality check
+    // below drops it. Also guard startedAt is a string.
+    if (typeof raw.dispatch_id !== 'string' || typeof startedAt !== 'string') {
       return [];
     }
 
@@ -230,7 +360,22 @@ export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
     return [dispatchEntry];
   });
 
-  return [...subagentDispatches, ...synthesizePmDispatches(manifest)];
+  return {
+    dispatches: [...subagentDispatches, ...synthesizePmDispatches(manifest)],
+    warnings,
+  };
+}
+
+/**
+ * Legacy export: normaliseDispatches returns only the dispatches array.
+ * Delegates to normaliseDispatchesWithWarnings; warnings are silently discarded.
+ * Callers that need warnings should use normaliseDispatchesWithWarnings instead.
+ *
+ * Preserved for backward compatibility with enrich.ts, cost-rollups, and
+ * manifest-backward-compat tests which are outside T-008 scope_files.
+ */
+export function normaliseDispatches(manifest: unknown): Session['dispatches'] {
+  return normaliseDispatchesWithWarnings(manifest).dispatches;
 }
 
 /**

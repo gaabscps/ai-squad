@@ -28,9 +28,16 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
+# squads/sdd/hooks/ is 3 levels below project root: project_root/squads/sdd/hooks/
+# parents[0] = squads/sdd/hooks, parents[1] = squads/sdd, parents[2] = squads, parents[3] = project root
 _SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
+# Append (not insert) so shared/lib does NOT shadow stdlib modules (e.g. warnings.py in shared/lib
+# must not intercept `import warnings` from pathlib._local during stdlib init).
+if str(_SHARED_LIB) not in sys.path:
+    sys.path.append(str(_SHARED_LIB))
 
 from hook_runtime import resolve_project_root
+from canonical_statuses import VALID_STATUSES as _CANONICAL_VALID_STATUSES, format_valid_list as _format_valid_list
 
 
 def _try_append_warning(task_id: str, reason: str, metadata: dict | None = None) -> None:
@@ -45,7 +52,10 @@ def _try_append_warning(task_id: str, reason: str, metadata: dict | None = None)
         print(f"verify-output-packet: warning append skipped ({exc})", file=sys.stderr)
 
 REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "summary", "evidence"}
-VALID_STATUSES = {"done", "needs_review", "blocked", "escalate"}
+# VALID_STATUSES derived from canonical source — do NOT hardcode here.
+# Single source: shared/schemas/dispatch-manifest.schema.json via shared/lib/canonical_statuses.py (T-002).
+# AC-002, AC-013: extending the schema enum propagates automatically to this hook without edits.
+VALID_STATUSES = _CANONICAL_VALID_STATUSES
 
 # Discriminated-union map: role -> extra validation performed after REQUIRED_FIELDS.
 # Keys map to callables: validate_role_fields(packet) -> (ok: bool, reason: str).
@@ -234,7 +244,10 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
     if missing:
         return False, f"Output Packet missing required fields: {sorted(missing)}"
     if packet.get("status") not in VALID_STATUSES:
-        return False, f"Output Packet status '{packet.get('status')}' not in {sorted(VALID_STATUSES)}"
+        return False, (
+            f"Output Packet status '{packet.get('status')}' not in valid statuses: "
+            f"{_format_valid_list(VALID_STATUSES)}"
+        )
     # AC-001: usage field enforcement (universal, pm-orchestrator exempt).
     # Checked separately from REQUIRED_FIELDS to emit role-specific error message.
     ok, reason = _validate_usage_field(packet)

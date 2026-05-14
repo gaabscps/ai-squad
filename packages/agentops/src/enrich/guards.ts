@@ -1,9 +1,17 @@
 /**
  * Type guards for enrich pipeline (Plan D11).
  * No `as` casts on uncertain shapes.
+ *
+ * FEAT-006 T-006: VALID_STATUSES and VALID_ROLES are derived from the canonical
+ * source (shared/schemas/dispatch-manifest.schema.json) via canonical-statuses.ts.
+ * Do NOT hardcode status or role strings here — extend the schema enum instead.
  */
 
 import type { Role, DispatchStatus, PhaseName, Session, Usage, TierCalibration, PmSessionSource } from '../types';
+import {
+  VALID_STATUSES as _CANONICAL_STATUSES,
+  VALID_ROLES as _CANONICAL_ROLES,
+} from '../canonical-statuses';
 
 export function isRecord(o: unknown): o is Record<string, unknown> {
   return typeof o === 'object' && o !== null && !Array.isArray(o);
@@ -13,23 +21,10 @@ export function isArray(o: unknown): o is unknown[] {
   return Array.isArray(o);
 }
 
-export const VALID_ROLES: Role[] = [
-  'dev',
-  'code-reviewer',
-  'logic-reviewer',
-  'qa',
-  'blocker-specialist',
-  'audit-agent',
-  'pm-orchestrator',
-];
-
-export const VALID_STATUSES: DispatchStatus[] = [
-  'done',
-  'needs_review',
-  'blocked',
-  'escalate',
-  'partial',
-];
+// Re-exported for downstream consumers that import VALID_ROLES / VALID_STATUSES
+// from this module. Derived from canonical schema — not hardcoded.
+export const VALID_ROLES: readonly string[] = _CANONICAL_ROLES;
+export const VALID_STATUSES: readonly string[] = _CANONICAL_STATUSES;
 
 export const VALID_PHASES: Session['currentPhase'][] = [
   'specify',

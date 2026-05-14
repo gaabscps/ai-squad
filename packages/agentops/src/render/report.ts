@@ -5,9 +5,14 @@
  *   - renderCostByTier:      ## Cost by tier  (AC-015, AC-016)
  *   - renderCostByPmSession: ## Cost by PM session  (AC-015, AC-013)
  *
+ * FEAT-006 T-009 (AC-007, AC-008):
+ *   - renderDispatchWarnings: ## Warnings section rendered when dispatch
+ *     warnings are present (unknown_status, deprecated_status, unknown_role).
+ *
  * Consumed by flow-report/index.ts when session data is present.
  */
 
+import type { DispatchWarning } from '../enrich/dispatches';
 import type { Session, PmSession, TierCalibration } from '../types';
 import { fmtUsd, mdTable } from './flow-report/utils';
 
@@ -102,4 +107,66 @@ export function renderCostByPmSession(pmSessions: PmSession[] | undefined): stri
   const totalLine = `\n_Total PM cost: ${fmtUsd(totalCost)}_`;
 
   return `## Cost by PM session\n\n${table}${totalLine}`;
+}
+
+// ---------------------------------------------------------------------------
+// renderDispatchWarnings — FEAT-006 T-009 (AC-007, AC-008)
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders the ## Warnings markdown section from dispatch warnings collected
+ * by normaliseDispatchesWithWarnings (T-008).
+ *
+ * Each warning line format:
+ *   - [<kind>] dispatch_id=<...>, task_id=<...>, role=<...>, status=<...>
+ *
+ * Returns null when warnings is empty or undefined (section is not emitted).
+ * AC-008: the section is ONLY omitted when there are truly zero warnings —
+ * it is never rendered as an empty section.
+ */
+export function renderDispatchWarnings(
+  warnings: DispatchWarning[] | undefined,
+): string | null {
+  if (!warnings || warnings.length === 0) return null;
+
+  const lines: string[] = ['## Warnings'];
+  lines.push('');
+
+  // Group by kind in canonical order: unknown_role, unknown_status, deprecated_status.
+  const kindOrder: DispatchWarning['kind'][] = [
+    'unknown_role',
+    'unknown_status',
+    'deprecated_status',
+  ];
+
+  for (const kind of kindOrder) {
+    const group = warnings.filter((w) => w.kind === kind);
+    if (group.length === 0) continue;
+
+    for (const w of group) {
+      const parts: string[] = [`[${w.kind}]`];
+
+      parts.push(`dispatch_id=${w.dispatch_id}`);
+
+      if (w.task_id) {
+        parts.push(`task_id=${w.task_id}`);
+      }
+
+      if (w.kind === 'unknown_role') {
+        parts.push(`role=${w.role}`);
+        parts.push(`valid_roles=[${w.valid.join(', ')}]`);
+      } else if (w.kind === 'unknown_status') {
+        parts.push(`role=${w.role}`);
+        parts.push(`status=${w.status}`);
+        parts.push(`valid_statuses=[${w.valid.join(', ')}]`);
+      } else if (w.kind === 'deprecated_status') {
+        parts.push(`status=${w.status}`);
+        parts.push(`note="${w.note}"`);
+      }
+
+      lines.push(`- ${parts.join(', ')}`);
+    }
+  }
+
+  return lines.join('\n');
 }

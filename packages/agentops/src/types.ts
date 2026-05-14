@@ -3,6 +3,9 @@
  * Types: FEAT-001 ConfigResolver (AgentOpsConfig, ResolvedConfig, ClaudeHookEntry, ClaudeSettings); FEAT-002 DM-1..DM-5; FEAT-003 DM-1..DM-4.
  */
 
+// FEAT-006 T-007 — DispatchStatus derived from canonical enum (single source of truth).
+import type { DispatchStatus } from './canonical-statuses';
+
 // FEAT-003 DM-1 — Usage: per-dispatch token usage captured from <usage> annotation
 export interface Usage {
   total_tokens: number;
@@ -92,8 +95,9 @@ export type Role =
   /** PM/orchestrator session — populated from Stop hook (FEAT-005). Virtual dispatch. */
   | 'pm-orchestrator';
 
-// DM-5 — DispatchStatus: possible status values for a dispatch
-export type DispatchStatus = 'done' | 'needs_review' | 'blocked' | 'escalate' | 'partial';
+// DM-5 — DispatchStatus: derived from canonical enum (FEAT-006 T-007).
+// Single source of truth: shared/schemas/dispatch-manifest.schema.json via canonical-statuses.ts.
+export type { DispatchStatus };
 
 // DM-5 — PhaseName: known SDD pipeline phases
 export type PhaseName = 'specify' | 'plan' | 'tasks' | 'implementation';

@@ -6,6 +6,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Deprecated
+
+- `partial` dispatch status: continues to be recognized by agentops report with deprecation warning. No current producer (orchestrator, hooks) emits this value. Full removal is planned for vNext+1 (no fixed timeline). Historical reports containing `partial` remain parseable.
+
+### Added
+
+- Canonical status enum as single source-of-truth (FEAT-006): `shared/schemas/dispatch-manifest.schema.json` is the exclusive definition. Python and TypeScript consumers derive their enums automatically via runtime schema import.
+- `committer` role: new Subagent (model: haiku) for auto-commit of working tree at end of Phase 4 when `verdict: done`.
+
+### Fixed
+
+- Silent drop of dispatches in agentops report when status is non-canonical. Now emits warning with structured error message + `unknown_status` bucket preserving total count (FEAT-006).
+
 ## 0.3.0 — 2026-05-06
 
 ### Added
