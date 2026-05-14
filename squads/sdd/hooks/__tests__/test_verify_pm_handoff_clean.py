@@ -17,6 +17,7 @@ Run with:
 OR:
   python3 squads/sdd/hooks/__tests__/test_verify_pm_handoff_clean.py
 """
+import atexit
 import json
 import os
 import shutil
@@ -26,6 +27,19 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+
+# Skill-scope gate stub (added with detect_active_skill gating in verify-pm-handoff-clean).
+# The hook now refuses to scan unless the active Skill is positively
+# identified as `pm`. Tests must simulate that context by providing a
+# transcript file containing the Skill marker.
+_PM_TRANSCRIPT = Path(tempfile.NamedTemporaryFile(
+    mode="w", suffix=".jsonl", delete=False
+).name)
+_PM_TRANSCRIPT.write_text(
+    "Base directory for this Skill: /tmp/.claude/skills/pm\n",
+    encoding="utf-8",
+)
+atexit.register(lambda: _PM_TRANSCRIPT.unlink(missing_ok=True))
 
 # ---------------------------------------------------------------------------
 # Locate the hook script
@@ -67,7 +81,10 @@ def _make_tree(tmp: Path, files: dict[str, str]) -> None:
 
 
 # Standard hook payload (stop hook — no tool_input).
-_BASE_PAYLOAD = {"stop_hook_active": False}
+_BASE_PAYLOAD = {
+    "stop_hook_active": False,
+    "transcript_path": str(_PM_TRANSCRIPT),
+}
 
 
 def _make_hook_script(tmp: Path, fake_pm_shared_src: str) -> Path:

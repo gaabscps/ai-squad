@@ -7,6 +7,7 @@ Claude Code sets CLAUDE_PROJECT_DIR.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -48,6 +49,106 @@ def edit_target_path(tool_input: Mapping[str, Any]) -> str:
 def shell_command(tool_input: Mapping[str, Any]) -> str:
     val = tool_input.get("command")
     return val if isinstance(val, str) else ""
+
+
+_SKILL_MARKER_PATTERN = re.compile(
+    r"[Bb]ase directory for this [Ss]kill:\s*\S*?/skills/([A-Za-z0-9_-]+)"
+)
+_SUBAGENT_TYPE_PATTERN = re.compile(
+    r"subagent_type:\s*[\"']?([A-Za-z0-9_-]+)"
+)
+_TRANSCRIPT_TAIL_BYTES = 256 * 1024
+_TRANSCRIPT_HEAD_LINE_LIMIT = 80
+
+
+def detect_active_skill(payload: Mapping[str, Any] | None) -> str | None:
+    """Return the slug of the most recently activated Claude Code Skill, or None.
+
+    Scans the tail of the JSONL transcript (last 256 KiB) for the canonical
+    marker `Base directory for this skill: .../skills/<name>` that Claude Code
+    emits when a Skill is invoked. The LAST occurrence wins — a session may
+    load multiple skills in sequence, and only the most recent one defines
+    the current scope.
+
+    Returns None when:
+      - payload is not a dict
+      - transcript_path missing or not a string
+      - transcript file unreadable
+      - no Skill marker found in the scanned tail
+    """
+    if not isinstance(payload, dict):
+        return None
+    tp = payload.get("transcript_path") or payload.get("agent_transcript_path")
+    if not isinstance(tp, str) or not tp:
+        return None
+    transcript_path = Path(tp)
+    try:
+        with transcript_path.open("rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            start = max(0, size - _TRANSCRIPT_TAIL_BYTES)
+            fh.seek(start)
+            tail = fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return None
+    matches = _SKILL_MARKER_PATTERN.findall(tail)
+    if not matches:
+        return None
+    return matches[-1]
+
+
+def detect_active_subagent(payload: Mapping[str, Any] | None) -> str | None:
+    """Return the Work Packet `subagent_type` slug, or None.
+
+    Scans the first _TRANSCRIPT_HEAD_LINE_LIMIT lines of the JSONL transcript
+    for the Work Packet marker `subagent_type: <name>`. The Work Packet is
+    always at the top of the sub-Task transcript, so a tight head bound is
+    safe and keeps latency predictable.
+
+    Returns None when:
+      - payload is not a dict
+      - transcript_path missing or not a string
+      - transcript file unreadable
+      - no subagent_type marker found within the scan window
+    """
+    if not isinstance(payload, dict):
+        return None
+    tp = payload.get("transcript_path") or payload.get("agent_transcript_path")
+    if not isinstance(tp, str) or not tp:
+        return None
+    transcript_path = Path(tp)
+    try:
+        with transcript_path.open("r", encoding="utf-8", errors="replace") as fh:
+            for lineno, raw_line in enumerate(fh, start=1):
+                if lineno > _TRANSCRIPT_HEAD_LINE_LIMIT:
+                    break
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                content = entry.get("content")
+                if content is None:
+                    msg = entry.get("message")
+                    if isinstance(msg, dict):
+                        content = msg.get("content")
+                if isinstance(content, list):
+                    content = " ".join(
+                        c.get("text", "") if isinstance(c, dict) else str(c)
+                        for c in content
+                    )
+                if not isinstance(content, str):
+                    continue
+                m = _SUBAGENT_TYPE_PATTERN.search(content)
+                if m:
+                    return m.group(1)
+    except OSError:
+        return None
+    return None
 
 
 def should_run_audit_manifest_verify(session_dir: Path) -> bool:

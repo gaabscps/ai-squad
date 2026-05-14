@@ -38,7 +38,7 @@ if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
 from _pm_shared import enumerate_working_tree_files, grep_debt_markers
-from hook_runtime import resolve_project_root
+from hook_runtime import detect_active_skill, resolve_project_root
 
 # ---------------------------------------------------------------------------
 # Soft budget for the scan operation (NFR-001: hook must complete within 5 s).
@@ -109,6 +109,15 @@ def main() -> int:
 
         # Guard against infinite stop-hook loop.
         if payload.get("stop_hook_active"):
+            _output_written = True  # intentional allow
+            return 0
+
+        # Skill-scope gate: debt-marker scan only applies to the pm Skill's
+        # session Stop. When deploy registers this hook globally under Stop,
+        # any other session Stop (main, orchestrator, other Skills) would
+        # otherwise scan the working tree and potentially block. Default:
+        # allow when active Skill is not positively identified as `pm`.
+        if detect_active_skill(payload) != "pm":
             _output_written = True  # intentional allow
             return 0
 

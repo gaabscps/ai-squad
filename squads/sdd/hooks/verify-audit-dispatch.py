@@ -22,7 +22,7 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from hook_runtime import resolve_project_root, should_run_audit_manifest_verify
+from hook_runtime import detect_active_skill, resolve_project_root, should_run_audit_manifest_verify
 
 
 def find_active_session(project_dir: Path) -> Path | None:
@@ -80,6 +80,15 @@ def main() -> int:
 
     if payload.get("stop_hook_active"):
         # We're already inside a stop-block loop; let it through to avoid infinite recursion.
+        return 0
+
+    # Skill-scope gate: audit reconciliation only applies to the orchestrator
+    # Skill's session Stop. When deploy registers this hook globally under
+    # Stop, any other session Stop (main, /pm Phase 1-3, other Skills) would
+    # otherwise trigger the manifest check. Default: allow when active Skill
+    # is not positively identified as `orchestrator`. The session.yml check
+    # below remains as defense-in-depth.
+    if detect_active_skill(payload) != "orchestrator":
         return 0
 
     project_dir = resolve_project_root(payload)

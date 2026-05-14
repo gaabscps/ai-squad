@@ -36,6 +36,12 @@ import sys
 import time
 from pathlib import Path
 
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
+
+from hook_runtime import detect_active_skill
+
 # ---------------------------------------------------------------------------
 # Roles that are tier-independent — always allowed (AC-007).
 # ---------------------------------------------------------------------------
@@ -811,6 +817,14 @@ def main() -> int:
     except json.JSONDecodeError as exc:
         # Malformed stdin — fail open (allow) but log to stderr.
         print(f"verify-tier-calibration: malformed stdin ({exc})", file=sys.stderr)
+        return 0
+
+    # Skill-scope gate: this hook enforces tier calibration on Task dispatches
+    # issued by the orchestrator Skill. When deploy registers it globally under
+    # PreToolUse(Task), any non-orchestrator session would otherwise see every
+    # Task call inspected and potentially blocked. Default: allow when the
+    # active Skill is not positively identified as `orchestrator`.
+    if detect_active_skill(payload) != "orchestrator":
         return 0
 
     # Extract the Task tool's `prompt` argument.

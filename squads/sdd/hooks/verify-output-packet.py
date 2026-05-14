@@ -36,8 +36,21 @@ _SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
 if str(_SHARED_LIB) not in sys.path:
     sys.path.append(str(_SHARED_LIB))
 
-from hook_runtime import resolve_project_root
+from hook_runtime import detect_active_subagent, resolve_project_root
 from canonical_statuses import VALID_STATUSES as _CANONICAL_VALID_STATUSES, format_valid_list as _format_valid_list
+
+# Subagent roles for which an Output Packet is mandatory at SubagentStop.
+# Other subagent_types (e.g., user-dispatched general-purpose, Explore) are
+# silently allowed — the Output Packet contract is specific to Phase 4 roles.
+_PHASE_4_SUBAGENTS = frozenset({
+    "dev",
+    "code-reviewer",
+    "logic-reviewer",
+    "qa",
+    "audit-agent",
+    "committer",
+    "blocker-specialist",
+})
 
 
 def _try_append_warning(task_id: str, reason: str, metadata: dict | None = None) -> None:
@@ -316,6 +329,17 @@ def main() -> int:
 
     if payload.get("stop_hook_active"):
         return 0  # avoid infinite loop
+
+    # Subagent-scope gate: only Phase 4 dispatch roles owe an Output Packet.
+    # When deploy registers this hook globally under SubagentStop, any other
+    # subagent (e.g., user-dispatched Explore, general-purpose, claude-code-guide)
+    # would otherwise be blocked at completion. detect_active_subagent returns
+    # None when the transcript carries no Work Packet — pre-Phase-4 sessions
+    # or main-session-spawned subagents — and the original dispatch_id check
+    # below also gates that path. Belt-and-suspenders.
+    active_subagent = detect_active_subagent(payload)
+    if active_subagent is not None and active_subagent not in _PHASE_4_SUBAGENTS:
+        return 0
 
     transcript_path_str = payload.get("transcript_path") or payload.get("agent_transcript_path")
     if not transcript_path_str:

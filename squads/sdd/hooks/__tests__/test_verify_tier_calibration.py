@@ -9,6 +9,7 @@ OR:
 """
 from __future__ import annotations
 
+import atexit
 import importlib.util
 import json
 import os
@@ -18,6 +19,19 @@ import timeit
 import unittest
 from io import StringIO
 from pathlib import Path
+
+# Skill-scope gate stub (added with detect_active_skill gating in verify-tier-calibration).
+# The hook now refuses to enforce unless the active Skill is positively
+# identified as `orchestrator`. Tests must simulate that context by providing
+# a transcript file containing the Skill marker.
+_ORCH_TRANSCRIPT = Path(tempfile.NamedTemporaryFile(
+    mode="w", suffix=".jsonl", delete=False
+).name)
+_ORCH_TRANSCRIPT.write_text(
+    "Base directory for this Skill: /tmp/.claude/skills/orchestrator\n",
+    encoding="utf-8",
+)
+atexit.register(lambda: _ORCH_TRANSCRIPT.unlink(missing_ok=True))
 
 # ---------------------------------------------------------------------------
 # Load the hook module directly (not importable as a package name).
@@ -59,7 +73,10 @@ def _run_main(payload: dict) -> tuple[int, str]:
 
 
 def _make_payload(prompt: str) -> dict:
-    return {"tool_input": {"prompt": prompt}}
+    return {
+        "tool_input": {"prompt": prompt},
+        "transcript_path": str(_ORCH_TRANSCRIPT),
+    }
 
 
 def _fenced_packet(**fields) -> str:
@@ -1356,7 +1373,10 @@ class TestAC009MainPipeline(unittest.TestCase):
         tool_input: dict = {"prompt": prompt}
         if tool_model is not None:
             tool_input["model"] = tool_model
-        return {"tool_input": tool_input}
+        return {
+            "tool_input": tool_input,
+            "transcript_path": str(_ORCH_TRANSCRIPT),
+        }
 
     def test_main_blocks_when_tool_model_missing(self):
         """main(): qa dispatch with no tool_input.model → block."""
