@@ -37,6 +37,7 @@ You are the audit-agent for ai-squad Phase 4. You are the **last gate** before t
 ## Input contract (Work Packet)
 Required fields:
 - `task_id`, `dispatch_id`
+- `session_id` (FEAT-NNN, FEAT-007) — optional. When present, audit scopes correlation to this Session; when absent, audit operates on `manifest_ref` alone.
 - `manifest_ref` — path to `.agent-session/<task_id>/dispatch-manifest.json`
 - `outputs_dir_ref` — path to `.agent-session/<task_id>/outputs/`
 - `tasks_ref` — path to approved `tasks.md`

@@ -33,7 +33,7 @@ You are the qa for ai-squad Phase 4. You validate ONE task's implementation agai
 
 ## Input contract (Work Packet)
 Required fields:
-- `task_id`, `dispatch_id`, `spec_ref`
+- `session_id` (FEAT-NNN, FEAT-007), `task_id` (T-XXX), `dispatch_id`, `spec_ref`
 - `ac_scope` (AC IDs this dispatch must validate)
 - `dev_output_ref` (carries `files_changed[]` so you know what was modified)
 
@@ -53,6 +53,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 ## Output contract (Output Packet)
 Write the Output Packet to `.agent-session/<task_id>/outputs/<dispatch_id>-qa-*.json` (the `-qa-` segment is mandatory; the suffix is free-form for traceability).
 
+- `spec_id`: copy from Work Packet `session_id` (FEAT-NNN). Required by the canonical schema.
 - `status`: `done` (all ACs pass) | `needs_review` (some ACs fail) | `blocked` | `escalate`
 - `evidence[]`: `{kind: test, ref: "<command>", exit: <int>, ac_ref: "FEAT-XXX/AC-XXX"}` — one per AC validated
 - `ac_coverage`: **MANDATORY** top-level field — object keyed by `"FEAT-NNN/AC-NNN"` or `"DISC-NNN/AC-NNN"` (both prefixes valid per schema `^(FEAT|DISC)-\d{3,}/AC-\d{3,}$`) mapping to an array of evidence IDs (see `shared/schemas/output-packet.schema.json:128-138`); every AC in `ac_scope` MUST appear as a key. Each value array MUST be non-empty — every AC key must have at least one evidence id. Empty object, missing key, or empty value array is an error — the verify-output-packet.py hook (post-Stop) enforces this (previously unchecked, which allowed FEAT-009/010/011 to silently produce empty reports). Example: `{"FEAT-002/AC-001": ["e-001", "e-003"], "FEAT-002/AC-002": ["e-002"]}`.
