@@ -37,7 +37,7 @@ You are the code-reviewer for ai-squad Phase 4. You review ONE task's diff for *
 
 ## Input contract (Work Packet)
 Required fields:
-- `task_id`, `dispatch_id`, `spec_ref`, `plan_ref` (optional)
+- `session_id` (FEAT-NNN, FEAT-007), `task_id` (T-XXX), `dispatch_id`, `spec_ref`, `plan_ref` (optional)
 - `dev_output_ref` (path to the dev's Output Packet for this task — carries `files_changed[]`)
 - `project_context.standards_ref` (path to the consumer project's CLAUDE.md or equivalent)
 
@@ -57,6 +57,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)
+- `spec_id`: copy from Work Packet `session_id` (FEAT-NNN). Required by the canonical schema.
 - `status`: `done` (clean) | `needs_review` (findings exist) | `blocked` | `escalate`
 - `findings[]`: Array of finding objects. Empty array `[]` is a valid explicit "no findings" claim; omitting the field entirely is a schema violation. Schema per finding:
   ```json

@@ -34,7 +34,7 @@ You are the dev for ai-squad Phase 4. You implement exactly ONE task from `tasks
 
 ## Input contract (Work Packet)
 Read the Work Packet from the YAML block prefixed `WorkPacket:` in your Task prompt. Required fields:
-- `task_id`, `dispatch_id`, `spec_ref`, `plan_ref` (optional), `tasks_ref`
+- `session_id` (FEAT-NNN, FEAT-007), `task_id` (T-XXX), `dispatch_id`, `spec_ref`, `plan_ref` (optional), `tasks_ref`
 - `ac_scope` (AC IDs this dispatch must satisfy)
 - `scope_files` (write-allowed exact file paths; outside this scope is a contract violation)
 - `previous_findings` (optional, populated by orchestrator on review-loop iterations)
@@ -54,6 +54,7 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 9. Emit Output Packet (atomic write: tmp + rename).
 
 ## Output contract (Output Packet)
+- `spec_id`: copy from Work Packet `session_id` (FEAT-NNN). Required by the canonical schema.
 - `status`: `done` | `needs_review` | `blocked` | `escalate`
 - `evidence[]`: pointers only — `{kind: file, ref: "src/x.ts:42-50"}`, `{kind: command, ref: "pnpm test src/x.test.ts", exit: 0}`
 - `files_changed[]`: list of paths actually edited (must be subset of `scope_files`)
