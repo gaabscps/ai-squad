@@ -1429,5 +1429,106 @@ class TestAC009MainPipeline(unittest.TestCase):
         self.assertEqual(out, "")
 
 
+# ===========================================================================
+# FEAT-007: session_id direct lookup + backward-compat
+# ===========================================================================
+
+class TestFEAT007SessionIdLookup(unittest.TestCase):
+    """Direct tasks.md lookup via Work Packet `session_id`; fallback when absent."""
+
+    def setUp(self) -> None:
+        self._session_dir = Path(tempfile.mkdtemp())
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self._session_dir, ignore_errors=True)
+
+    def test_session_id_direct_lookup_under_feat_dir(self):
+        """When session_id is set, _read_task_tier reads
+        <session_dir>/<session_id>/tasks.md directly — no glob fallback."""
+        feat_dir = self._session_dir / "FEAT-077"
+        feat_dir.mkdir()
+        (feat_dir / "tasks.md").write_text(
+            _make_tasks_md("T-001", "T2"),
+            encoding="utf-8",
+        )
+        # No per-task <session_dir>/T-001/tasks.md exists — verifies the
+        # legacy path is NOT what gets read.
+        tier = _read_task_tier("T-001", self._session_dir, session_id="FEAT-077")
+        self.assertEqual(tier, "T2")
+
+    def test_session_id_absent_falls_back_to_per_task_dir(self):
+        """Without session_id, the legacy <session_dir>/<task_id>/tasks.md
+        path is used (backward-compat)."""
+        task_dir = self._session_dir / "T-002"
+        task_dir.mkdir()
+        (task_dir / "tasks.md").write_text(
+            _make_tasks_md("T-002", "T1"),
+            encoding="utf-8",
+        )
+        tier = _read_task_tier("T-002", self._session_dir, session_id=None)
+        self.assertEqual(tier, "T1")
+
+    def test_session_id_extracted_from_workpacket(self):
+        """_extract_fields recognises both snake_case and camelCase variants."""
+        prompt = _fenced_packet(
+            task_id="T-001",
+            session_id="FEAT-099",
+            model="sonnet",
+            effort="medium",
+            tier="T2",
+            subagent_type="dev",
+        )
+        fields = _extract_fields(prompt)
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.get("session_id"), "FEAT-099")
+
+        prompt_camel = _fenced_packet(
+            task_id="T-001",
+            sessionId="FEAT-100",
+            model="sonnet",
+            effort="medium",
+            tier="T2",
+            subagent_type="dev",
+        )
+        fields_camel = _extract_fields(prompt_camel)
+        self.assertIsNotNone(fields_camel)
+        self.assertEqual(fields_camel.get("session_id"), "FEAT-100")
+
+    def test_verify_with_session_id_skips_legacy_fallback(self):
+        """_verify_tier_calibration_for_task uses session_id; passes when
+        canonical model/effort match."""
+        feat_dir = self._session_dir / "FEAT-077"
+        feat_dir.mkdir()
+        (feat_dir / "tasks.md").write_text(
+            _make_tasks_md("T-001", "T2"), encoding="utf-8",
+        )
+        (feat_dir / "dispatch-manifest.json").write_text(
+            json.dumps({
+                "schema_version": 1,
+                "expected_pipeline": [{"task_id": "T-001"}],
+                "actual_dispatches": [],
+            }),
+            encoding="utf-8",
+        )
+        prompt = _fenced_packet(
+            task_id="T-001", session_id="FEAT-077",
+            model="sonnet", effort="medium",
+            tier="T2", subagent_type="dev",
+        )
+        result = _verify_tier_calibration_for_task(
+            task_id="T-001",
+            model="sonnet",
+            effort="medium",
+            tier="T2",
+            subagent_type="dev",
+            prompt=prompt,
+            tool_model="sonnet",
+            session_dir=self._session_dir,
+            session_id="FEAT-077",
+        )
+        self.assertEqual(result, {}, f"expected silent allow, got {result!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
