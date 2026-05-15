@@ -97,6 +97,18 @@ The orchestrator reads each task's `Tier:` field from `tasks.md` and overrides W
 
 **Dynamic reclassification:** if L1 reviewer findings reveal complexity exceeding the initial tier, the orchestrator (or PM, in autonomous mode) MUST raise the task's `Tier:` field in `tasks.md` *before* dispatching L2 — so L2+ runs at the corrected tier. Recording the bump as a `Tier-bump note:` line on the task in `tasks.md` is recommended for audit traceability.
 
+## Model precedence (FEAT-008)
+
+A precedência canônica que determina o modelo efetivo no runtime, de mais alta pra mais baixa:
+
+1. **Task tool `model` parameter** — único campo que controla o run-model do subagent. O orchestrator DEVE passá-lo em todo dispatch de role tiered (`dev`, `code-reviewer`, `logic-reviewer`, `qa`).
+2. **Agent file frontmatter `model:`** — fallback documental; só é honrado quando (1) é omitido. Pode ser silenciosamente ignorado por mudanças no runtime do Claude Code.
+3. **Parent session's model** — default implícito quando (1) e (2) ausentes. Inerentemente errado pra dispatches tiered (tipicamente opus no orchestrator, mas o subagent pode precisar de haiku/sonnet).
+
+**Enforcement:** `verify-tier-calibration.py` (PreToolUse) bloqueia dispatches sem `model` no Task tool ou com `model` divergente do canônico. `verify-output-packet.py` (Stop) emite warning em stderr quando `usage.model` resolvido diverge do `model` requested no Work Packet — defesa pós-fato, não-bloqueante (o trabalho já aconteceu).
+
+**Work Packet `model: ...`** é descritivo (pro subagent auto-conhecer seu tier no prompt), nunca enforced no runtime.
+
 ## Why not Opus everywhere
 
 Opus consumes platform quota roughly 5× faster than Sonnet. The squad's heaviest amplifier is `fan_out`: a Role marked `fan_out: true` can be instantiated N times in parallel. Pushing `dev` (the most fan-out-heavy Role) to Opus would burn a typical user's quota in a single feature.
