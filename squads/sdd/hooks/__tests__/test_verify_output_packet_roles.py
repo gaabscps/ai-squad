@@ -428,5 +428,80 @@ class TestCheckOnlyDispatchId(unittest.TestCase):
         self.assertEqual(_derive_dispatch_id(p), "d-001-qa")
 
 
+# ===========================================================================
+# FEAT-008 Gap A: model drift detection
+# ===========================================================================
+
+class TestFEAT008ModelDriftDetection(unittest.TestCase):
+    """Drift between Work Packet `model` and Output Packet `usage.model`
+    emits a warning to stderr but does NOT block Stop."""
+
+    def setUp(self) -> None:
+        self._tmp = Path(tempfile.mkdtemp())
+        self._task_dir = self._tmp / "T-001"
+        (self._task_dir / "inputs").mkdir(parents=True)
+        (self._task_dir / "outputs").mkdir(parents=True)
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _write_paired_packets(self, requested_model: str, resolved_model: str) -> Path:
+        dispatch_id = "d-T-001-dev-l1"
+        wp_path = self._task_dir / "inputs" / f"{dispatch_id}.json"
+        wp_path.write_text(json.dumps({
+            "spec_id": "FEAT-099",
+            "dispatch_id": dispatch_id,
+            "to_role": "dev",
+            "model": requested_model,
+            "effort": "high",
+        }), encoding="utf-8")
+        op_path = self._task_dir / "outputs" / f"{dispatch_id}.json"
+        op_path.write_text(json.dumps({
+            "spec_id": "FEAT-099",
+            "dispatch_id": dispatch_id,
+            "role": "dev",
+            "status": "done",
+            "summary": "ok",
+            "evidence": [],
+            "usage": {
+                "total_tokens": 100,
+                "tool_uses": 1,
+                "duration_ms": 10,
+                "model": resolved_model,
+            },
+        }), encoding="utf-8")
+        return op_path
+
+    def test_drift_emits_warning(self):
+        op = self._write_paired_packets(requested_model="sonnet", resolved_model="opus")
+        _check_model_drift = _mod._check_model_drift
+        warnings = _check_model_drift(op)
+        self.assertTrue(warnings)
+        joined = " ".join(warnings).lower()
+        self.assertIn("sonnet", joined)
+        self.assertIn("opus", joined)
+
+    def test_substring_match_emits_no_warning(self):
+        op = self._write_paired_packets(requested_model="sonnet", resolved_model="claude-sonnet-4-5")
+        _check_model_drift = _mod._check_model_drift
+        self.assertEqual(_check_model_drift(op), [])
+
+    def test_no_work_packet_no_warning(self):
+        dispatch_id = "d-T-002-dev-l1"
+        op_path = self._task_dir / "outputs" / f"{dispatch_id}.json"
+        op_path.write_text(json.dumps({
+            "spec_id": "FEAT-099",
+            "dispatch_id": dispatch_id,
+            "role": "dev",
+            "status": "done",
+            "summary": "ok",
+            "evidence": [],
+            "usage": {"total_tokens": 100, "tool_uses": 1, "duration_ms": 10, "model": "opus"},
+        }), encoding="utf-8")
+        _check_model_drift = _mod._check_model_drift
+        self.assertEqual(_check_model_drift(op_path), [])
+
+
 if __name__ == "__main__":
     unittest.main()
