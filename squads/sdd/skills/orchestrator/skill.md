@@ -182,6 +182,21 @@ Pipeline per task (per `squads/sdd/docs/concepts/pipeline.md`):
 - On `qa` fail: loop to `dev` (cap: `qa_loops_max=2`, skips reviewers).
 - On any cap hit OR `status: blocked` from any Subagent: cascade to `blocker-specialist` (cap: `blocker_calls_max=2` per task).
 
+### Reviewer mandatoriness (FEAT-008 Gap B)
+
+Code-reviewer e logic-reviewer são **mandatórios** entre `dev` e `qa` para toda task do tipo dev. Pular CR/LR sem registro explícito é proibido — `verify-pipeline-completeness.py` (PreToolUse Task) bloqueia o `qa` dispatch caso CR + LR não tenham status `done` ou `needs_review` no manifesto pra mesma `task_id`.
+
+**Exceção explícita:** quando o PM/orchestrator avalia que o custo dos reviewers não se justifica para uma task específica (e.g. one-line fix, doc-only edit), pode declarar isenção em `tasks.md` na seção da task:
+
+```markdown
+## T-XXX titulo
+
+**Tier:** T1
+**Skip reviewers:** budget — single-line docs typo fix, no logic surface
+```
+
+O marker libera o `qa` gate. Sem o marker, qualquer skip é bloqueado. Esta exceção é audit-visible: audit-agent reporta tasks com skip-reviewers como `pipeline_stage_skipped` finding (severity `warning`, not blocker).
+
 **Pre-`done` usage check (AC-004):** Before transitioning any task-scoped dispatch entry in `actual_dispatches[]` to `status: done`, the orchestrator MUST re-read the manifest and verify that `usage` is present and `usage.total_tokens > 0` for that dispatch. This check applies to all roles except `pm-orchestrator` and `audit-agent`. Protocol:
 1. Re-read `dispatch-manifest.json` (atomic read — no lock needed for read-only).
 2. Find the entry for the dispatch just completed.
