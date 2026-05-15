@@ -396,7 +396,11 @@ _TIER_FIELD_RE = re.compile(
 _tier_cache: dict[str, dict] = {}
 
 
-def _read_task_tier(task_id: str, session_dir: Path) -> str | None:
+def _read_task_tier(
+    task_id: str,
+    session_dir: Path,
+    session_id: str | None = None,
+) -> str | None:
     """Read the Tier: field for *task_id* from its tasks.md file.
 
     Caches the result per-session in /tmp/ai-squad-tier-cache-<task_id>.json
@@ -406,6 +410,21 @@ def _read_task_tier(task_id: str, session_dir: Path) -> str | None:
       - The tasks.md file does not exist.
       - The file exists but no Tier: line is found.
     """
+    # FEAT-007: direct lookup when Work Packet carries session_id.
+    # Skips the legacy mtime-ordered fallback scan entirely on the happy path.
+    if session_id:
+        direct_path = session_dir / session_id / "tasks.md"
+        try:
+            content = direct_path.read_text(encoding="utf-8", errors="replace")
+        except (OSError, IOError):
+            content = None
+        if content is not None:
+            tier = _extract_tier_for_task(content, task_id)
+            if tier is not None:
+                return tier
+            # File exists but task section missing — fall through to the
+            # legacy heuristic. Common during partial migrations.
+
     tasks_path = session_dir / task_id / "tasks.md"
     tasks_path_str = str(tasks_path)
 
@@ -579,6 +598,7 @@ _MANIFEST_MISSING: list[dict] | None = None
 def _load_manifest_dispatches(
     session_dir: Path,
     task_id: str,
+    session_id: str | None = None,
 ) -> "list[dict] | None | tuple[str, str]":
     """Load actual_dispatches[] from dispatch-manifest.json.
 
@@ -592,11 +612,16 @@ def _load_manifest_dispatches(
       - ("malformed", "<err>")  when a manifest file EXISTS but JSON is invalid or
                                 actual_dispatches is not a list — caller MUST block.
     """
-    # Primary candidates: the two historical paths (per-task and root-of-session-dir).
-    primary_candidates = [
+    # FEAT-007: direct lookup when Work Packet carries session_id.
+    # Adds <session_dir>/<session_id>/dispatch-manifest.json at the front of
+    # the candidate list — checked before the legacy paths.
+    primary_candidates: list[Path] = []
+    if session_id:
+        primary_candidates.append(session_dir / session_id / "dispatch-manifest.json")
+    primary_candidates.extend([
         session_dir / "dispatch-manifest.json",
         session_dir / task_id / "dispatch-manifest.json",
-    ]
+    ])
 
     # HOTFIX FEAT-006: also scan per-feature manifests under session_dir/*/dispatch-manifest.json
     # for the "1 dir per feature" convention. T-XXX numbering is reused across features, so
@@ -668,6 +693,7 @@ def _verify_tier_calibration_for_task(
     prompt: str,
     tool_model: str | None = None,
     session_dir: Path | None = None,
+    session_id: str | None = None,
 ) -> dict:
     """Full Tier × Loop verification (T-009 / AC-005, AC-008, AC-009).
 
@@ -706,7 +732,7 @@ def _verify_tier_calibration_for_task(
         return {}
 
     # Step 2: read Tier from tasks.md (authoritative).
-    task_tier = _read_task_tier(task_id, session_dir)
+    task_tier = _read_task_tier(task_id, session_dir, session_id=session_id)
     if task_tier is None:
         return {
             "decision": "block",
@@ -714,7 +740,7 @@ def _verify_tier_calibration_for_task(
         }
 
     # Step 3: load manifest dispatches for loop-kind derivation.
-    manifest_result = _load_manifest_dispatches(session_dir, task_id)
+    manifest_result = _load_manifest_dispatches(session_dir, task_id, session_id=session_id)
 
     if isinstance(manifest_result, tuple) and manifest_result[0] == "malformed":
         # Manifest file exists but is invalid JSON or has wrong schema.
@@ -904,6 +930,7 @@ def main() -> int:
     # -----------------------------------------------------------------
     task_id = fields.get("task_id", "")
     tier = fields.get("tier", "")
+    session_id = fields.get("session_id", "") or None
 
     result = _verify_tier_calibration_for_task(
         task_id=task_id,
@@ -913,6 +940,7 @@ def main() -> int:
         subagent_type=subagent_type,
         prompt=prompt,
         tool_model=tool_model,
+        session_id=session_id,
     )
 
     if result.get("decision") == "block":
