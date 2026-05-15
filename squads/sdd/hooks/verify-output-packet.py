@@ -276,6 +276,50 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
     return True, "valid"
 
 
+def _check_model_drift(output_packet_path: Path) -> list[str]:
+    """FEAT-008 Gap A: compare Work Packet `model` with Output Packet `usage.model`.
+
+    Returns a list of warning strings (empty when no drift or when the paired
+    Work Packet is absent). Never blocks — emits warnings only.
+
+    Heuristic: the canonical model (e.g. "sonnet") is expected as a substring of
+    the resolved id (e.g. "claude-sonnet-4-5-..."). Case-insensitive.
+    """
+    try:
+        op = json.loads(output_packet_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    usage = op.get("usage")
+    if not isinstance(usage, dict):
+        return []
+    resolved = usage.get("model")
+    if not isinstance(resolved, str) or not resolved:
+        return []
+
+    dispatch_id = op.get("dispatch_id")
+    if not isinstance(dispatch_id, str) or not dispatch_id:
+        return []
+
+    wp_path = output_packet_path.parent.parent / "inputs" / f"{dispatch_id}.json"
+    try:
+        wp = json.loads(wp_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    requested = wp.get("model")
+    if not isinstance(requested, str) or not requested:
+        return []
+
+    if requested.lower() in resolved.lower():
+        return []
+
+    return [
+        f"model_drift: dispatch_id={dispatch_id} requested='{requested}' "
+        f"resolved='{resolved}' — Task tool model param may have been dropped"
+    ]
+
+
 def _derive_dispatch_id(packet_path: Path) -> str:
     """Derive dispatch_id from the packet file path basename.
 
@@ -430,6 +474,10 @@ def main() -> int:
         }
         print(json.dumps(decision))
         return 0
+
+    # FEAT-008 Gap A: model drift warning (non-blocking).
+    for w in _check_model_drift(packet_path):
+        print(f"verify-output-packet: WARN {w}", file=sys.stderr)
 
     return 0
 
