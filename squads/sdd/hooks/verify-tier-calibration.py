@@ -432,15 +432,11 @@ def _read_task_tier(
     try:
         current_mtime = tasks_path.stat().st_mtime
     except (OSError, FileNotFoundError):
-        # HOTFIX FEAT-006: fall back to the "1 dir per feature" convention.
-        # The session_dir/<task_id>/tasks.md path (per-task convention) does not
-        # exist. Identify the owning session by finding the dispatch-manifest.json
-        # whose expected_pipeline references this task_id, then read THAT
-        # session's tasks.md. This prevents cross-session contamination — older
-        # sessions (FEAT-001..N) may have unrelated tasks reusing the same T-XXX
-        # numbering. Only triggers for T-XXX task_ids; FEAT-NNN inputs preserve
-        # original path. NOTE(FEAT-007): replace with proper session_id-based
-        # resolution that gets the session_id directly from the Work Packet.
+        # Legacy heuristic — kept as backward-compat for Work Packets emitted
+        # before FEAT-007 (no session_id). The direct lookup path above is
+        # preferred; this scanner runs only when session_id is absent OR the
+        # direct path exists but does not contain the task section.
+        # Only triggers for T-XXX task_ids; FEAT-NNN inputs preserve original path.
         if re.match(r"^T-\d+$", task_id):
             # T-XXX numbering is reused across features (FEAT-001 and FEAT-006 may
             # both have ## T-001 sections). Pick the manifest by recency: the
@@ -623,12 +619,11 @@ def _load_manifest_dispatches(
         session_dir / task_id / "dispatch-manifest.json",
     ])
 
-    # HOTFIX FEAT-006: also scan per-feature manifests under session_dir/*/dispatch-manifest.json
-    # for the "1 dir per feature" convention. T-XXX numbering is reused across features, so
-    # pick fallback candidates by mtime (most recent first) — the active session's manifest is
-    # always the freshest one. Cross-session contamination is further guarded below via the
-    # _is_referencing_task check. Only triggers for T-XXX task_ids.
-    # NOTE(FEAT-007): replace with proper session_id-based resolution.
+    # Legacy mtime-ordered scan — kept as backward-compat for Work Packets
+    # without session_id. Direct lookup happens above via the session_id branch
+    # of primary_candidates. T-XXX numbering is reused across features, so
+    # candidates are ranked by mtime (most recent first) and further guarded
+    # via the _is_referencing_task check below.
     fallback_candidates: list[Path] = []
     if re.match(r"^T-\d+$", task_id):
         scored: list[tuple[float, Path]] = []
