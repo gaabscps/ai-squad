@@ -245,7 +245,8 @@ Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in
 ```
 WorkPacket:
 ```yaml
-task_id: FEAT-NNN
+session_id: FEAT-NNN     # FEAT-007: feature scope; used by hooks for direct lookup
+task_id: T-XXX
 dispatch_id: <uuid>
 spec_ref: ./.agent-session/FEAT-NNN/spec.md
 plan_ref: ./.agent-session/FEAT-NNN/plan.md
@@ -262,6 +263,8 @@ project_context:
 ```
 
 The Subagent body's "Input contract" specifies which fields are required for that Role. Missing fields → Subagent emits `status: blocked, blocker_kind: contract_violation`.
+
+**`session_id` (FEAT-007):** mandatory for task-scoped dispatches (`dev`, `code-reviewer`, `logic-reviewer`, `qa`); optional for `audit-agent` (pipeline-scoped). Derived from the orchestrator's cwd — when running from `.agent-session/<FEAT-NNN>/`, emit `session_id: FEAT-NNN`. The `verify-tier-calibration.py` hook uses it for direct `<session_dir>/<session_id>/tasks.md` lookup; without it the hook falls back to mtime-ordered manifest scanning (legacy backward-compat path, slower).
 
 ### Task tool `model` parameter (run-model enforcement — AC-009)
 **The `model` parameter of the Task tool itself controls the actual run-model of the subagent.** The Work Packet YAML is descriptive metadata — it does NOT control which model runs the subagent. If the orchestrator omits the Task tool's `model` parameter, Claude Code inherits the parent session's model (the orchestrator's own model, typically `opus`), bypassing the Tier × Loop table entirely. This was the root cause of severe cost amplification observed in early FEAT-* sessions (qa tasks calibrated for `haiku` running in `opus`, multiplying real cost 3-12×).
@@ -299,6 +302,7 @@ Task(
   description="QA validation for T-001",
   prompt='''WorkPacket:
 ```yaml
+session_id: FEAT-NNN
 task_id: T-001
 dispatch_id: d-T-001-qa-l1
 model: haiku
