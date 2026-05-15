@@ -160,6 +160,8 @@ def _extract_fields(prompt: str) -> dict[str, str] | None:
     for src_key, canonical_key in (
         ("task_id", "task_id"),
         ("taskId", "task_id"),
+        ("session_id", "session_id"),
+        ("sessionId", "session_id"),
         ("model", "model"),
         ("effort", "effort"),
         ("tier", "tier"),
