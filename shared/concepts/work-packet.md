@@ -29,6 +29,7 @@ It is the **yang to the Output Packet's yin**: same FS layout (`.agent-session/<
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `spec_id` | string | yes | The Spec ID (`FEAT-XXX`). |
+| `session_id` | string | yes (task-scoped roles); no (audit-agent) | FEAT-007. The Session/feature scope (`FEAT-NNN`) the orchestrator runs under. Derived from the orchestrator's cwd (`.agent-session/<FEAT-NNN>/`). Used by `verify-tier-calibration.py` for direct `tasks.md` lookup; Subagents copy it into their Output Packet `spec_id`. |
 | `dispatch_id` | string | yes | Unique within the Session. The corresponding Output Packet uses the same `dispatch_id`. |
 | `spec_ref` | string | yes | Path to the Spec file: `.agent-session/<task_id>/spec.md`. |
 | `to_role` | string | yes | One of the 8 canonical Roles. |

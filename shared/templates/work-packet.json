@@ -1,5 +1,6 @@
 {
   "spec_id": "FEAT-XXX",
+  "session_id": "FEAT-XXX",
   "dispatch_id": "dev-7b3c1a",
   "spec_ref": "./.agent-session/FEAT-XXX/spec.md",
 
