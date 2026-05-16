@@ -41,6 +41,30 @@ Which Phases will this Session run?
 ```
 Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks"` bypasses the prompt with the same selection semantics.
 
+### 2.5. Pipeline mode selection (fresh start only)
+
+Use `AskUserQuestion` (binary, default to `standard` if unsure):
+
+```
+What's the scope of this change?
+
+[ ] Small change (lite mode)
+    Fix, small refactor, doc/copy change, or single-purpose feature.
+    Downstream effects:
+      - task-builder caps total tasks at 2
+      - task-builder auto-skips logic-reviewer for single-purpose tasks
+      - orchestrator caps fan-out at 1 (sequential tasks)
+      - orchestrator clamps tier ceiling to T2 (cheap dispatch by default)
+    Quality unchanged: logic-gap sweep, edge-case categories, audit-gate all still mandatory.
+
+[ ] Standard or larger (default)
+    All Phases run with full rigor, fan-out, and per-task tier calibration.
+```
+
+Save selection to `session.yml.pipeline_mode` (atomic write: tmp + rename). Valid values: `lite`, `standard`. Power-user flag `--mode=lite|standard` bypasses the prompt with the same semantics.
+
+**Recommendation surfaced after the answer:** if `lite` selected and `planned_phases` still includes `plan`, print a short note: `"Lite mode typically skips the Plan Phase. Current planned_phases keeps it — that's fine if you have a real architecture decision to capture; otherwise re-run /spec-writer with --plan='specify,tasks,implementation' to drop it."` Do not auto-mutate `planned_phases`; respect the user's earlier choice.
+
 ### 3. Capture initial pitch (if not provided)
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
 
@@ -49,12 +73,15 @@ Produce a full draft of `spec.md` from `squads/sdd/templates/spec.md`, populated
 - Fill all sections you can confidently infer (Problem, Goal, Constraints, Notes).
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 3 — see step 5).
 - Generate at least one `US-001 [P1]` from the pitch.
+- **Lite mode constraint** (`session.yml.pipeline_mode == "lite"`): generate **exactly one** `US-001 [P1]`. If the pitch implies multiple stories, surface this via chat: `"Lite mode allows only one US. The pitch suggests N stories — pick the most important one for this Session, or switch to standard mode."` Standard mode: 1-3 USs as appropriate from the pitch.
+- **Edge-case coverage (mandatory):** for every US-XXX with code-touching ACs, enumerate ACs covering all four categories: **empty state**, **error state**, **concurrent action**, **partial failure**. If a category is genuinely N/A for a US, write `AC-NNN: N/A — <one-line reason>` explicitly (silent omission becomes a finding in step 6.7).
 - Write to `.agent-session/<task_id>/spec.md` (atomic write; `status: draft`).
 - Save Spec title to `session.yml.feature_name` for human-readable reference.
 
 ### 5. Clarification pass (one ambiguity at a time)
 For each `[NEEDS CLARIFICATION]` (max 3 — if more would emerge, ask the human to pick the 3 most important; the rest become `## Open Questions` entries):
-- Use `AskUserQuestion` with 2-3 enumerable resolution options + an "Other" free-form fallback.
+- **Research dispatch trigger:** if the clarification touches **external API integration**, **concurrency / race conditions**, **security mechanisms** (auth, sessions, secrets, crypto), or **data migration**, dispatch an `Explore` agent (single research pass — one dispatch, synthesize, decide; do NOT loop) BEFORE asking the human. Check how Anthropic / Claude Code / industry literature treats the case. The research result becomes evidence in the spec's `## Constraints` or `## Notes` section. Skip this trigger for purely UX/copy/scope questions.
+- Use `AskUserQuestion` with 2-3 enumerable resolution options + an "Other" free-form fallback. Options should reflect research findings when applicable.
 - On answer: replace the marker with the resolved text; atomic write `spec.md`.
 - When all resolved: proceed to step 6.
 
@@ -63,6 +90,20 @@ The human may want to refine any section. Conventions for picking the right tool
 - Enumerable decision (priority P1/P2/P3, "Add another US?" yes/no, pick from 2-3 options) → `AskUserQuestion`.
 - Generative decision (rewrite a US's prose, refine a Constraint's wording) → free-form chat.
 - After every accepted change to a major section (Problem, Goal, any US, NFR, SC): atomic write of the full `spec.md`.
+
+### 6.4. Logic-gap sweep (mandatory — runs before 6.5 and 7)
+
+Before any approval path, the spec-writer MUST perform an explicit self-critique sweep. This is the single highest-leverage step for shortening Phase 4 wall-clock: every gap caught here saves a `review_loops_max=3` or `qa_loops_max=2` cascade downstream.
+
+Answer each item literally (do not skip):
+
+1. **What would reviewer / QA flag?** Imagine the `code-reviewer`, `logic-reviewer`, and `qa` subagents reading this spec. What ambiguities, missing ACs, or under-specified edge cases would they cite? List concretely.
+2. **Edge-case coverage** — confirm every US-XXX with code-touching ACs has ACs for **empty / error / concurrent / partial-failure** OR explicit `N/A — <reason>`.
+3. **Out of Scope explicit** — anything a reasonable reviewer might assume is in scope but is NOT must be named. Silent exclusion is a gap.
+4. **Non-functional constraints** — perf, security, compliance, observability called out where applicable. "Fast" / "secure" / "scalable" without a measurable definition is a gap.
+5. **Term definitions** — every domain term used in ACs must be defined (in `## Notes` or inline). Undefined terms cause downstream agents to guess.
+
+If the sweep finds gaps: patch `spec.md` inline (atomic write), re-run the sweep until zero gaps remain. Gaps are RESOLVED in the spec, never deferred to follow-ups. Only after zero gaps remain proceed to step 6.5 (PM mode) or step 7 (human mode).
 
 ### 6.5. PM-mode approval gate check (bypass — runs before Step 7)
 

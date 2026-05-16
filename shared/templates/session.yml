@@ -37,6 +37,14 @@ planned_phases:
   - "tasks"
   - "implementation"
 
+# Pipeline mode — selected at Phase 1 (spec-writer step 2.5) or via --mode flag. Governs downstream rigor:
+#   lite     — single-purpose change. task-builder caps tasks at 2, auto-skips logic-reviewer for single-file tasks.
+#              orchestrator caps fan-out at 1 and clamps tier ceiling to T2. Quality gates (logic-gap sweep,
+#              edge-case categories, audit) all remain mandatory.
+#   standard — default. Full rigor, fan-out 5, per-task tier per Tier × Loop table.
+# Pre-v0.7 sessions without this field default to `standard` (orchestrator reads with fallback).
+pipeline_mode: "standard"
+
 # Phase 4 only — Pipeline-level state
 pipeline_started_at: ""
 pipeline_completed_at: ""

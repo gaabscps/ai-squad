@@ -33,13 +33,19 @@ The Skill that turns an approved Spec + Plan into an approved Tasks list: granul
 4. Build the **AC universe** (every AC from Spec) — Tasks must cover all of them.
 
 ### 2. Generate first draft (vertical-slice decomposition — Spec Kit pattern)
+
+**Read `session.yml.pipeline_mode` first.** It changes the targets below.
+
 Decompose using the per-User-Story phase model:
 - One section of tasks per User Story, sequenced by priority (P1 → P2 → P3).
 - Inside each story: layered tasks (model → service → API → UX → tests) following INVEST sizing (Independent, Negotiable, Valuable, Estimable, Small, Testable).
-- Target: **5-8 tasks per story, ~15-30 tasks total per feature**. Outliers OK with rationale; if over 40, flag possible feature-scope explosion.
+- **Target by mode:**
+  - `standard` mode: **5-8 tasks per story, ~15-30 tasks total per feature**. Outliers OK with rationale; if over 40, flag possible feature-scope explosion.
+  - `lite` mode: **HARD CAP of 2 tasks total** across the entire feature. If decomposition naturally exceeds 2, the spec was too big for `lite` — surface this via chat: `"Lite mode caps tasks at 2; decomposition produced N. Either merge tasks (preferred — lite implies single-purpose change), or re-run /spec-writer --mode=standard."` Do not silently break the cap.
 - **Task size = smallest independently testable slice that touches a coherent file set** (not 1 file, not 1 module).
 - Each task gets: monotonic `T-XXX` ID, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths — see step 4), `AC covered:` tags, optional `Depends on:`, `Estimated complexity:`.
-- Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding before any story tasks; optional **Foundational** phase for cross-story prereqs.
+- **Auto skip-reviewers (lite mode only):** for any lite-mode task whose `Files:` set is exactly **one file** AND whose `Estimated complexity:` is `trivial` or `small`, automatically append `Skip reviewers: lite mode — single-file <category>` to the task (category = `fix` | `doc` | `copy` | `single-fn`). This grants the orchestrator's reviewer-skip exception (per `orchestrator/skill.md`) without manual annotation. Multi-file lite tasks still get full reviewers.
+- Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding before any story tasks; optional **Foundational** phase for cross-story prereqs. **Lite mode disallows Setup/Foundational phases** — if scaffolding is needed, lite is the wrong mode.
 - Write to `.agent-session/<task_id>/tasks.md` (atomic; `status: draft`).
 
 ### 3. Mark `[P]` (parallelization — Spec Kit dual-rule)
