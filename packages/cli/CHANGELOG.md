@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 — 2026-05-16
+
+### Bug fixes
+
+- **`spec-writer` still inferred PM mode from `.agent-session/` history despite 0.7.1 fix.** Observed in calendarfr: a repo with 3 prior `auto_approved_by: pm` Sessions caused Opus 4.7 to write `auto_approved_by: pm`, `pipeline_mode: standard`, and full `planned_phases` into a new Session without running `AskUserQuestion`, even with the in-step invariants from 0.7.1. The model made the decision before reaching steps 2/2.5 by doing in-context learning on prior `session.yml` files. Fix layered in three places:
+  - **Top-of-file Hard rule** (above `## When to invoke`): explicit "fresh-start mode is ALWAYS interactive. NEVER infer PM bypass / pipeline_mode / planned_phases from prior `.agent-session/` files. PM bypass is set EXCLUSIVELY by `/pm` in the same invocation."
+  - **Step 1 read constraint**: when scanning prior `FEAT-*/` directories for ID increment, the ONLY field readable from any prior `session.yml` is the directory name itself. `auto_approved_by`, `pipeline_mode`, `planned_phases`, `phase_history`, `notes` MUST NOT be opened from history.
+  - **`## Hard rules` section**: enumerated invariants near the end of the skill restating the same rules, for a third pass of reinforcement.
+
+  The structural fix (PM mode as an out-of-band signal from `/pm`, not a file-inferred state) is tracked as a separate issue for the 0.8 cycle — this 0.7.2 patch is the immediate doc-level mitigation.
+
 ## 0.7.1 — 2026-05-16
 
 ### Bug fixes

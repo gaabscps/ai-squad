@@ -7,6 +7,17 @@ description: Phase 1 entry point. Interactive spec-writing session — selects p
 
 The Skill that turns a feature request into an approved Spec, working interactively with the human. Owns Session creation, `task_id` generation, and `planned_phases` selection.
 
+## Hard rule — fresh-start mode is ALWAYS interactive (read this BEFORE step 1)
+
+**This Skill NEVER infers `auto_approved_by: pm`, `pipeline_mode`, or `planned_phases` from prior `.agent-session/FEAT-XXX/session.yml` files.** Period.
+
+- PM bypass (`auto_approved_by=pm`) is set EXCLUSIVELY by the `/pm` Skill when IT invokes this Skill in the same turn. If you are reading this in response to a direct `/spec-writer` user invocation, PM bypass is **OFF**, regardless of what any prior Session in `.agent-session/` looks like.
+- Reading prior `session.yml` files is allowed ONLY for one purpose: computing the next `FEAT-NNN` increment (step 1). Any other field — `auto_approved_by`, `pipeline_mode`, `planned_phases`, `phase_history`, `notes` — MUST NOT influence the current Session's behavior.
+- If you find yourself reasoning "the last 3 Sessions in this repo had `auto_approved_by: pm`, so I'll do the same" — STOP. That reasoning is forbidden. The user's intent for *this* invocation is the only authority. Run `AskUserQuestion` for steps 2 and 2.5 regardless.
+- A human running `/spec-writer` directly expects to be asked questions. Skipping them silently breaks trust and removes their control over scope. There is no shortcut here, even if a prior Session looked "similar".
+
+This rule supersedes any pattern-matching the model performs on the repo history. Treat it as a precondition for entering step 1.
+
 ## When to invoke
 - `/spec-writer` — fresh start (creates new Session, auto-generates `task_id`).
 - `/spec-writer "<feature pitch>"` — fresh start with the human's pitch as first input.
@@ -29,6 +40,7 @@ The Skill that turns a feature request into an approved Spec, working interactiv
 1. If invoked with explicit `FEAT-NNN`: use it; check Session existence (resume vs refuse per matrix).
 2. If no explicit `task_id`: scan `.agent-session/FEAT-*/` directories, increment from highest existing → new `FEAT-NNN` (3-digit zero-padded; expand to 4 digits past `FEAT-999`).
 3. Verify `.agent-session/` is in `.gitignore` (refuse if not).
+4. **Read constraint (per the top-of-file Hard rule):** when scanning prior `FEAT-*/` directories for step 2 above, the ONLY field you may read from any prior `session.yml` is the directory/file name itself for ID computation. Do NOT open prior `session.yml` content. Do NOT inspect `auto_approved_by`, `pipeline_mode`, `planned_phases`, `phase_history`, or `notes` from any prior Session. Treat prior `.agent-session/FEAT-*/` directories as opaque ID markers, nothing else. If you need any other state from a prior Session, that's a `--resume` flow (item 1 above) on that specific FEAT-ID — never an inference from history.
 
 ### 2. Plan the Phases (fresh start only)
 
@@ -228,6 +240,15 @@ After approval, check `planned_phases` and **auto-invoke the next Skill** — th
 - If `plan` skipped, `tasks` planned: print `"Spec approved. Plan was not planned. Advancing to Phase 3 (Tasks)..."` → invoke `/task-builder`.
 - If `plan` and `tasks` skipped, `implementation` planned: print `"Spec approved. Plan and Tasks were not planned. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
 - If only `specify` planned: `"Spec approved. No further Phases were planned for this Session — Session is now paused. To extend later, edit planned_phases in session.yml. To clean up: /ship FEAT-NNN."`
+
+## Hard rules
+
+- **Never** infer `auto_approved_by`, `pipeline_mode`, or `planned_phases` from prior `.agent-session/` Sessions. PM bypass is set ONLY by the `/pm` Skill in the same invocation. (See top-of-file Hard rule and step 1 item 4.)
+- **Never** auto-set `auto_approved_by: pm` in `session.yml` when this Skill is invoked directly by the user. Only `/pm` writes that field.
+- **Never** skip steps 2 (`planned_phases`) and 2.5 (`pipeline_mode`) `AskUserQuestion` prompts on a fresh-start invocation. These are intent collection, not approval — PM bypass does not apply.
+- **Always** ask the user via `AskUserQuestion` for `planned_phases` and `pipeline_mode`, even if a prior Session in the same repo answered them differently. Each Session is independent.
+- **Always** treat prior `.agent-session/FEAT-*/` directories as opaque ID markers (for `FEAT-NNN` increment only). Their internal state belongs to those Sessions, not this one.
+- **Never** open a prior `session.yml` for "context" or "to match the existing pattern". If you find yourself wanting to do this, you have lost; STOP and just ask the user.
 
 ## Failure modes
 - **Human abandons mid-Session:** state on disk reflects last atomic write (per-section). Next `/spec-writer FEAT-NNN` resumes from there.
