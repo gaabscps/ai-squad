@@ -40,17 +40,27 @@ Phase 4 dispatches subagents whose PreToolUse/PostToolUse/Stop hooks live in `$C
 As your **first action**, run this Bash check exactly once per fresh invocation:
 
 ```sh
-required="verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py"
+# Resolve repo root robustly. Claude Code does not always export
+# $CLAUDE_PROJECT_DIR into Bash tool calls (only into hook subshells), so
+# falling back to git rev-parse / pwd avoids false-positive "MISSING_HOOKS".
+repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+hooks_dir="$repo_root/.claude/hooks"
+# Use positional parameters ($@) for POSIX-safe iteration. A bare `for f in
+# $required` only word-splits in bash; zsh keeps the variable as a single
+# string and the loop fires once with the whole list concatenated. Setting
+# positional parameters makes the iteration shell-agnostic.
+set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py
 missing=""
-for f in $required; do
-  [ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/$f" ] || missing="$missing $f"
+for f in "$@"; do
+  [ -f "$hooks_dir/$f" ] || missing="$missing $f"
 done
 if [ -n "$missing" ]; then
   printf 'MISSING_HOOKS:%s\n' "$missing"
+  printf 'Checked under: %s\n' "$hooks_dir"
   printf 'Run in this repo: ai-squad deploy --hooks-only  (or: npx @ai-squad/cli deploy --hooks-only)\n'
   exit 1
 fi
-echo "hooks-ok"
+echo "hooks-ok (under $hooks_dir)"
 ```
 
 - `hooks-ok` → proceed to "Refuse when" section below.
@@ -81,6 +91,10 @@ Skip this check on `--resume` after the first turn of the same Session has confi
 ### 1. Resolve Session and read inputs
 1. Determine `task_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec/Plan/Tasks (auto-derive if Plan/Tasks were skipped per `planned_phases`).
+2a. **Read `session.yml.pipeline_mode`** (defaults to `standard` if absent — pre-v0.7 sessions). Valid values: `lite` | `standard`. The mode governs two clamps applied in this skill:
+    - **Fan-out cap (step 3):** `lite` clamps concurrent dispatches to 1 (sequential); `standard` keeps the 5-cap.
+    - **Tier ceiling (Model/effort selection):** `lite` clamps every task's effective tier to **T2 max** regardless of `tasks.md` declaration; `standard` honors the declared tier as-is.
+    Skip-reviewers markers (per task) are honored in both modes — they are independent of `pipeline_mode`.
 3. **Preflight: validate `ac_scope` and `Tier:` on every task.** Before any dispatch, iterate every `T-XXX` in `tasks.md`. If any task does not declare an `ac_scope` field (or `ac_scope` is empty), abort with error:
    ```
    "Task <T-XXX> in tasks.md missing required ac_scope field"
@@ -165,17 +179,26 @@ For each `T-XXX`:
 - Independent tasks form the **ready queue**; dependent tasks wait until predecessors complete.
 
 ### 3. Dispatch loop (capped concurrency = 5, FIFO overflow queue)
+
+**Single-turn fan-out rule (read this before reading anything else):** in Claude Code, parallelism happens ONLY when multiple `Task` tool calls are issued in the SAME assistant turn (one response with N tool_use blocks). Issuing dispatches across separate turns — even inside the same loop iteration — runs them serially. Whenever you have ≥2 dispatches ready, you MUST batch them in a single turn.
+
+**Mode-aware fan-out cap:**
+- `standard` mode: **5 concurrent dispatches** per turn (default).
+- `lite` mode: **1 dispatch** per turn (sequential pipeline by design — lite implies single-purpose changes where parallel coordination overhead exceeds benefit).
+
+The single-turn rule still applies in `lite` mode for the reviewers fan-out within a task (code-reviewer + logic-reviewer in one turn when both are dispatched), unless the task carries a `Skip reviewers:` marker.
+
 While ready queue is non-empty OR any task is in-flight:
-- Pull up to **5 concurrent `Task` tool dispatches** from the ready queue. (Anthropic's empirical 3-5 fan-out sweet spot per their multi-agent research blog; well under Claude Code's hard 10-cap; quota-friendly for Max 5x.)
-- For each pulled task: build the Work Packet and dispatch via `Task` tool (see "Dispatch contract" below).
-- Tasks beyond 5 wait in FIFO queue; queue refills as tasks complete (no fail-fast).
-- On each Subagent completion: read its Output Packet, run step 4 (state merge), step 5 (progress check), step 6 (cascade routing if needed). Re-evaluate ready queue.
+- Take up to **N dispatches** from the ready queue (N = 5 for `standard`, N = 1 for `lite`; Anthropic's empirical 3-5 fan-out sweet spot per their multi-agent research blog; well under Claude Code's hard 10-cap; quota-friendly for Max 5x). Build the Work Packet for each.
+- **Issue all N `Task` tool calls in a single assistant turn** — one response containing N tool_use blocks. Never dispatch one, wait for return, then dispatch the next: that defeats the entire fan-out and is the most common cause of slow pipelines.
+- Tasks beyond 5 wait in FIFO queue; queue refills only after the in-flight batch returns.
+- When the batch returns (all N Output Packets in hand): for each, run step 4 (state merge), step 5 (progress check), step 6 (cascade routing if needed). Then re-evaluate ready queue and issue the next batch — again, all in one turn.
 
 ### 4. Per-task state machine (orchestrator-managed, atomic write)
 Each task transitions through: `pending` → `running` → (`done` | `blocked` | `pending_human` | `failed`).
 
 Pipeline per task (per `squads/sdd/docs/concepts/pipeline.md`):
-- Dispatch `dev`. On `dev` Output Packet `status: done`: dispatch `code-reviewer` ‖ `logic-reviewer` in parallel (counts against the 5-cap).
+- Dispatch `dev`. On `dev` Output Packet `status: done`: dispatch `code-reviewer` and `logic-reviewer` in parallel. **Single-turn rule:** issue BOTH `Task` tool calls in the SAME assistant turn (one response with two tool_use blocks). Do NOT wait for the first reviewer to return before issuing the second — that serializes the fan-out and doubles wall-clock per task. Both count against the 5-cap.
 - If reviewers return findings: loop to `dev` (cap: `review_loops_max=3`).
 - If reviewers conflict on same `file:line`: cascade to `blocker-specialist`.
 - On reviewers clean: dispatch `qa`.
@@ -260,20 +283,22 @@ Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in
 ```
 WorkPacket:
 ```yaml
+# --- Stable block (cache-friendly prefix; keep order identical across all dispatches in this Session) ---
 session_id: FEAT-NNN     # FEAT-007: feature scope; used by hooks for direct lookup
-task_id: T-XXX
-dispatch_id: <uuid>
 spec_ref: ./.agent-session/FEAT-NNN/spec.md
 plan_ref: ./.agent-session/FEAT-NNN/plan.md
 tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
-ac_scope: [AC-001, AC-003]
-scope_files: [src/auth/login.ts]
-previous_findings: <path-or-null>
+project_context:
+  standards_ref: ./CLAUDE.md
+# --- Variable block (per-dispatch — placed AFTER stable block so prefix matches across dispatches) ---
+task_id: T-XXX
+dispatch_id: <uuid>
 model: sonnet            # set by orchestrator from Tier × Loop table
 effort: high             # set by orchestrator from Tier × Loop table
 tier: T3                 # echoed for traceability; source of truth is tasks.md
-project_context:
-  standards_ref: ./CLAUDE.md
+ac_scope: [AC-001, AC-003]
+scope_files: [src/auth/login.ts]
+previous_findings: <path-or-null>
 ```
 ```
 
@@ -295,6 +320,7 @@ On every Subagent dispatch, the orchestrator MUST (a) pass the Task tool `model`
 
 **Algorithm:**
 1. Read the task's `Tier:` field from `tasks.md` (values: `T1`, `T2`, `T3`, `T4`). If absent → abort with error `"Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"`. Do NOT silently default; that defeats the calibration.
+1a. **Lite-mode tier clamp:** if `session.yml.pipeline_mode == "lite"` AND the declared `Tier:` is `T3` or `T4`, **clamp to `T2`** for this dispatch and record `pm_note: "Lite-mode tier clamp T<X> → T2"` on the `actual_dispatches[]` entry. The clamp is per-dispatch (transient) and does NOT rewrite `tasks.md`. If reviewer findings later trigger dynamic tier reclassification beyond T2 (e.g., race condition surfaced), the orchestrator MUST switch the Session out of `lite` mode (atomic write to `session.yml.pipeline_mode = "standard"`) before dispatching the bumped tier — lite is a budget contract; breaking it requires explicit mode change.
 2. Determine the dispatch's **loop kind** by inspecting `task_states[T-XXX]` and the immediately preceding dispatch in `actual_dispatches[]`:
    - `dev` + first dispatch on task → `dev L1`
    - `dev` + previous_findings from reviewer + `task_states.loops == 2` → `dev L2`
@@ -317,14 +343,23 @@ Task(
   description="QA validation for T-001",
   prompt='''WorkPacket:
 ```yaml
+# Stable block (cache-friendly prefix)
 session_id: FEAT-NNN
+spec_ref: ./.agent-session/FEAT-NNN/spec.md
+plan_ref: ./.agent-session/FEAT-NNN/plan.md
+tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
+project_context:
+  standards_ref: ./CLAUDE.md
+# Variable block (per-dispatch)
 task_id: T-001
 dispatch_id: d-T-001-qa-l1
 model: haiku
 effort: high
 tier: T1
 subagent_type: qa
-...
+ac_scope: [AC-001]
+scope_files: [src/auth/login.ts]
+previous_findings: null
 ```
 '''
 )
@@ -332,6 +367,18 @@ subagent_type: qa
 Omitting `model="haiku"` causes the subagent to run on the orchestrator's own model (opus), and `verify-tier-calibration.py` will block the dispatch.
 
 **Dynamic tier reclassification:** if reviewer findings on a `dev` L1 Output Packet reveal complexity exceeding the initial `Tier:` (e.g., findings cite invariants, race conditions, or cross-module impact not anticipated in the original tier), the orchestrator MUST update the task's `Tier:` line in `tasks.md` BEFORE dispatching the L2 dev. Append a `Tier-bump note:` line on the task explaining the bump (one line). The L2+ dispatches read the corrected tier. Tier reclassification is logged on the next `actual_dispatches[]` entry's `pm_note` as `"Tier-bump T<X> → T<Y> — <one-line reason>"`.
+
+### Prompt caching strategy (subagent dispatch efficiency)
+
+Every Phase 4 dispatch reuses the same large context: `spec.md` + `plan.md` + `tasks.md` + `CLAUDE.md`. Across a typical pipeline (N tasks × 4-5 roles), that block is consumed 20-50+ times. Without a stable prefix, every dispatch re-pays the full token cost. With a stable prefix, Anthropic's ephemeral prompt cache (5-min TTL) lets all dispatches after the first hit cache.
+
+**Rules:**
+- Embed the **stable context** (`spec_ref`, `plan_ref`, `tasks_ref`, `CLAUDE.md` path / standards_ref) near the TOP of the Work Packet `prompt`, before any per-dispatch fields. The cache keys on the longest matching prefix — variable content high up defeats the cache.
+- Per-dispatch unique fields (`dispatch_id`, `previous_findings`, `ac_scope`, `scope_files`) go at the END of the Work Packet.
+- Keep YAML field order identical across dispatches in the same Session. Reordering breaks the prefix match.
+- Do NOT interleave variable and stable fields.
+
+The orchestrator's responsibility is prefix stability; Claude Code's runtime applies `cache_control` automatically when the prefix matches. No explicit cache markers needed in the Work Packet.
 
 ## Output
 - Per dispatch: Work Packet snapshot at `.agent-session/<task_id>/inputs/<dispatch_id>.json` (orchestrator writes for traceability); Output Packet at `.agent-session/<task_id>/outputs/<dispatch_id>.json` (Subagent writes via atomic write).
