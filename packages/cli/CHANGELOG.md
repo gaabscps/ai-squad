@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.0 — 2026-05-16
+
+### New features
+
+- **Pipeline lite mode (SDD squad).** New `session.yml.pipeline_mode` field with values `lite | standard`. Selected interactively in `spec-writer` step 2.5 (or via `--mode=lite|standard` flag). Lite mode is the compressed pipeline for single-purpose changes (fix, small refactor, doc/copy, single-file feature):
+  - `spec-writer`: caps US count to 1.
+  - `task-builder`: hard cap of 2 tasks total, disallows Setup/Foundational phases, auto-appends `Skip reviewers:` marker to single-file trivial/small tasks (grants the existing orchestrator reviewer-skip exception without manual annotation).
+  - `orchestrator`: clamps fan-out cap to 1 (sequential) and clamps per-task tier ceiling to T2 (cheap dispatch by default). Reviewer-skip markers honored independently of mode.
+  - Quality gates (logic-gap sweep, edge-case categories, audit-gate) remain mandatory in lite mode. Lite reduces volume, not rigor. Pre-v0.7 sessions default to `standard` for backward compatibility.
+
+- **Spec rigor sweep (Frente B).** `spec-writer` now performs an explicit logic-gap sweep before any approval path (PM bypass or human gate), with concrete edge-case categories (empty / error / concurrent / partial-failure) mandatory at draft time. Clarifications touching external APIs, concurrency, security, or data migration now trigger a research dispatch (single Explore pass per decision block) before asking the human. Designed to cut Phase 4 review_loops/qa_loops cascades by resolving gaps upstream.
+
+### Performance
+
+- **Orchestrator single-turn fan-out (Frente C).** Phase 4 dispatch loop and per-task reviewers fan-out (code-reviewer + logic-reviewer) now explicitly require issuing all N `Task` tool calls in the SAME assistant turn. The previous wording was ambiguous enough that dispatches ran serially despite the "concurrent" intent — defeating the entire fan-out model. Expected impact: significant Phase 4 wall-clock reduction on multi-task pipelines.
+
+- **Prompt caching strategy.** Work Packet structure reordered so stable context (`session_id`, `spec_ref`, `plan_ref`, `tasks_ref`, `standards_ref`) precedes per-dispatch variable fields. Anthropic's ephemeral cache (5-min TTL) keys on the longest matching prefix; this ordering enables cache hits across the 20-50+ dispatches in a typical pipeline.
+
+### Code quality
+
+- **Tighter comments policy (Frente D).** `dev` and `code-reviewer` updated with a hard rule defaulting to NO comments. Comments are added only when the WHY is non-obvious (hidden constraint, subtle invariant, workaround for a specific bug, surprising behavior). Forbidden patterns: comments restating WHAT the code does, references to current task/PR/issue/callers, multi-paragraph docstrings on simple functions, stale TODOs without owner+date+condition. `code-reviewer` flags noise comments under `dimension: comments`.
+
+### Bug fixes
+
+- **Orchestrator preflight false-positive `MISSING_HOOKS`.** Preflight check now resolves repo root via `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}` instead of relying on `$CLAUDE_PROJECT_DIR` being exported into ad-hoc Bash invocations. Matches the pattern already used in `pm/skill.md`. Eliminates false-positive aborts in freshly-deployed consumer repos.
+
 ## 0.4.0 — 2026-05-13
 
 ### Bug fixes
