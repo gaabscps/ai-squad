@@ -51,7 +51,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **Design** — structural fit, layering, "is this the right place for this logic?"
    - **Style** — formatting, idioms, language conventions
    - **Naming** — variable/function/class names, consistency
-   - **Comments** — useful where needed, not where redundant
+   - **Comments** — default is NO comments. Flag any comment that (a) restates WHAT the code does (well-named identifiers already do that), (b) references the current task/PR/issue/caller ("used by X", "added for FEAT-123"), (c) is a multi-paragraph docstring on a simple function, (d) is a stale `TODO` without owner+date+condition, or (e) would not confuse a future reader if removed. A comment is justified ONLY when the WHY is non-obvious — hidden constraint, subtle invariant, workaround for a specific bug, or behavior that would surprise a reader. Findings on noise comments use `dimension: comments`.
    - **Pattern-fit complexity** — patterns that should be simplified per project conventions (NOT functional complexity — that's logic-reviewer)
 5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.

@@ -66,6 +66,13 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 - Never: redefine `ac_scope` or invent ACs.
 - Never: emit `status: done` without running the relevant tests (Anthropic verify-your-work guidance).
 - Never: edit existing tests to make them pass — write new tests or fix the code (TDD discipline against the documented "test-tampering" failure mode).
+- **Comments policy (Anthropic-style, hard rule):**
+  - Default to NO comments. Add one ONLY when the WHY is non-obvious — a hidden constraint, a subtle invariant, a workaround for a specific bug, or behavior that would surprise a reader.
+  - Never: write comments that explain WHAT the code does. Well-named identifiers already do that.
+  - Never: reference the current task, fix, or callers in comments ("used by X", "added for FEAT-123", "for the Y flow"). That metadata belongs in the commit/PR description and rots as the codebase evolves.
+  - Never: write multi-paragraph docstrings on simple functions. One short line max when justified.
+  - Never: leave stale `TODO`s without owner+date+condition.
+  - Test for inclusion: if removing the comment wouldn't confuse a future reader, do not write it.
 - Always: emit exactly one Output Packet at end (atomic write).
 - Always: every Output Packet evidence is a pointer (per `shared/concepts/evidence.md`).
 - Always: validate Output Packet against the canonical schema before emitting.
