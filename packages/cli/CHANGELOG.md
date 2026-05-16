@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 — 2026-05-16
+
+### Bug fixes
+
+- **`spec-writer` skipped `planned_phases` and `pipeline_mode` questions in repos with prior PM-mode sessions.** Observed in calendarfr: spec-writer detected `auto_approved_by=pm` in `.agent-session/` history and auto-decided both `planned_phases` (full) and `pipeline_mode` (standard) without running `AskUserQuestion`, removing user control over intent. Root cause: steps 2 and 2.5 lacked an explicit invariant that they are NEVER skipped by PM bypass — Opus 4.7 inferred "PM mode end-to-end" from context. Fix: both steps now declare `MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.` with explicit anti-inference wording. PM bypass only governs approval gates (steps 6.5/7); intent collection is always interactive.
+
 ## 0.7.0 — 2026-05-16
 
 ### New features

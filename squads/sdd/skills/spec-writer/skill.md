@@ -31,6 +31,9 @@ The Skill that turns a feature request into an approved Spec, working interactiv
 3. Verify `.agent-session/` is in `.gitignore` (refuse if not).
 
 ### 2. Plan the Phases (fresh start only)
+
+**MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `planned_phases` is user intent about which Phases will run, NOT an automatable inference. PM bypass (`auto_approved_by=pm`, detected at step 6.5) governs APPROVAL gates only (steps 6.5 and 7) — it does NOT cover intent collection. If you find yourself about to auto-pick `planned_phases` because a previous Session in `.agent-session/` did it that way: STOP and run `AskUserQuestion` regardless. The user may want a different shape this time.
+
 Use `AskUserQuestion` with checkbox. Default all 4 checked, including Implementation:
 ```
 Which Phases will this Session run?
@@ -43,7 +46,9 @@ Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Pow
 
 ### 2.5. Pipeline mode selection (fresh start only)
 
-Use `AskUserQuestion` (binary, default to `standard` if unsure):
+**MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `pipeline_mode` is user intent about scope of the change, NOT an inference from "this looks visually medium-sized" or from prior Sessions. PM bypass governs APPROVAL gates only (steps 6.5/7) — intent collection is always interactive. If you find yourself about to auto-pick `standard` because the feature looks non-trivial, or auto-pick from a prior Session's mode: STOP and run `AskUserQuestion` regardless. The user is the only authority on whether this is a `lite` or `standard` change.
+
+Use `AskUserQuestion` (binary):
 
 ```
 What's the scope of this change?
