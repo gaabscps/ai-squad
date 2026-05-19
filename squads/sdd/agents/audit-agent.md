@@ -7,19 +7,10 @@ effort: medium
 fan_out: false
 permissionMode: bypassPermissions
 hooks:
-  PostToolUse:
-    - matcher: "Write|Edit"
-      hooks:
-        - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
-          timeout: 5
   Stop:
     - hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
-          timeout: 5
-        - type: command
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"'
           timeout: 5
 ---
 
@@ -50,12 +41,12 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 2. Read `manifest_ref` — extract `expected_pipeline[]` (declared dispatches per task) and `actual_dispatches[]` (recorded by orchestrator).
 3. Read `tasks_ref` — extract every `T-XXX` and the AC universe (`AC covered:` per task).
 4. List files in `outputs_dir_ref` — every file should be `<dispatch_id>.json`.
-5. Run the **11 reconciliation checks** below. Each check that fails contributes one finding. Checks 10–11 are PM-mode only; skip when `pm_sessions[]` absent (AC-020).
+5. Run the **6 reconciliation checks** below. Each check that fails contributes one finding.
 6. Run the **Phase 4 sweep** — role-specific Output Packet validation for qa, code-reviewer, logic-reviewer dispatches. Collect all gaps; emit one consolidated finding if any exist.
 7. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
 8. Emit Output Packet (atomic write).
 
-## The 11 reconciliation checks (9 universal + 2 PM-mode)
+## The 6 reconciliation checks
 
 **Check 1 — Manifest completeness (mandatory roles per task).**
 For every `T-XXX` in `tasks.md`, the manifest's `expected_pipeline` must declare the canonical Subagent set: `dev`, `code-reviewer`, `logic-reviewer`, `qa`. Missing role → finding `severity: blocker, audit_finding_kind: missing_expected_dispatch`.
@@ -94,102 +85,9 @@ Aggregate `ac_coverage` from every `qa` Output Packet. Every AC ID in `tasks.md`
 **Check 6 — Source-file ownership (orchestrator non-edit invariant).**
 Run `git diff --name-only HEAD` to enumerate files modified in the working tree. Aggregate the union of `files_changed[]` across all `dev` Output Packets. The two sets must be equal (modulo `.agent-session/` paths, which are orchestrator-managed and excluded). Files in the working tree NOT covered by any `dev` packet → finding `severity: blocker, audit_finding_kind: orchestrator_edited_source` (orchestrator bypassed dispatch and edited directly). If git is not available (consumer repo not a git working tree), emit `kind: absence` evidence and a `severity: major` warning instead of `blocker` — best-effort fallback.
 
-**Check 7 — PM session presence (AC-001b).**
-Read `dispatch-manifest.json#pm_sessions[]`. If the array is absent, empty, or every entry has `usage.input_tokens + usage.output_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens == 0` (i.e., total captured tokens == 0), emit finding:
-```
-severity: blocker
-audit_finding_kind: pm_session_not_captured
-ref: dispatch-manifest.json#pm_sessions
-rationale: "PM session not captured — pm_sessions[] empty or all entries have zero tokens"
-```
-This check is PM-exclusive: it validates the `pm_sessions[]` channel populated by `capture-pm-session.ts`, not the `usage` field on `actual_dispatches[]`.
-
-**Check 8 — Subagent usage presence (AC-002).**
-Iterate `actual_dispatches[]`. For every entry where `role != "pm-orchestrator"` AND (`usage` key is absent OR `usage.total_tokens == 0`), emit one finding per failing entry:
-```
-severity: blocker
-audit_finding_kind: usage_not_captured
-ref: dispatch-manifest.json#actual_dispatches[<dispatch_id>]
-rationale: "usage not captured for role <role> dispatch <dispatch_id>"
-```
-Collect all failing entries — do not short-circuit on the first failure.
-
-**Check 9 — Capture failure marker (AC-003).**
-Read `.agent-session/<task_id>/.capture-usage-failed.json` if it exists. For every entry in the array, emit one finding:
-```
-severity: blocker
-audit_finding_kind: usage_capture_failed
-ref: .agent-session/<task_id>/.capture-usage-failed.json
-rationale: "Usage capture failed for dispatch <dispatch_id>: <reason>"
-```
-If the file does not exist, this check passes silently.
-
-**Check 10 — PM gate violations (AC-017, AC-020, AC-021).**
-*Precondition:* skip this check entirely when `dispatch-manifest.json.pm_sessions[]` is absent or empty (non-PM run — AC-020).
-
-When `pm_sessions[]` is populated: read `session.yml` (located at `.agent-session/<task_id>/session.yml`). **If `session.yml` is missing or unreadable** (any I/O or parse error), immediately emit `status: escalate, blocker_kind: contract_violation` with rationale `"session.yml missing or unreadable at <path>"` — do not continue to sub-steps below.
-
-**Pre-FEAT-004 session guard (AC-021):** If `session.yml.notes` is absent (key not present) or is not a list, skip Check 10 entirely — this is a pre-FEAT-004 session that predates the `pm_decision` notes schema. Do NOT emit any finding — absence of notes in a pre-FEAT-004 session is not a violation.
-
-Iterate every key in `session.yml.phase_history`. For each phase entry where `approved_by == "pm"`:
-1. Identify the artifact path the phase produced (the file recorded in `phase_history.<phase>.artifact_path`). **If `artifact_path` is null, absent, or an empty string `""` (AC-020):** log a warning and skip this phase entry — do NOT attempt string matching against a null or empty path (would cause TypeError or false match). Continue to the next phase entry.
-2. Scan `session.yml.notes` for all `pm_decision` YAML list items where `phase` matches the current phase key AND `artifact_path` equals the phase artifact path (exact string match). From the candidates collected by this `artifact_path` match, apply the timestamp constraint as follows:
-   - **If `phase_history.<phase>.approved_at` is present and parses as valid ISO 8601:** filter candidates to those whose `timestamp` also parses as valid ISO 8601 and falls within ±60 seconds of `approved_at`. If multiple candidates remain after this filter, use the one with the LATEST (maximum) `timestamp`.
-   - **If `phase_history.<phase>.approved_at` is absent:** skip the ±60s filter entirely (fail-open). Any candidate that matched phase + `artifact_path` is accepted. Additionally emit one `minor` finding per phase:
-     ```
-     severity: minor
-     audit_finding_kind: pm_gate_violations
-     ref: session.yml#phase_history.<phase>
-     rationale: "approved_at absent for PM-approved phase '<phase>' — timestamp check skipped"
-     ```
-   - **If `phase_history.<phase>.approved_at` is present but does NOT parse as valid ISO 8601:** treat as a malformed timestamp — emit one `major` finding:
-     ```
-     severity: major
-     audit_finding_kind: pm_gate_violations
-     ref: session.yml#phase_history.<phase>
-     rationale: "unparseable timestamp in phase_history.<phase>.approved_at"
-     ```
-     and continue as if `approved_at` were absent (fail-open on `artifact_path` match alone).
-   - **If a `pm_decision` candidate's own `timestamp` field does not parse as valid ISO 8601:** that candidate is invalid regardless of the `approved_at` situation — discard it and emit one `major` finding:
-     ```
-     severity: major
-     audit_finding_kind: pm_gate_violations
-     ref: session.yml#notes[pm_decision]
-     rationale: "unparseable timestamp in pm_decision entry for phase '<phase>'"
-     ```
-3. If after all filtering no valid matching `pm_decision` entry is found, emit one `blocker` finding per offending phase:
-```
-severity: blocker
-audit_finding_kind: pm_gate_violations
-ref: session.yml#phase_history.<phase>
-rationale: "PM-approved phase '<phase>' has no matching pm_decision evidence in session.yml.notes (artifact_path or timestamp mismatch)"
-```
-Collect all findings across all failing phases — do NOT short-circuit on the first failure.
-
-**Check 11 — PM cost cap exceeded (AC-018, AC-019, AC-020).**
-*Precondition:* skip this check entirely when `dispatch-manifest.json.pm_sessions[]` is absent or empty (non-PM run — AC-020).
-
-When `pm_sessions[]` is populated:
-1. Read `session.yml.pm_cost_cap_usd`. If the field is absent or `null`, skip the budget check entirely and do NOT emit a finding — cap is opt-in only (AC-019). PM total cost still surfaces in the agentops report as an informational metric via the `## Cost by PM session` section (not this check's responsibility).
-2. If `pm_cost_cap_usd` is explicitly set to a value that is not null AND is a number (including `0` — an explicit cap of `0` means any cost over $0 is a violation): compute `total_cost` using the defensive sum (AC-019):
-   ```python
-   total_cost = sum(
-       v if isinstance(v := (s.get("usage") or {}).get("cost_usd"), (int, float)) else 0
-       for s in pm_sessions if s is not None
-   )
-   ```
-   This guards against: `s` being `None` in the array, `usage` key absent, `cost_usd` key absent, `cost_usd` being `None`, and `cost_usd` being a non-numeric value — all treated as `0` rather than propagating through arithmetic. If `total_cost > pm_cost_cap_usd`, emit one finding:
-```
-severity: major
-audit_finding_kind: pm_cost_cap_exceeded
-ref: dispatch-manifest.json#pm_sessions
-rationale: "PM total cost $<total_cost> exceeds cap $<pm_cost_cap_usd> set in session.yml.pm_cost_cap_usd"
-```
-If `total_cost <= pm_cost_cap_usd`, this check passes silently.
-
 ## Phase 4 sweep — role-specific Output Packet validation (AC-003)
 
-Run this sweep **after** the 11 reconciliation checks and **before** emitting the Output Packet. Collect all failures into a single consolidated finding — do NOT short-circuit on the first failure.
+Run this sweep **after** the 6 reconciliation checks and **before** emitting the Output Packet. Collect all failures into a single consolidated finding — do NOT short-circuit on the first failure.
 
 **Roles in scope:** `qa`, `code-reviewer`, `logic-reviewer`.
 
@@ -221,7 +119,7 @@ Run this sweep **after** the 11 reconciliation checks and **before** emitting th
    ```
    The session status MUST be `blocked` (not `done`) when any gap is recorded.
 
-5. **If the gap list is empty:** no additional finding is added for this sweep. The session may still be `blocked` due to findings from the 11 reconciliation checks.
+5. **If the gap list is empty:** no additional finding is added for this sweep. The session may still be `blocked` due to findings from the 6 reconciliation checks.
 
 ## Phase 4 sweep — warnings.json summary (AC-008)
 
@@ -230,7 +128,7 @@ Run this step **after** all reconciliation checks and **before** emitting the Ou
 1. Read `.agent-session/<task_id>/warnings.json` if it exists.
 2. If the file exists but is malformed JSON, treat as 0 warnings and emit a finding `audit_finding_kind: warnings_file_corrupt` with `severity: major` pointing to the file. Do not crash — continue to the next check.
 3. Count entries by `severity` (`info`, `warning`, `error`) and by `source`.
-4. Include the counts in the Output Packet `summary` field (append a brief note, e.g. `"Warnings: 2 warning, 1 error (sources: capture-pm-session, verify-output-packet)."`).
+4. Include the counts in the Output Packet `summary` field (append a brief note, e.g. `"Warnings: 2 warning, 1 error (sources: verify-output-packet)."`).
 5. Include a pointer evidence entry:
    ```
    kind: file
@@ -265,9 +163,8 @@ Run this check **as part of** the Phase 4 sweep, **after** role-specific Output 
   - `done` — all applicable checks pass AND Phase 4 sweep finds no gaps; orchestrator may emit handoff
   - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
   - `escalate` — audit cannot run (manifest unreadable, outputs dir missing); orchestrator escalates to human
-- `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the 11 kinds below>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
-  - Universal kinds (Checks 1–9): `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `pm_session_not_captured`, `usage_not_captured`, `usage_capture_failed`, `warnings_file_corrupt`, `incomplete_review`
-  - PM-mode kinds (Checks 10–11, emitted only when `pm_sessions[]` populated): `pm_gate_violations` (blocker/major/minor), `pm_cost_cap_exceeded` (major)
+- `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the kinds below>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
+  - Finding kinds: `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `warnings_file_corrupt`, `incomplete_review`
 - `evidence[]`: pointers to manifest entries and output packet files inspected
 - `notes`: ≤80 chars (schema constraint); brief pointer only — e.g. "Phase 4 gaps: see findings[N].note for full list"
 
@@ -276,7 +173,7 @@ Run this check **as part of** the Phase 4 sweep, **after** role-specific Output 
 - Never: dispatch other Subagents (you are leaf node — singleton).
 - Never: pass-through audit when checks fail. **Bias toward `blocked`** — false-positive (block a clean run) is recoverable; false-negative (let a fraudulent handoff through) defeats the entire layer.
 - Never: paste raw file content in findings — pointers only.
-- Always: run all applicable checks even if check 1 fails (collect every finding in one pass, don't short-circuit). Checks 10–11 are conditional on `pm_sessions[]` being present but must both run when it is.
+- Always: run all applicable checks even if check 1 fails (collect every finding in one pass, don't short-circuit).
 - Always: validate Output Packet against the canonical schema before emitting.
 
 ## No fan-out

@@ -1,9 +1,0 @@
-src/
-__tests__/
-__fixtures__/
-esbuild.config.ts
-jest.config.ts
-tsconfig.json
-*.map
-.gitignore
-coverage/

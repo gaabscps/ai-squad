@@ -12,16 +12,10 @@ hooks:
         - type: command
           command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-reviewer-write-path.py"
           timeout: 5
-        - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
-          timeout: 5
   Stop:
     - hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
-          timeout: 5
-        - type: command
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"'
           timeout: 5
 ---
 
@@ -148,8 +142,8 @@ When all ACs are satisfied and no gaps remain:
 - **Required top-level fields**: `spec_id`, `dispatch_id`, `role`, `status`, `summary`, `evidence`, `usage` (matches schema `required[]`)
 - **Required per finding**: `id`, `ac_ref`, `file`, `line`, `severity`, `gap_kind`, `evidence_ref`, `rationale`
 
-### `usage` (AC-006)
-Always emit `"usage": null`. The `capture-subagent-usage.py` Stop hook reads token usage from the Claude API response envelope and populates `usage.cost_usd` post-completion. Never include `cost_usd` or `cost_source` as top-level fields — schema `additionalProperties: false` rejects them.
+### `usage`
+Always emit `"usage": null`. Never include `cost_usd` or `cost_source` as top-level fields — schema `additionalProperties: false` rejects them.
 
 ### Allowed write target
 - **Only**: `.agent-session/<task_id>/outputs/<dispatch_id>.json` — where `task_id` and `dispatch_id` come from the Work Packet. `task_id` is what the orchestrator passes (typically a `FEAT-NNN` session id, not the per-AC `T-NNN`).

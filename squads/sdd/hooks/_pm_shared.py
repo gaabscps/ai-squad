@@ -4,7 +4,6 @@ Shared helpers for FEAT-004 PM enforcement hooks.
 Used by:
   - verify-pm-handoff-clean.py  (T-004 / AC-001)
   - verify-tier-calibration.py  (T-008/T-009 / AC-005)
-  - capture-pm-usage.py         (T-016 / AC-013, transcript path AC-014)
 
 Python 3.8+. No external dependencies (stdlib only).
 """
@@ -119,7 +118,7 @@ def _is_excluded(p: Path, root: Path) -> bool:
       2. Any component of *p* relative to *root* matches an excluded name
          (e.g. ``node_modules``, ``.agent-session``).  Checked across ALL
          path parts so nested occurrences like
-         ``packages/agentops/node_modules/`` are also caught.
+         ``packages/some-pkg/node_modules/`` are also caught.
     """
     try:
         resolved = p.resolve()
@@ -321,7 +320,7 @@ def atomic_manifest_mutate(
     Raises ``json.JSONDecodeError`` if the file is not valid JSON.
     All other I/O errors propagate to the caller.
 
-    Pattern mirrors ``capture-subagent-usage.py:update_manifest``.
+    Atomic read-modify-write pattern (tmp + rename + sidecar fcntl lock).
     """
     manifest_path = manifest_path.resolve()
     lock_path = manifest_path.parent / (manifest_path.name + ".lock")

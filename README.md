@@ -77,23 +77,6 @@ The audit-agent ensures the pipeline wasn't bypassed — every task must produce
 
 ---
 
-## What to Expect
-
-<!-- TODO: populate this section with real cost and timeline data once we have a representative round of sessions with full cost instrumentation enabled. For now, track your own sessions with `npx @ai-squad/agentops report`. -->
-
-**Pipeline health metrics tracked out of the box (via agentops):**
-
-- ✅ AC closure rate (pass / partial / fail / missing per acceptance criterion)
-- ✅ Dev task success rate (first-try vs looped)
-- ✅ Escalation rate (healthy band: < 10%)
-- ✅ Reviewer findings density (critical / major / minor)
-- ✅ Token usage and estimated cost per dispatch — by model tier (Opus / Sonnet / Haiku) and by role
-- ✅ Wall-clock duration per phase
-
-After any SDD session, run `npx @ai-squad/agentops report` to generate `docs/agentops/index.html` with the full breakdown.
-
----
-
 ## Install
 
 **Requirements:** Node ≥ 18, Python 3.8+ on `PATH`. Works with **Claude Code**, **Cursor**, or **Kiro** as the agent host.
@@ -101,8 +84,8 @@ After any SDD session, run `npx @ai-squad/agentops report` to generate `docs/age
 ### npm (recommended)
 
 ```bash
-# Once per machine — installs the CLI and the report engine:
-npm i -g @ai-squad/cli @ai-squad/agentops
+# Once per machine — installs the CLI:
+npm i -g @ai-squad/cli
 
 # Once per project where you want ai-squad available:
 cd <your-project>
@@ -116,14 +99,7 @@ After deploy:
 
 Start with `/spec-writer "<your pitch>"` or `/discovery-lead "<your problem signal>"` in any deployed project.
 
-> **Why hooks per-project?** Hooks write cost, AC closure, and audit data into `.agent-session/`, and your agentops reports read from the same place. Shipping them next to the data they produce means the report always reflects the hook version that ran — no version drift, no guessing. It also lets different projects run different ai-squad versions side by side, and works in CI without a pre-seeded `$HOME`.
-
-### Generate reports
-
-```bash
-# After any SDD or Discovery session:
-npx @ai-squad/agentops report      # writes docs/agentops/index.html
-```
+> **Why hooks per-project?** Hooks validate the `.agent-session/` pipeline data the SDD squads produce. Shipping the hooks next to the data they enforce means schema and validation always agree — no version drift, no guessing. It also lets different projects run different ai-squad versions side by side, and works in CI without a pre-seeded `$HOME`.
 
 ### Upgrading
 
@@ -221,7 +197,7 @@ Defense-in-depth narrows the blast radius. It doesn't eliminate it:
 >
 > ⚠️ **Hallucinated specs ship as real code.** If `spec-writer` invents a requirement, the pipeline will faithfully implement it. The four conversational phases (Specify / Plan / Tasks) exist specifically so you read these artifacts — `/pm` collapses that into one trust decision at the start.
 >
-> ⚠️ **Cost can still escalate.** Sonnet 4.6 is cheaper per token, but the pipeline runs longer and dispatches more subagents under autonomous operation. Watch `npx @ai-squad/agentops report` after each session.
+> ⚠️ **Cost can still escalate.** Sonnet 4.6 is cheaper per token, but the pipeline runs longer and dispatches more subagents under autonomous operation. Watch your Anthropic Console usage after each session.
 
 **Recommended posture:**
 
@@ -330,10 +306,9 @@ squads/
   sdd/              🚢 SDD squad (Specify → Plan → Tasks → Build)
     skills/         4 conversational Skills
     agents/         6 autonomous Subagents (incl. audit-agent)
-    hooks/          12 Python hooks (deployed per-project to <repo>/.claude/hooks/)
+    hooks/          guardrail Python hooks (deployed per-project to <repo>/.claude/hooks/)
 packages/
   cli/              @ai-squad/cli — `ai-squad deploy` CLI
-  agentops/         @ai-squad/agentops — session reports
 shared/             Cross-squad schemas, glossary, concepts
 examples/           Worked examples (one per squad)
 docs/               Inspirations, operational model, design specs

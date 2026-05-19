@@ -7,7 +7,7 @@
  *
  * Rationale: hooks are operational, low-trust scripts that should be
  * (a) inspectable in the consuming repo, (b) versioned together with
- * the agentops data they emit, and (c) deployable in CI without a
+ * the pipeline data they validate, and (c) deployable in CI without a
  * pre-seeded $HOME. Skills+agents are declarative prompt content and
  * can stay user-global without ergonomic loss.
  *
@@ -241,7 +241,7 @@ function mergeBucketHooks(existingHooks, desiredHooks) {
  *
  *   "python3 ...verify-tier-calibration.py"         → "py:verify-tier-calibration.py"
  *   "[ -f X ] || exit 0; python3 X"                 → "py:<basename>"
- *   "npx @ai-squad/agentops capture"                → "npx:@ai-squad/agentops:capture"
+ *   "npx <package> <subcommand>"                    → "npx:<package>:<subcommand>"
  *   anything else                                    → "raw:<full command>"
  */
 function extractHookId(command) {

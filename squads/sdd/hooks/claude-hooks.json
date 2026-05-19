@@ -49,18 +49,6 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "",
@@ -71,15 +59,7 @@
           },
           {
             "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\""
-          },
-          {
-            "type": "command",
             "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\""
-          },
-          {
-            "type": "command",
-            "command": "npx @ai-squad/agentops capture"
           }
         ]
       }
@@ -91,10 +71,6 @@
           {
             "type": "command",
             "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py\""
-          },
-          {
-            "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\""
           }
         ]
       }

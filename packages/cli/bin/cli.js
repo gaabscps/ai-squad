@@ -6,7 +6,7 @@
  *   deploy [--squad NAME ...] [--cursor] [--force]   Install squads to ~/.claude/
  *   help                                             Print usage
  *
- * Future: report (proxy to @ai-squad/agentops), new, doctor.
+ * Future: new, doctor.
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

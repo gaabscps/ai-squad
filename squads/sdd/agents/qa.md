@@ -6,19 +6,10 @@ effort: medium
 fan_out: true
 permissionMode: bypassPermissions
 hooks:
-  PostToolUse:
-    - matcher: "Write|Edit"
-      hooks:
-        - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
-          timeout: 5
   Stop:
     - hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
-          timeout: 5
-        - type: command
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"'
           timeout: 5
 ---
 

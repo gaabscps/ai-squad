@@ -49,7 +49,7 @@ hooks_dir="$repo_root/.claude/hooks"
 # $required` only word-splits in bash; zsh keeps the variable as a single
 # string and the loop fires once with the whole list concatenated. Setting
 # positional parameters makes the iteration shell-agnostic.
-set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py
+set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py
 missing=""
 for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
@@ -103,7 +103,7 @@ Skip this check on `--resume` after the first turn of the same Session has confi
    ```
    "Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"
    ```
-   Do NOT dispatch any Subagent until all tasks pass both checks. The `ac_scope` guard exists because tasks without it cannot populate `acScope` in `expected_pipeline[]` and break the agentops coverage matrix. The `Tier` guard exists because dispatch model/effort selection is tier-driven (see "Model/effort selection" below); silently defaulting defeats the calibration.
+   Do NOT dispatch any Subagent until all tasks pass both checks. The `ac_scope` guard exists because tasks without it cannot populate `acScope` in `expected_pipeline[]`, which downstream reviewers and qa rely on to scope their work. The `Tier` guard exists because dispatch model/effort selection is tier-driven (see "Model/effort selection" below); silently defaulting defeats the calibration.
 4. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
 5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
@@ -164,9 +164,7 @@ Field rules:
 
 **`expected_pipeline[]` population rules (AC-005):**
 - `acScope`: array of AC-IDs from the task's `ac_scope` field in `tasks.md` (e.g. `["AC-001", "AC-002"]`). For `audit-agent`, set to `[]` (audit validates all tasks, not a specific AC subset).
-- `tasksCovered`: for task-scoped roles (dev, code-reviewer, logic-reviewer, qa), always `[task_id]` (single-element array). For `audit-agent`, set to the full list of all `T-XXX` IDs in the pipeline. Both fields are required — omitting them will cause the agentops coverage matrix to emit warnings.
-
-The `usage` field on each entry is populated automatically by the `capture-subagent-usage.py` Stop hook — the orchestrator does NOT write it. The hook correlates via `_session_id` injected into the output packet by `stamp-session-id.py` (PostToolUse).
+- `tasksCovered`: for task-scoped roles (dev, code-reviewer, logic-reviewer, qa), always `[task_id]` (single-element array). For `audit-agent`, set to the full list of all `T-XXX` IDs in the pipeline. Both fields are required for the audit-agent reconciliation step.
 
 Atomic write pattern (tmp + rename) on every append. Manifest is the **mechanical audit trail** the audit-agent reconciles in step 8.
 
@@ -219,16 +217,6 @@ Code-reviewer e logic-reviewer são **mandatórios** entre `dev` e `qa` para tod
 ```
 
 O marker libera o `qa` gate. Sem o marker, qualquer skip é bloqueado. Esta exceção é audit-visible: audit-agent reporta tasks com skip-reviewers como `pipeline_stage_skipped` finding (severity `warning`, not blocker).
-
-**Pre-`done` usage check (AC-004):** Before transitioning any task-scoped dispatch entry in `actual_dispatches[]` to `status: done`, the orchestrator MUST re-read the manifest and verify that `usage` is present and `usage.total_tokens > 0` for that dispatch. This check applies to all roles except `pm-orchestrator` and `audit-agent`. Protocol:
-1. Re-read `dispatch-manifest.json` (atomic read — no lock needed for read-only).
-2. Find the entry for the dispatch just completed.
-3. If `usage` is absent or `usage.total_tokens == 0`:
-   - Set the entry's `status` to `blocked` with `pm_note: "usage_missing"`.
-   - Cascade to `blocker-specialist` with `cascade_trigger: "usage_missing"`.
-   - Do NOT mark the task `done`. Blocker-specialist decides whether to retry capture or escalate.
-4. If `usage.total_tokens > 0`: proceed normally to mark the dispatch `done`.
-This check is synchronous and deterministic — no async timeout. The `capture-subagent-usage.py` Stop hook runs before the orchestrator processes the return, so usage is available if the hook ran successfully.
 
 After every Subagent return: atomically update `session.yml.task_states[T-XXX]` (tmp + rename). Sole-writer invariant = no race.
 
@@ -333,7 +321,6 @@ On every Subagent dispatch, the orchestrator MUST (a) pass the Task tool `model`
 3. Look up `(loop_kind, tier)` in the Tier × Loop table → `(model, effort)`.
 4. **Pass `model` as the Task tool's `model` parameter** — this is what actually controls the subagent's run-model. Omitting it bypasses the table entirely.
 5. Write `model`, `effort`, `tier` into the Work Packet YAML (descriptive only — for subagent self-awareness and audit).
-6. Echo the same `model`/`effort` into a `tier_calibration` field on the `actual_dispatches[]` entry for the dispatch (`{tier: "T3", model: "sonnet", effort: "high", loop_kind: "dev L2"}`) — agentops uses this for cost-attribution reporting.
 
 **Concrete Task tool call (canonical example for a qa T1 dispatch):**
 ```

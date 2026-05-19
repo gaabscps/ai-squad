@@ -12,16 +12,10 @@ hooks:
         - type: command
           command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/verify-reviewer-write-path.py"
           timeout: 5
-        - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
-          timeout: 5
   Stop:
     - hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
-          timeout: 5
-        - type: command
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"'
           timeout: 5
 ---
 
@@ -157,8 +151,8 @@ You MUST write your Output Packet to disk using the `Write` tool after completin
 }
 ```
 
-### `usage` (AC-006)
-Always emit `"usage": null`. The `capture-subagent-usage.py` Stop hook reads token usage from the Claude API response envelope and populates `usage.cost_usd` post-completion. Never include `cost_usd` or `cost_source` as top-level fields — the schema has `additionalProperties: false` and will reject them.
+### `usage`
+Always emit `"usage": null`. Never include `cost_usd` or `cost_source` as top-level fields — the schema has `additionalProperties: false` and will reject them.
 
 ### Non-overwrite rule (AC-008)
 BEFORE writing, use the `Read` tool on `outputs/<dispatch_id>.json`:
@@ -168,8 +162,6 @@ BEFORE writing, use the `Read` tool on `outputs/<dispatch_id>.json`:
 - **File unreadable / malformed JSON**: treat as not-found — proceed with write.
 
 > Note: TOCTOU is architecturally impossible in this pipeline — dispatch_ids are unique per dispatch and the orchestrator never re-runs an in-progress dispatch. The guard exists for robustness, not concurrent access.
-
-> Cost on skip: when skip-path fires (existing non-null status), this run's cost is unattributed (the Stop hook has no fresh packet target). This is expected for duplicate-dispatch scenarios, which the orchestrator prevents by design.
 
 Write path must be **relative**: `outputs/<dispatch_id>.json` (not absolute).
 

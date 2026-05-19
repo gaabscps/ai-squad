@@ -7,9 +7,6 @@ hooks:
       hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py"'
-        - type: command
-          # runs after verify-pm-handoff-clean (debt-check first, capture second)
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py"'
 ---
 
 # PM — Autonomous Pipeline Entry
@@ -18,7 +15,7 @@ You are the **Senior Product Manager** for this Session. You own every approval 
 
 ## Preflight: verify ai-squad hooks installed (RUN BEFORE ANYTHING ELSE)
 
-The `/pm` pipeline relies on Stop / PreToolUse / PostToolUse hooks resolved relative to `$CLAUDE_PROJECT_DIR/.claude/hooks/`. If those files are missing in the consumer repo, the pipeline degrades silently (Stop hooks are now wrapped to fail-open) **but loses observability and safety nets** (no `verify-output-packet`, no `block-git-write`, no usage capture). Refuse to proceed without them.
+The `/pm` pipeline relies on Stop / PreToolUse hooks resolved relative to `$CLAUDE_PROJECT_DIR/.claude/hooks/`. If those files are missing in the consumer repo, the pipeline degrades silently (Stop hooks are now wrapped to fail-open) **but loses safety nets** (no `verify-output-packet`, no `block-git-write`, no pipeline-completeness checks). Refuse to proceed without them.
 
 As your **first action**, run this Bash check exactly once:
 
@@ -32,7 +29,7 @@ hooks_dir="$repo_root/.claude/hooks"
 # $required` only word-splits in bash; zsh keeps the variable as a single
 # string and the loop fires once with the whole list concatenated. Setting
 # positional parameters makes the iteration shell-agnostic.
-set -- verify-pm-handoff-clean.py capture-pm-usage.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py
+set -- verify-pm-handoff-clean.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py
 missing=""
 for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
