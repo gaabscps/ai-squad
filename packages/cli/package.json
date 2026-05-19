@@ -36,6 +36,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "prepare": "node scripts/sync-components.mjs",
     "prepack": "node scripts/sync-components.mjs",
     "test": "node --test test/",
     "sync": "node scripts/sync-components.mjs"
