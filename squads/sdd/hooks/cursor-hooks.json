@@ -18,6 +18,11 @@
         "command": "python3 ./hooks/ai-squad/capture-session-cost.py",
         "timeout": 10,
         "loop_limit": 5
+      },
+      {
+        "command": "python3 ./hooks/ai-squad/generate-session-report.py",
+        "timeout": 20,
+        "loop_limit": 5
       }
     ],
     "subagentStop": [
