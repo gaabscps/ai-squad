@@ -137,6 +137,17 @@ Run this step **after** all reconciliation checks and **before** emitting the Ou
    ```
 6. If `warnings.json` does not exist, skip this step silently (no finding — absence is normal for clean runs).
 
+## Phase 4 sweep — cost-capture completeness (read-only)
+
+Run this step **after** all reconciliation checks. You are read-only: you DETECT and FLAG gaps, you NEVER write cost files. Backfill is the orchestrator's job at handoff (it has write authority); your role is to make a miss visible.
+
+1. Count the expected per-subagent cost files: the number of entries in `actual_dispatches[]` whose `role` is one of `dev`, `code-reviewer`, `logic-reviewer`, `qa` AND that produced an Output Packet (status `done` or `needs_review`).
+2. Count the actual cost files: `Bash: ls .agent-session/<task_id>/costs/agent-*.json 2>/dev/null | wc -l`.
+3. If actual `<` expected, emit finding `severity: warning, audit_finding_kind: cost_capture_incomplete, ref: .agent-session/<task_id>/costs/`, rationale `"Cost capture incomplete: <actual>/<expected> subagent cost files — orchestrator must backfill before report"`. This is **non-blocking** (does NOT force session `blocked`); it marks the cost report incomplete so the total is never silently low.
+4. If `costs/` is absent entirely (no capture ran), emit the same finding with `<actual>=0`. Still non-blocking.
+
+The principle: the SubagentStop hook is the fast path; this count is the safety net. A missed capture surfaces as `cost_capture_incomplete`, never as a silently low total.
+
 ## Phase 4 sweep — review_loop validation on dev fix-dispatches
 
 Run this check **as part of** the Phase 4 sweep, **after** role-specific Output Packet validation and **before** emitting the Output Packet.
@@ -164,7 +175,7 @@ Run this check **as part of** the Phase 4 sweep, **after** role-specific Output 
   - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
   - `escalate` — audit cannot run (manifest unreadable, outputs dir missing); orchestrator escalates to human
 - `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the kinds below>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
-  - Finding kinds: `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `warnings_file_corrupt`, `incomplete_review`
+  - Finding kinds: `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `warnings_file_corrupt`, `incomplete_review`, `cost_capture_incomplete`
 - `evidence[]`: pointers to manifest entries and output packet files inspected
 - `notes`: ≤80 chars (schema constraint); brief pointer only — e.g. "Phase 4 gaps: see findings[N].note for full list"
 

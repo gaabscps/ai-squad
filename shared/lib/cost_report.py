@@ -1,6 +1,41 @@
 """Aggregate per-agent + session cost files into one report. Pure stdlib."""
 import json
+import re
+import sys
 from pathlib import Path
+
+# Append (not insert(0)): shared/lib/warnings.py would shadow stdlib `warnings`.
+sys.path.append(str(Path(__file__).resolve().parent))
+
+_AGENT_FILE_RE = re.compile(r"agent-(.+)\.jsonl$")
+
+
+def backfill_missing(session_dir, transcript_paths, prices):
+    """Write costs/agent-<id>.json for any subagent transcript lacking one.
+
+    Write-capable recovery path — invoked by the orchestrator (NOT the read-only
+    audit-agent). Returns the list of agent ids that were backfilled.
+    """
+    from transcript_cost import extract_transcript_cost
+
+    session_dir = Path(session_dir)
+    out_dir = session_dir / "costs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    done = []
+    for tp in transcript_paths:
+        m = _AGENT_FILE_RE.search(str(tp))
+        if not m:
+            continue
+        agent_id = m.group(1)
+        out_file = out_dir / f"agent-{agent_id}.json"
+        if out_file.exists():
+            continue
+        result = extract_transcript_cost(tp, prices)
+        payload = {"agent_id": agent_id, "transcript_path": str(tp),
+                   "scope": "implementation", "backfilled": True, **result}
+        out_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        done.append(agent_id)
+    return done
 
 
 def build_cost_report(session_dir):

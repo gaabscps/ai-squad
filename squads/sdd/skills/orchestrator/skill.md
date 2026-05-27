@@ -263,6 +263,20 @@ The audit-agent's verdict is binding. The orchestrator MUST NOT emit a "uniform 
 
 ### 9. Pipeline-end handoff (only if step 8 passed)
 - Set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
+- **Cost report.** Before emitting the handoff (you have write authority; the read-only audit-agent does not):
+  1. **Backfill any missed capture.** Locate this session's subagent transcripts (`~/.claude/projects/<project-slug>/<sessionId>/subagents/agent-*.jsonl`) and run the write-capable backfill so a missed `SubagentStop` is recovered:
+     ```sh
+     python3 - "$PWD/.agent-session/<task_id>" <<'PY'
+     import sys, glob, os
+     sys.path.append("shared/lib")
+     import cost_report, pricing
+     session_dir = sys.argv[1]
+     tps = glob.glob(os.path.expanduser("~/.claude/projects/*/*/subagents/agent-*.jsonl"))
+     print("backfilled:", cost_report.backfill_missing(session_dir, tps, pricing.load_prices()))
+     PY
+     ```
+  2. **Emit the report:** `python3 scripts/cost-report.py <task_id>` — writes `.agent-session/<task_id>/cost-report.json` and prints the planning/orchestration/implementation table.
+  3. Include the one-line total in the handoff message, and if the audit raised `cost_capture_incomplete` OR the report's `complete` is false, flag the gap (unpriced models / uncaptured agents) explicitly — never present an incomplete total as final.
 - Emit handoff message (see "Handoff" section); also save to `.agent-session/<task_id>/handoff.md`.
 
 ## Dispatch contract (Work Packet embedded in `Task` prompt)
