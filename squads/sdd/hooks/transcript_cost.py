@@ -3,8 +3,8 @@ import json
 import sys
 from pathlib import Path
 
-# Append (not insert(0)): shared/lib/warnings.py would otherwise shadow the
-# stdlib `warnings` module that pathlib imports, causing a circular import.
+# Make sibling `pricing` importable when this module is loaded via importlib
+# spec (unit tests) rather than as part of the hooks-dir package.
 sys.path.append(str(Path(__file__).resolve().parent))
 from pricing import cost_for_usage  # noqa: E402
 

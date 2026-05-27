@@ -11,6 +11,19 @@ PRICES = {"m": {"input_per_mtok": 1_000_000.0, "output_per_mtok": 2_000_000.0}}
 FIXTURE = _DIR / "fixtures" / "sample_transcript.jsonl"
 
 
+def test_cache_writes_flow_through_extraction(tmp_path):
+    # regression: _accumulate stores writes as flat ephemeral keys; cost_for_usage
+    # must price them (previously dropped -> silent undercount of cache writes).
+    p = tmp_path / "t.jsonl"
+    p.write_text('{"type":"assistant","timestamp":"2026-05-27T10:00:00Z","message":'
+                 '{"id":"w","model":"m","usage":{"input_tokens":0,"output_tokens":0,'
+                 '"cache_read_input_tokens":0,'
+                 '"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":100}}}}\n')
+    r = tc.extract_transcript_cost(p, PRICES)
+    # 100*1.25 + 100*2.0 = 325, * $1
+    assert r["total_cost_usd"] == 325.0
+
+
 def test_dedupes_by_message_id():
     r = tc.extract_transcript_cost(FIXTURE, PRICES)
     # msg_a counted ONCE: 10*$1 + 5*$2 = 20 ; msg_b: 100 read *0.1*$1 = 10 ; total 30

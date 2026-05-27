@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-# Append (not insert(0)): shared/lib/warnings.py would shadow stdlib `warnings`.
+# Make sibling `transcript_cost` importable when loaded via importlib spec.
 sys.path.append(str(Path(__file__).resolve().parent))
 
 _AGENT_FILE_RE = re.compile(r"agent-(.+)\.jsonl$")

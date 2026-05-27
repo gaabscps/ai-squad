@@ -13,12 +13,22 @@
         "command": "python3 ./hooks/ai-squad/verify-audit-dispatch.py",
         "timeout": 5,
         "loop_limit": 5
+      },
+      {
+        "command": "python3 ./hooks/ai-squad/capture-session-cost.py",
+        "timeout": 10,
+        "loop_limit": 5
       }
     ],
     "subagentStop": [
       {
         "command": "python3 ./hooks/ai-squad/verify-output-packet.py",
         "timeout": 5,
+        "loop_limit": 5
+      },
+      {
+        "command": "python3 ./hooks/ai-squad/capture-subagent-cost.py",
+        "timeout": 10,
         "loop_limit": 5
       }
     ]

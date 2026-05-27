@@ -11,12 +11,8 @@ import sys
 from pathlib import Path
 
 _HOOKS_DIR = Path(__file__).resolve().parent
-_SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
-# Append, not insert(0): shared/lib/warnings.py would shadow the stdlib `warnings`
-# module (pathlib imports it), causing a circular import. Stdlib must win.
-for _p in (str(_HOOKS_DIR), str(_SHARED_LIB)):
-    if _p not in sys.path:
-        sys.path.append(_p)
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
 
 import pricing  # noqa: E402
 import transcript_cost  # noqa: E402

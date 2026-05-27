@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""CLI: python3 scripts/cost-report.py <FEAT-NNN> [base_dir]
+"""CLI: python3 .claude/hooks/cost-report.py <FEAT-NNN> [base_dir]
 Writes <session_dir>/cost-report.json and prints the markdown table.
 
+Lives in the hooks dir so it deploys with the per-repo hook bundle and can
+import its sibling cost_report module in any consumer repo.
 base_dir defaults to .agent-session (relative to cwd in the consumer repo)."""
 import json
 import sys
 from pathlib import Path
 
-# Append, not insert(0): shared/lib/warnings.py shadows the stdlib `warnings`
-# module if shared/lib lands at the front of sys.path (circular import via pathlib).
-sys.path.append(str(Path(__file__).resolve().parent.parent / "shared" / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cost_report  # noqa: E402
 
 

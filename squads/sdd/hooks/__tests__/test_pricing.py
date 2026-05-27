@@ -36,6 +36,15 @@ def test_flat_cache_creation_fallback_assumes_5m():
     assert r["cost_usd"] == 125.0  # 100 * 1.25 * $1
 
 
+def test_accumulated_flat_ephemeral_keys_are_priced():
+    # the shape transcript_cost._accumulate produces (flat ephemeral keys, no dict)
+    usage = {"ephemeral_5m_input_tokens": 100,    # *1.25 -> 125
+             "ephemeral_1h_input_tokens": 100,    # *2.00 -> 200
+             "cache_creation_input_tokens": 200}  # mirror; must NOT be double-counted
+    r = pricing.cost_for_usage(usage, "m", PRICES)
+    assert r["cost_usd"] == 325.0  # (125 + 200) * $1 — flat ephemeral wins over the mirror
+
+
 def test_unknown_model_is_flagged_not_zeroed():
     r = pricing.cost_for_usage({"input_tokens": 10}, "unknown", PRICES)
     assert r["priced"] is False

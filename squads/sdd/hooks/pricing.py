@@ -19,11 +19,21 @@ CACHE_READ_MULT = 0.10
 
 
 def _write_buckets(usage):
-    """Return (tokens_5m, tokens_1h) from either the dict or flat cache_creation form."""
+    """Return (tokens_5m, tokens_1h) for cache writes.
+
+    Handles three shapes:
+      1. raw transcript message:   usage["cache_creation"] = {ephemeral_5m..., ephemeral_1h...}
+      2. accumulated (transcript_cost._accumulate): flat ephemeral_5m_input_tokens / ephemeral_1h_input_tokens keys
+      3. legacy single-bucket:     usage["cache_creation_input_tokens"] (assume 5-minute TTL)
+    """
     cc = usage.get("cache_creation")
     if isinstance(cc, dict):
         return cc.get("ephemeral_5m_input_tokens", 0), cc.get("ephemeral_1h_input_tokens", 0)
-    # Flat fallback: assume 5-minute TTL (Claude Code default) when not broken out.
+    w5 = usage.get("ephemeral_5m_input_tokens", 0)
+    w1 = usage.get("ephemeral_1h_input_tokens", 0)
+    if w5 or w1:
+        return w5, w1
+    # Legacy flat fallback: assume 5-minute TTL (Claude Code default) when not broken out.
     return usage.get("cache_creation_input_tokens", 0), 0
 
 
