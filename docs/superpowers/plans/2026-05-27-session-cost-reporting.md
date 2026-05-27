@@ -3,6 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
 > **Project note:** ai-squad does NOT dogfood its own SDD pipeline on itself. Execute this plan with manual Read/Edit/Write + the pytest suite, in the pair protocol (one task, await approval, next).
+>
+> **Status — IMPLEMENTED (2026-05-27).** All runtime lives in `squads/sdd/hooks/` (the only code that deploys per-repo, into `<repo>/.claude/hooks/`). This doc reflects the final locations. Two design decisions diverged from the first draft: (a) the audit-agent is **read-only** — it flags `cost_capture_incomplete` but the orchestrator does the backfill + report emission; (b) an HTML report (`report.html`) is generated automatically on session `Stop`. The only remaining manual step is the live end-to-end smoke (Task 9, Step 5).
 
 **Goal:** Produce a real, API-equivalent dollar cost report per ai-squad session, split into planning / orchestration / implementation, accurate down to prompt-cache economics.
 
@@ -41,31 +43,34 @@ The buckets are disjoint (`input_tokens` excludes cached tokens), so there is no
 
 | File | Responsibility |
 |---|---|
-| `shared/lib/model_prices.json` | Per-model base rates (input/output $ per Mtok). The one file to update when prices change. |
-| `shared/lib/pricing.py` | `cost_for_usage(usage, model, prices)` — applies the formula. Cache multipliers are universal constants here. |
-| `shared/lib/transcript_cost.py` | `extract_transcript_cost(path, prices)` — parse one JSONL, dedupe by `message.id`, sum buckets per model, price. |
+| `squads/sdd/hooks/model_prices.json` | Per-model base rates (input/output $ per Mtok). The one file to update when prices change. |
+| `squads/sdd/hooks/pricing.py` | `cost_for_usage(usage, model, prices)` — applies the formula. Cache multipliers are universal constants here. |
+| `squads/sdd/hooks/transcript_cost.py` | `extract_transcript_cost(path, prices)` — parse one JSONL, dedupe by `message.id`, sum buckets per model, price. |
 | `squads/sdd/hooks/capture-subagent-cost.py` | `SubagentStop` hook. Writes `.agent-session/<FEAT>/costs/agent-<agentId>.json`. No manifest mutation, no lock contention. |
 | `squads/sdd/hooks/capture-session-cost.py` | `Stop` hook. Writes `.agent-session/<FEAT>/costs/session-<sessionId>.json`, bracketed into planning vs orchestration by `phase_history` timestamps. |
-| `shared/lib/cost_report.py` | `build_cost_report(session_dir)` — sum all `costs/*.json` → structured rollup. |
-| `scripts/cost-report.py` | Thin CLI: `python3 scripts/cost-report.py <FEAT-NNN>` → writes `cost-report.json` + prints markdown. |
-| `squads/sdd/agents/audit-agent.md` | + reconciliation check: every subagent transcript on disk has a cost file; backfill or flag. |
-| `shared/schemas/output-packet.schema.json`, `dispatch-manifest.schema.json` | Remove dead `capture-subagent-usage.py` references; fix `usage` provenance. |
-| `squads/sdd/hooks/claude-hooks.json`, `cursor-hooks.json` | Register the two new hooks. |
-| `packages/cli/components/**` | Synced via `npm run sync` (prepare hook). |
+| `squads/sdd/hooks/cost_report.py` | `build_cost_report(session_dir)` — sum all `costs/*.json` → rollup; `backfill_missing(...)` — write-capable recovery of missed captures (called by the orchestrator). |
+| `squads/sdd/hooks/cost-report.py` | Thin CLI. Runtime (deployed): `python3 .claude/hooks/cost-report.py <FEAT-NNN>` → writes `cost-report.json` + prints markdown. |
+| `squads/sdd/hooks/session_report.py` | `build_html_report(session_dir, diff_provider)` — renders the HTML report (cost + per-dispatch review + git diff), all content HTML-escaped. |
+| `squads/sdd/hooks/generate-session-report.py` | `Stop` hook. Writes `.agent-session/<FEAT>/report.html` at session end when a pipeline is active (guard: `costs/` exists). |
+| `squads/sdd/agents/audit-agent.md` | + read-only completeness check: counts on-disk cost files vs expected dispatches; flags `cost_capture_incomplete` (never writes). |
+| `squads/sdd/skills/orchestrator/skill.md` | Handoff step 9: backfill missed captures + emit the cost report via `.claude/hooks/`. |
+| `shared/schemas/output-packet.schema.json`, `dispatch-manifest.schema.json` | Remove dead `capture-subagent-usage.py` references; mark `usage` legacy (cost lives in `costs/*.json`). |
+| `squads/sdd/hooks/claude-hooks.json`, `cursor-hooks.json` | Register hooks: SubagentStop → `capture-subagent-cost`; Stop → `capture-session-cost`, `generate-session-report`. |
+| `packages/cli/components/**` | Synced via `npm run sync` (prepare hook); gitignored, ships in the npm tarball. |
 
 ---
 
 ## Task 1: Model price config + loader
 
 **Files:**
-- Create: `shared/lib/model_prices.json`
-- Create: `shared/lib/__tests__/test_model_prices.py`
+- Create: `squads/sdd/hooks/model_prices.json`
+- Create: `squads/sdd/hooks/__tests__/test_model_prices.py`
 
 > **Data-sourcing note (not a placeholder):** the dollar rates below MUST be set from the official Anthropic pricing page (platform.claude.com pricing) at implementation time. The values shown are the structurally-correct shape with last-known published rates for Sonnet/Haiku and a clearly-marked TODO for any model whose public rate you must confirm. Confirm every rate before committing.
 
 - [ ] **Step 1: Create the config file**
 
-`shared/lib/model_prices.json`:
+`squads/sdd/hooks/model_prices.json`:
 
 ```json
 {
@@ -81,7 +86,7 @@ The buckets are disjoint (`input_tokens` excludes cached tokens), so there is no
 
 - [ ] **Step 2: Write the failing test**
 
-`shared/lib/__tests__/test_model_prices.py`:
+`squads/sdd/hooks/__tests__/test_model_prices.py`:
 
 ```python
 import importlib.util
@@ -110,12 +115,12 @@ def test_load_prices_custom_path(tmp_path):
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_model_prices.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_model_prices.py -v`
 Expected: FAIL — `pricing.py` does not exist yet (ModuleNotFoundError / exec error).
 
 - [ ] **Step 4: Implement `load_prices` (minimal — full pricing.py comes in Task 2)**
 
-Create `shared/lib/pricing.py` with just the loader for now:
+Create `squads/sdd/hooks/pricing.py` with just the loader for now:
 
 ```python
 """ai-squad cost pricing — pure stdlib. Applies per-model rates + universal cache multipliers."""
@@ -134,13 +139,13 @@ def load_prices(path=None):
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_model_prices.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_model_prices.py -v`
 Expected: PASS (2 passed).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add shared/lib/model_prices.json shared/lib/pricing.py shared/lib/__tests__/test_model_prices.py
+git add squads/sdd/hooks/model_prices.json squads/sdd/hooks/pricing.py squads/sdd/hooks/__tests__/test_model_prices.py
 git commit -m "feat(cost): model price config + loader"
 ```
 
@@ -149,12 +154,12 @@ git commit -m "feat(cost): model price config + loader"
 ## Task 2: `cost_for_usage` — apply the formula
 
 **Files:**
-- Modify: `shared/lib/pricing.py`
-- Create: `shared/lib/__tests__/test_pricing.py`
+- Modify: `squads/sdd/hooks/pricing.py`
+- Create: `squads/sdd/hooks/__tests__/test_pricing.py`
 
 - [ ] **Step 1: Write the failing test**
 
-`shared/lib/__tests__/test_pricing.py`:
+`squads/sdd/hooks/__tests__/test_pricing.py`:
 
 ```python
 import importlib.util
@@ -203,12 +208,12 @@ def test_unknown_model_is_flagged_not_zeroed():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_pricing.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_pricing.py -v`
 Expected: FAIL — `cost_for_usage` not defined.
 
 - [ ] **Step 3: Implement `cost_for_usage`**
 
-Append to `shared/lib/pricing.py`:
+Append to `squads/sdd/hooks/pricing.py`:
 
 ```python
 # Universal prompt-cache multipliers (relative to base input rate). Anthropic pricing model.
@@ -252,13 +257,13 @@ def cost_for_usage(usage, model, prices):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_pricing.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_pricing.py -v`
 Expected: PASS (4 passed).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add shared/lib/pricing.py shared/lib/__tests__/test_pricing.py
+git add squads/sdd/hooks/pricing.py squads/sdd/hooks/__tests__/test_pricing.py
 git commit -m "feat(cost): cost_for_usage with cache-aware multipliers"
 ```
 
@@ -267,13 +272,13 @@ git commit -m "feat(cost): cost_for_usage with cache-aware multipliers"
 ## Task 3: Transcript extraction (dedupe + per-model sum)
 
 **Files:**
-- Create: `shared/lib/transcript_cost.py`
-- Create: `shared/lib/__tests__/test_transcript_cost.py`
-- Create (fixture): `shared/lib/__tests__/fixtures/sample_transcript.jsonl`
+- Create: `squads/sdd/hooks/transcript_cost.py`
+- Create: `squads/sdd/hooks/__tests__/test_transcript_cost.py`
+- Create (fixture): `squads/sdd/hooks/__tests__/fixtures/sample_transcript.jsonl`
 
 - [ ] **Step 1: Create the fixture transcript**
 
-`shared/lib/__tests__/fixtures/sample_transcript.jsonl` (note: `msg_a` is duplicated to prove dedupe; one user line and one no-usage line to prove they're ignored):
+`squads/sdd/hooks/__tests__/fixtures/sample_transcript.jsonl` (note: `msg_a` is duplicated to prove dedupe; one user line and one no-usage line to prove they're ignored):
 
 ```
 {"type":"user","timestamp":"2026-05-27T10:00:00Z","message":{"role":"user"}}
@@ -284,7 +289,7 @@ git commit -m "feat(cost): cost_for_usage with cache-aware multipliers"
 
 - [ ] **Step 2: Write the failing test**
 
-`shared/lib/__tests__/test_transcript_cost.py`:
+`squads/sdd/hooks/__tests__/test_transcript_cost.py`:
 
 ```python
 import importlib.util
@@ -321,12 +326,12 @@ def test_unpriced_model_surfaces_in_report():
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_transcript_cost.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_transcript_cost.py -v`
 Expected: FAIL — `transcript_cost.py` not found.
 
 - [ ] **Step 4: Implement extraction**
 
-`shared/lib/transcript_cost.py`:
+`squads/sdd/hooks/transcript_cost.py`:
 
 ```python
 """Extract API-equivalent cost from one Claude Code JSONL transcript. Pure stdlib."""
@@ -415,21 +420,21 @@ def extract_transcript_cost(path, prices, since=None, until=None):
 
 - [ ] **Step 5: Add the sys.path shim, then run tests**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_transcript_cost.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_transcript_cost.py -v`
 Expected: PASS (3 passed).
 
 - [ ] **Step 6: Smoke-test against a REAL transcript**
 
 Run (sanity, not committed):
 ```bash
-python3 -c "import sys; sys.path.insert(0,'shared/lib'); import transcript_cost as t, pricing; import glob,os; f=max(glob.glob(os.path.expanduser('~/.claude/projects/-Users-gabrielandrade-Developer-ai-squad/*.jsonl')),key=os.path.getmtime); print(t.extract_transcript_cost(f, pricing.load_prices()))"
+python3 -c "import sys; sys.path.insert(0,'squads/sdd/hooks'); import transcript_cost as t, pricing; import glob,os; f=max(glob.glob(os.path.expanduser('~/.claude/projects/-Users-gabrielandrade-Developer-ai-squad/*.jsonl')),key=os.path.getmtime); print(t.extract_transcript_cost(f, pricing.load_prices()))"
 ```
 Expected: a plausible dollar figure with `unpriced_models: []`. If a model shows up unpriced, add it to `model_prices.json`.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add shared/lib/transcript_cost.py shared/lib/__tests__/test_transcript_cost.py shared/lib/__tests__/fixtures/sample_transcript.jsonl
+git add squads/sdd/hooks/transcript_cost.py squads/sdd/hooks/__tests__/test_transcript_cost.py squads/sdd/hooks/__tests__/fixtures/sample_transcript.jsonl
 git commit -m "feat(cost): transcript extraction with message-id dedupe"
 ```
 
@@ -785,13 +790,13 @@ git commit -m "feat(cost): Stop hook splits session cost into planning/orchestra
 ## Task 6: Report aggregator + CLI
 
 **Files:**
-- Create: `shared/lib/cost_report.py`
-- Create: `shared/lib/__tests__/test_cost_report.py`
-- Create: `scripts/cost-report.py`
+- Create: `squads/sdd/hooks/cost_report.py`
+- Create: `squads/sdd/hooks/__tests__/test_cost_report.py`
+- Create: `squads/sdd/hooks/cost-report.py`
 
 - [ ] **Step 1: Write the failing test**
 
-`shared/lib/__tests__/test_cost_report.py`:
+`squads/sdd/hooks/__tests__/test_cost_report.py`:
 
 ```python
 import importlib.util
@@ -846,12 +851,12 @@ def test_markdown_renders(tmp_path):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_cost_report.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_cost_report.py -v`
 Expected: FAIL.
 
 - [ ] **Step 3: Implement aggregator + renderer**
 
-`shared/lib/cost_report.py`:
+`squads/sdd/hooks/cost_report.py`:
 
 ```python
 """Aggregate per-agent + session cost files into one report. Pure stdlib."""
@@ -911,11 +916,11 @@ def render_markdown(rep, task_id):
 
 - [ ] **Step 4: Create the CLI**
 
-`scripts/cost-report.py`:
+`squads/sdd/hooks/cost-report.py`:
 
 ```python
 #!/usr/bin/env python3
-"""CLI: python3 scripts/cost-report.py <FEAT-NNN> [--session-base .agent-session]
+"""CLI: python3 squads/sdd/hooks/cost-report.py <FEAT-NNN> [--session-base .agent-session]
 Writes <session_dir>/cost-report.json and prints the markdown table."""
 import json
 import sys
@@ -944,13 +949,13 @@ if __name__ == "__main__":
 
 - [ ] **Step 5: Run tests + smoke the CLI**
 
-Run: `python3 -m pytest shared/lib/__tests__/test_cost_report.py -v`
+Run: `python3 -m pytest squads/sdd/hooks/__tests__/test_cost_report.py -v`
 Expected: PASS (3 passed).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add shared/lib/cost_report.py shared/lib/__tests__/test_cost_report.py scripts/cost-report.py
+git add squads/sdd/hooks/cost_report.py squads/sdd/hooks/__tests__/test_cost_report.py squads/sdd/hooks/cost-report.py
 git commit -m "feat(cost): report aggregator + cost-report CLI"
 ```
 
@@ -972,38 +977,34 @@ Confirm the existing 6-check structure and the `## Phase 4 sweep` section (where
 
 Insert a new check after the existing manifest-vs-outputs reconciliation. Exact text to add (adapt heading numbering to match the file's existing scheme):
 
+The audit-agent is **read-only** — it DETECTS and FLAGS gaps, it never writes cost files. Backfill + report emission are the orchestrator's job at handoff (write authority). This split keeps the verifier pure.
+
 ```markdown
-### Check 7 — Cost capture reconciliation (AC-COST)
+## Phase 4 sweep — cost-capture completeness (read-only)
 
-For the active session, enumerate the subagent transcripts that physically exist:
-`~/.claude/projects/<project-slug>/<sessionId>/subagents/agent-*.jsonl`.
+1. Count expected per-subagent cost files: `actual_dispatches[]` entries with role in
+   {dev, code-reviewer, logic-reviewer, qa} that produced an Output Packet.
+2. Count actual: `ls .agent-session/<task_id>/costs/agent-*.json | wc -l`.
+3. If actual < expected (or costs/ absent), emit a finding
+   `severity: warning, audit_finding_kind: cost_capture_incomplete`. NON-blocking —
+   it does not fail the pipeline; it marks the cost report `complete: false`.
 
-For each transcript, confirm a matching cost file exists at
-`.agent-session/<task_id>/costs/agent-<agentId>.json`.
-
-- **Gap with recoverable transcript:** run the backfill —
-  `python3 scripts/cost-report.py <task_id>` after invoking the extraction
-  directly: `python3 -c "import sys; sys.path.insert(0,'shared/lib'); import transcript_cost,pricing,json; ..."`
-  to write the missing `costs/agent-<agentId>.json`. Re-check.
-- **Gap that cannot be backfilled** (transcript unreadable/absent): emit a finding
-  `severity: warning, audit_finding_kind: cost_capture_incomplete` listing the
-  uncaptured agent ids. This is NON-blocking (does not fail the pipeline) but
-  marks the cost report `complete: false`.
-
-The principle: the filesystem (the subagent transcripts) is ground truth; the
-SubagentStop hook is the fast path, this check is the safety net. A missed hook
-must surface as `cost_capture_incomplete`, never as a silently low total.
+Principle: the on-disk subagent transcripts are ground truth; the SubagentStop hook
+is the fast path, this count is the safety net. A miss surfaces as
+cost_capture_incomplete, never as a silently low total.
 ```
 
-- [ ] **Step 3: Add cost rollup to the Phase 4 sweep**
+- [ ] **Step 3: Wire backfill + report emission into the orchestrator handoff (write-capable)**
 
-In the existing `## Phase 4 sweep` section, add a step:
+In `orchestrator/skill.md` step 9 (pipeline-end handoff), before emitting the handoff — the cost runtime is vendored in the per-repo hooks dir, so it resolves in any consumer repo:
 
 ```markdown
-N. Build the cost report: run `python3 scripts/cost-report.py <task_id>`. Append a
-   one-line cost summary to the Output Packet `summary` field, e.g.
-   `"Cost: $X.XX total (planning $A, orchestration $B, implementation $C across K subagents)."`
-   If the report's `complete` is false, also note the unpriced models / uncaptured agents.
+1. Backfill any missed capture (glob this session's subagent transcripts; import from .claude/hooks):
+   python3 -c "import sys; sys.path.insert(0,'.claude/hooks'); import cost_report,pricing,glob,os; \
+     print(cost_report.backfill_missing('.agent-session/<task_id>', \
+       glob.glob(os.path.expanduser('~/.claude/projects/*/*/subagents/agent-*.jsonl')), pricing.load_prices()))"
+2. Emit the report: python3 .claude/hooks/cost-report.py <task_id>  (writes .agent-session/<task_id>/cost-report.json)
+3. Include the one-line total in the handoff; if complete=false, flag unpriced models / uncaptured agents.
 ```
 
 - [ ] **Step 4: Verify the markdown is well-formed and references resolve**
@@ -1046,7 +1047,7 @@ In `shared/schemas/dispatch-manifest.schema.json`:
 Run:
 ```bash
 python3 -c "import json; json.load(open('shared/schemas/output-packet.schema.json')); json.load(open('shared/schemas/dispatch-manifest.schema.json')); print('ok')"
-python3 -m pytest squads/sdd/hooks/__tests__ shared/lib/__tests__ -q
+python3 -m pytest squads/sdd/hooks/__tests__ squads/sdd/hooks/__tests__ -q
 ```
 Expected: `ok` + all tests pass (no test asserts the old description text).
 
@@ -1098,13 +1099,13 @@ Run:
 ```bash
 cd packages/cli && npm run sync && cd ../..
 git diff --stat packages/cli/components | head
-python3 -m pytest squads/sdd/hooks/__tests__ shared/lib/__tests__ .claude/hooks/__tests__ -q
+python3 -m pytest squads/sdd/hooks/__tests__ squads/sdd/hooks/__tests__ .claude/hooks/__tests__ -q
 ```
 Expected: components show the two new hook files synced; all tests pass.
 
 - [ ] **Step 5: End-to-end smoke (manual, recommended-mode shape)**
 
-In a throwaway consumer repo (NOT this one), `ai-squad deploy`, run a minimal `/spec-writer` session through to a paused state, then `--resume` a Phase 4. Confirm `.agent-session/<FEAT>/costs/` fills with `session-*.json` + `agent-*.json`, and `python3 scripts/cost-report.py <FEAT>` prints a populated table. Document the observed numbers in the commit body.
+In a throwaway consumer repo (NOT this one), `ai-squad deploy`, run a minimal `/spec-writer` session through to a paused state, then `--resume` a Phase 4. Confirm `.agent-session/<FEAT>/costs/` fills with `session-*.json` + `agent-*.json`, that `report.html` is written at session end, and that `python3 .claude/hooks/cost-report.py <FEAT>` prints a populated table. Document the observed numbers in the commit body.
 
 - [ ] **Step 6: Commit + bump CLI**
 
