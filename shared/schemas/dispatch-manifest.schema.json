@@ -165,7 +165,7 @@
             ]
           },
           "usage": {
-            "description": "Optional: per-dispatch token usage captured by capture-subagent-usage.py Stop hook",
+            "description": "Optional/legacy. Per-dispatch cost is recorded out-of-band in .agent-session/<task_id>/costs/agent-<agentId>.json by capture-subagent-cost.py; not populated here.",
             "oneOf": [
               {
                 "type": "null"
@@ -334,7 +334,7 @@
               "platform_captured",
               "self_reported"
             ],
-            "description": "Provenance of usage data. platform_captured = from Claude Code session telemetry (preferred). self_reported = written by PM Skill at handoff from pm_handoff.json (fallback)."
+            "description": "Legacy provenance field, retained for backward compatibility with pre-cost-report manifests. Current cost data lives in .agent-session/<task_id>/costs/*.json, not here."
           }
         }
       }

@@ -344,7 +344,7 @@
       "description": "Optional hint; orchestrator decides actual routing"
     },
     "usage": {
-      "description": "Per-dispatch token usage, populated by capture-subagent-usage.py Stop hook. Required for all roles except pm-orchestrator. Set to null when emitting; hook fills it in.",
+      "description": "Reserved/legacy. Per-dispatch cost is captured out-of-band into .agent-session/<task_id>/costs/agent-<agentId>.json by the capture-subagent-cost.py SubagentStop hook; this field stays null. Kept for backward compatibility.",
       "oneOf": [
         {
           "type": "null"
