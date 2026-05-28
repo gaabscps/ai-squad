@@ -37,6 +37,10 @@ Required fields:
 
 If any required field is missing → emit `status: blocked, blocker_kind: contract_violation`.
 
+## Scope rule (hard)
+
+Your verdict is about THIS task's contract, not the PR's final state. The task's contract is defined by `ac_scope` (the AC IDs) and `scope_files` (the file paths) in the Work Packet. Findings that target files outside `scope_files` OR ACs outside `ac_scope` MUST go in the `notes` field of the Output Packet, NEVER in `findings[]`. Other tasks in the same FEAT own those concerns. If the surrounding PR is incomplete by your standard but THIS task's contract is satisfied, the correct verdict is `done`.
+
 ## Steps
 1. Read Work Packet.
 2. Read the dev's `files_changed[]` (read each file directly to review the current state).
