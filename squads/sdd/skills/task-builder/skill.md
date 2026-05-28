@@ -172,7 +172,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 ## Handoff (auto-advance when next Phase is planned)
 After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
 - If `implementation` planned next: print `"Tasks approved. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
-- If `implementation` not planned: `"Tasks approved. Implementation was not planned for this Session — Session is now paused. To execute later: /orchestrator FEAT-NNN --resume. To clean up without executing: /ship FEAT-NNN."`
+- If `implementation` not planned (recommended path): `"Tasks approved. Implementation runs in a separate session for a clean per-phase cost split + structural prevention of PM-mode inference from planning history. Session is now paused. ▶ Next step: /orchestrator FEAT-NNN --resume (autonomous Phase 4; generates .agent-session/FEAT-NNN/report.html at session end with cost + code review). To clean up without executing: /ship FEAT-NNN."`
 
 ## Failure modes
 - **Human abandons mid-Session:** state on disk reflects last atomic write. Next `/task-builder FEAT-NNN` resumes.

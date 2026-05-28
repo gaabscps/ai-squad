@@ -46,15 +46,17 @@ This rule supersedes any pattern-matching the model performs on the repo history
 
 **MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `planned_phases` is user intent about which Phases will run, NOT an automatable inference. PM bypass (`auto_approved_by=pm`, detected at step 6.5) governs APPROVAL gates only (steps 6.5 and 7) — it does NOT cover intent collection. If you find yourself about to auto-pick `planned_phases` because a previous Session in `.agent-session/` did it that way: STOP and run `AskUserQuestion` regardless. The user may want a different shape this time.
 
-Use `AskUserQuestion` with checkbox. Default all 4 checked, including Implementation:
+Use `AskUserQuestion` with checkbox. **Default = planning only (Specify + Plan + Tasks); Implementation UNCHECKED by default** — recommended path is to run Implementation in a separate session via `/orchestrator FEAT-NNN --resume` for (a) clean per-phase cost attribution in `report.html`, and (b) structural prevention of PM-mode inference from planning history (a recurring bug class — see commits `4a06ff9`, `d91c0a4`).
+
 ```
-Which Phases will this Session run?
+Which Phases will this Session run? (Recommended: leave Implementation UNCHECKED and run it in a fresh `--resume` session.)
 [x] Specify (always; you are here)
 [x] Plan
 [x] Tasks
-[x] Implementation
+[ ] Implementation  — opt-in only; checking this runs everything in this session and gives an APPROXIMATE planning/orchestration cost split (timestamp-bracketed, not session-isolated).
 ```
-Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks"` bypasses the prompt with the same selection semantics.
+
+Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks,implementation"` bypasses the prompt with explicit semantics (use it to opt into single-session implementation).
 
 ### 2.5. Pipeline mode selection (fresh start only)
 

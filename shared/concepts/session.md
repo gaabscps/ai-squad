@@ -119,8 +119,8 @@ The selection is saved to `session.yml` as `planned_phases`. Every subsequent Sk
 
 **Use cases this enables:**
 
-- **Full run** (all 4 checked): default flow — Spec → Plan → Tasks → Implementation → handoff.
-- **Plan-only mode** (Specify + Plan + Tasks, no Implementation): "I want to plan this feature now, execute next week" — Session ends in `paused` after Tasks; human runs `/orchestrator FEAT-XXX --resume` later.
+- **Recommended plan-then-execute** (Specify + Plan + Tasks): default — Session pauses after Tasks; human runs `/orchestrator FEAT-XXX --resume` in a fresh session to execute Phase 4. Clean per-phase cost split in `report.html`.
+- **Single-session full run** (all 4 checked, opt-in): Spec → Plan → Tasks → Implementation → handoff, all in one session. Cost split is timestamp-bracketed approximate. Use when one-shot convenience matters more than a cleaner report.
 - **Spec-only mode** (only Specify): humans planning to use the Spec for ticketing without ai-squad implementation. Session ends in `paused` after Specify; can be discarded with `/ship FEAT-XXX` if not coming back.
 - **Resume after pause**: invoking the Skill of the next planned Phase resumes from the paused state without re-asking the checkbox.
 

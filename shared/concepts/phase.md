@@ -132,15 +132,15 @@ Which Phases will this Session run?
 [x] Specify (always; you are here)
 [x] Plan
 [x] Tasks
-[x] Implementation
+[ ] Implementation
 ```
 
-Default: all 4 checked. The human can uncheck any non-Specify Phase to skip it. The selection is saved as `planned_phases` in `session.yml`. Subsequent Skills verify their own Phase is in the list before proceeding.
+**Default: planning only (Specify + Plan + Tasks); Implementation UNCHECKED by default.** The recommended path runs Implementation in a separate session via `/orchestrator FEAT-XXX --resume` — that gives a clean per-phase cost split in `report.html` and structurally prevents PM-mode inference from planning history. The human can opt-in to a single-session full run by checking Implementation (autonomous mode trade-off: cost attribution becomes timestamp-bracketed approximate). The selection is saved as `planned_phases` in `session.yml`. Subsequent Skills verify their own Phase is in the list before proceeding.
 
 **Use cases this enables:**
 
-- **Full run** (all 4 checked): default flow — Spec → Plan → Tasks → Implementation → handoff.
-- **Plan-only mode** (Specify + Plan + Tasks, no Implementation): "I want to plan this feature now, execute next week" — Session ends in `paused` after Tasks; human runs `/orchestrator FEAT-XXX --resume` later.
+- **Recommended plan-then-execute** (Specify + Plan + Tasks): default — Session pauses after Tasks; run `/orchestrator FEAT-XXX --resume` in a fresh session to execute Phase 4. Cost report cleanly attributes planning vs implementation.
+- **Single-session full run** (all 4 checked, opt-in): "execute everything in one shot" — Spec → Plan → Tasks → Implementation → handoff, all in one session. Cost split is approximate (timestamp-bracketed). Use when the convenience of one-shot outweighs the cleaner report.
 - **Spec-only mode** (only Specify): humans planning to use the Spec for ticketing without ai-squad implementation. Session ends in `paused` after Specify.
 - **Resume after pause**: invoking the next planned Phase's Skill resumes from the paused state.
 
