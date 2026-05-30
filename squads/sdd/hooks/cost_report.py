@@ -68,7 +68,11 @@ def build_cost_report(session_dir):
         "total_cost_usd": total,
         "subagent_count": subagents,
         "unpriced_models": sorted(unpriced),
-        "complete": len(unpriced) == 0,
+        # `complete` means "we actually measured something AND everything we
+        # measured was priced". Zero captures (empty costs/) is NOT complete —
+        # the old `len(unpriced) == 0` reported complete:true for a $0/0-subagent
+        # report, masking a capture failure as a clean run (the FEAT-010 bug).
+        "complete": subagents > 0 and not unpriced,
     }
 
 

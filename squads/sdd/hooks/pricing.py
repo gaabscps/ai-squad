@@ -1,15 +1,39 @@
 """ai-squad cost pricing — pure stdlib. Applies per-model rates + universal cache multipliers."""
 import json
+import os
 from pathlib import Path
 
-_DEFAULT_PRICES = Path(__file__).resolve().parent / "model_prices.json"
+# Resolution chain (first match wins):
+#   1. explicit path argument
+#   2. local — next to this hook (per-repo install: <repo>/.claude/hooks/)
+#   3. global — ~/.claude/hooks/ (framework-global fallback)
+# The deploy step installs the table in BOTH (2) and (3) so it is effectively
+# always present; this chain only matters under a partial install.
+_LOCAL_PRICES = Path(__file__).resolve().parent / "model_prices.json"
+_GLOBAL_PRICES = Path(os.path.expanduser("~/.claude/hooks/model_prices.json"))
+
+
+def _price_table_candidates(path=None):
+    """Ordered list of paths to try. Explicit path short-circuits the chain."""
+    if path:
+        return [Path(path)]
+    return [_LOCAL_PRICES, _GLOBAL_PRICES]
 
 
 def load_prices(path=None):
-    """Return {model_id: {input_per_mtok, output_per_mtok}} from the config file."""
-    path = Path(path) if path else _DEFAULT_PRICES
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data["models"]
+    """Return {model_id: {input_per_mtok, output_per_mtok}} from the first table found.
+
+    Tries the resolution chain (explicit -> local -> global). Raises
+    FileNotFoundError listing every path tried if none exist — callers that
+    must not fail (token capture) catch it and degrade to tokens-only.
+    """
+    candidates = _price_table_candidates(path)
+    for candidate in candidates:
+        if candidate.is_file():
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+            return data["models"]
+    tried = ", ".join(str(c) for c in candidates)
+    raise FileNotFoundError(f"model_prices.json not found (tried: {tried})")
 
 
 # Universal prompt-cache multipliers (relative to base input rate). Anthropic pricing model.

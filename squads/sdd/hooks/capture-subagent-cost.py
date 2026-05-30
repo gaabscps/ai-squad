@@ -72,7 +72,22 @@ def main():
         transcript_path = max(hits, key=os.path.getmtime) if hits else None
     if not transcript_path:
         return 0
-    return capture(agent_id, transcript_path, session_dir, pricing.load_prices())
+    # Decoupling: token capture must NEVER depend on the price table being
+    # present. The tokens come from the transcript; pricing only converts them
+    # to USD. If the table is missing (deploy gap), capture the tokens anyway —
+    # the model is recorded as `unpriced` (cost_usd: null), never dropped.
+    # Normal operation always has the table (deploy installs it per-repo +
+    # global); this except is the safety net, not the happy path.
+    try:
+        prices = pricing.load_prices()
+    except (FileNotFoundError, OSError, ValueError, KeyError) as e:
+        print(
+            f"capture-subagent-cost: price table unavailable ({e}); "
+            "capturing tokens unpriced",
+            file=sys.stderr,
+        )
+        prices = {}
+    return capture(agent_id, transcript_path, session_dir, prices)
 
 
 if __name__ == "__main__":

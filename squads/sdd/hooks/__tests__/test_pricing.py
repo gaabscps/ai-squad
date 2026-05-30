@@ -49,3 +49,28 @@ def test_unknown_model_is_flagged_not_zeroed():
     r = pricing.cost_for_usage({"input_tokens": 10}, "unknown", PRICES)
     assert r["priced"] is False
     assert r["cost_usd"] is None
+
+
+def test_load_prices_explicit_path(tmp_path):
+    p = tmp_path / "model_prices.json"
+    p.write_text('{"models": {"m": {"input_per_mtok": 1.0, "output_per_mtok": 2.0}}}')
+    models = pricing.load_prices(str(p))
+    assert models["m"]["input_per_mtok"] == 1.0
+
+
+def test_load_prices_missing_raises_listing_paths(tmp_path):
+    missing = tmp_path / "nope.json"
+    try:
+        pricing.load_prices(str(missing))
+        assert False, "expected FileNotFoundError"
+    except FileNotFoundError as e:
+        assert "nope.json" in str(e)  # error names what it tried
+
+
+def test_price_table_candidates_chain_order():
+    # default chain: local (per-repo) before global (~/.claude/hooks)
+    cands = pricing._price_table_candidates()
+    assert cands == [pricing._LOCAL_PRICES, pricing._GLOBAL_PRICES]
+    # explicit path short-circuits the chain
+    only = pricing._price_table_candidates("/x/y.json")
+    assert [str(c) for c in only] == ["/x/y.json"]

@@ -65,6 +65,40 @@ def test_backfill_creates_missing_cost_files(tmp_path):
     assert data["backfilled"] is True
 
 
+def test_empty_costs_is_incomplete(tmp_path):
+    # Zero captures must NOT report complete:true (the FEAT-010 bug — a
+    # $0/0-subagent report claiming "complete").
+    (tmp_path / "costs").mkdir()
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 0
+    assert rep["total_cost_usd"] == 0.0
+    assert rep["complete"] is False
+
+
+def test_complete_true_when_captured_and_priced(tmp_path):
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 2.0, "agent_id": "a",
+        "unpriced_models": []}))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["complete"] is True
+
+
+def test_captured_but_unpriced_is_incomplete(tmp_path):
+    # Tokens captured but a model lacked a price → tokens present, but report
+    # is honestly flagged incomplete (never a silently-low total).
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 0.0, "agent_id": "a",
+        "unpriced_models": ["mystery"]}))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["complete"] is False
+
+
 def test_backfill_skips_existing(tmp_path):
     (tmp_path / "costs").mkdir()
     (tmp_path / "costs" / "agent-zzz.json").write_text('{"agent_id":"zzz","total_cost_usd":5.0}')

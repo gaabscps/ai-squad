@@ -20,13 +20,40 @@
  * <squad>/hooks/cursor-hooks.json into ~/.cursor/hooks.json (additive,
  * deduped by command path).
  */
-import { appendFile, chmod, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { appendFile, chmod, cp, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 const SKILL_LINE_CAP = 300;
 const AGENT_LINE_CAP = 150;
 const GITIGNORE_BLOCK = '\n# ai-squad per-repo hook install (managed by `ai-squad deploy`)\n.claude/hooks/\n';
+
+// Non-.py data assets a hook needs at runtime. The .py copy loops filter on
+// `.endsWith('.py')`, so these must be copied explicitly or they never reach
+// the consumer repo. Deployed in BOTH scopes (per-repo + global) so pricing.py's
+// resolution chain (local -> global) always finds a price table; without it,
+// cost capture degrades to tokens-only. This was the FEAT-010 cost-report gap.
+const HOOK_DATA_ASSETS = ['model_prices.json'];
+
+/**
+ * Known-defunct ai-squad hook registrations. Older deploys may have written
+ * these into <repo>/.claude/settings.local.json; we strip them on every deploy
+ * so the stale commands don't run (and fail noisily) at session events.
+ *
+ * The orphan-prune above only scopes `$CLAUDE_PROJECT_DIR/.claude/hooks/*.py`
+ * commands by design (to avoid clobbering user-added hooks). This list covers
+ * registrations the framework itself once shipped under different shapes
+ * (npx-invoked packages, external scripts) that we have since retired.
+ *
+ * Add an entry every time we retire a registration the framework once shipped.
+ */
+const LEGACY_REGISTRATIONS = [
+  {
+    pattern: /@ai-squad\/agentops/,
+    what: 'agentops capture pipeline',
+    since: 'commit 3b30f82 (observability removal)',
+  },
+];
 
 async function exists(p) {
   try {
@@ -60,6 +87,23 @@ async function listFiles(p, ext) {
 async function lineCount(filePath) {
   const txt = await readFile(filePath, 'utf8');
   return txt.split('\n').length;
+}
+
+/**
+ * Copy known non-.py hook data assets (HOOK_DATA_ASSETS) from a squad's hooks
+ * source dir into destDir, when present. Returns the copied basenames.
+ * Exported for unit testing; used in both the per-repo and global scopes.
+ */
+export async function copyHookDataAssets({ hooksSrc, destDir }) {
+  const copied = [];
+  for (const asset of HOOK_DATA_ASSETS) {
+    const src = join(hooksSrc, asset);
+    if (await exists(src)) {
+      await cp(src, join(destDir, asset));
+      copied.push(asset);
+    }
+  }
+  return copied;
 }
 
 async function checkLength(file, cap, label) {
@@ -108,6 +152,18 @@ async function deployClaudeCodeGlobal({ componentsRoot, squads }) {
       await cp(src, dst);
     }
   }
+
+  // Global price-table fallback: pricing.py resolves local (per-repo) -> global
+  // (~/.claude/hooks/). Install hook data assets globally so cost capture still
+  // prices tokens in repos where `deploy --hooks-only` never ran.
+  const hooksGlobalDst = join(home, '.claude', 'hooks');
+  await mkdir(hooksGlobalDst, { recursive: true });
+  for (const squad of squads) {
+    const hooksSrc = join(componentsRoot, squad, 'hooks');
+    for (const asset of await copyHookDataAssets({ hooksSrc, destDir: hooksGlobalDst })) {
+      console.log(`  [data asset]     ${asset} -> ${hooksGlobalDst}`);
+    }
+  }
 }
 
 async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
@@ -130,10 +186,60 @@ async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
       await cp(src, dst);
       await chmod(dst, 0o755);
     }
+    for (const asset of await copyHookDataAssets({ hooksSrc, destDir: hooksDst })) {
+      console.log(`  [data asset]     ${asset}`);
+    }
   }
 
+  // Prune scope is computed across ALL bundled squads, not just the ones being
+  // deployed in this invocation. Otherwise `ai-squad deploy --squad sdd` (with
+  // discovery previously installed) would treat discovery's hooks as orphans
+  // and nuke them. The desired set is the union of every bundled squad's hooks.
+  const desiredHookFiles = await collectBundledHookFiles(componentsRoot);
+  await pruneOrphanHookFiles({ hooksDst, desiredHookFiles });
   await ensureGitignore(repoRoot);
-  await registerClaudeCodeHooks({ componentsRoot, squads, repoRoot });
+  await registerClaudeCodeHooks({ componentsRoot, squads, repoRoot, desiredHookFiles });
+}
+
+/**
+ * Return the set of every `.py` hook basename present in any squad under
+ * `componentsRoot`. Used to scope prune correctly during partial deploys.
+ */
+async function collectBundledHookFiles(componentsRoot) {
+  const result = new Set();
+  for (const squad of await listDirs(componentsRoot)) {
+    const hooksSrc = join(componentsRoot, squad, 'hooks');
+    for (const hookFile of await listFiles(hooksSrc, '.py')) {
+      result.add(hookFile);
+    }
+  }
+  return result;
+}
+
+/**
+ * Remove `.py` files from <repo>/.claude/hooks/ that are no longer present in
+ * any bundled squad. Mirrors the bundle as source-of-truth: removing a hook
+ * upstream must propagate to consumer repos on `ai-squad deploy`.
+ *
+ * Why this matters: a stale on-disk hook file paired with a stale settings
+ * registration is what caused calendarFR's pipeline to wedge — Claude Code
+ * invoked the hook, the script existed at one point but did not, and the
+ * Write tool was aborted. The settings prune (`pruneOrphanHookRegistrations`)
+ * handles half of the problem; this prunes the other half so future drift
+ * does not re-create the foot-gun.
+ *
+ * Scope: only `.py` files are pruned. Non-Python files in `.claude/hooks/`
+ * (config, README, anything user-placed) are left alone.
+ */
+async function pruneOrphanHookFiles({ hooksDst, desiredHookFiles }) {
+  if (!(await isDir(hooksDst))) return;
+  const existing = await listFiles(hooksDst, '.py');
+  for (const file of existing) {
+    if (desiredHookFiles.has(file)) continue;
+    const target = join(hooksDst, file);
+    await unlink(target);
+    console.log(`  [prune hook]     ${file} (no longer in bundle)`);
+  }
 }
 
 /**
@@ -146,7 +252,7 @@ async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
  * and that scope is too narrow for guards like verify-tier-calibration to
  * fire reliably across all dispatch contexts.
  */
-async function registerClaudeCodeHooks({ componentsRoot, squads, repoRoot }) {
+async function registerClaudeCodeHooks({ componentsRoot, squads, repoRoot, desiredHookFiles }) {
   const settingsPath = join(repoRoot, '.claude', 'settings.local.json');
   let settings = {};
   if (await exists(settingsPath)) {
@@ -187,14 +293,133 @@ async function registerClaudeCodeHooks({ componentsRoot, squads, repoRoot }) {
     }
   }
 
-  if (totalAdded === 0) {
-    console.log(`  [settings] no new hook registrations needed (${settingsPath})`);
+  const pruned = pruneOrphanHookRegistrations(settings.hooks, desiredHookFiles ?? new Set());
+  for (const note of pruned) {
+    console.log(`  [prune hook]     ${note.event} (${note.matcher || '*'}): ${note.command}`);
+  }
+
+  const prunedLegacy = pruneLegacyRegistrations(settings.hooks);
+  for (const note of prunedLegacy) {
+    console.log(
+      `  [prune legacy]   ${note.event} (${note.matcher || '*'}): ${note.command}  [${note.reason}]`,
+    );
+  }
+
+  if (totalAdded === 0 && pruned.length === 0 && prunedLegacy.length === 0) {
+    console.log(`  [settings] no hook registration changes needed (${settingsPath})`);
     return;
   }
 
   await mkdir(join(repoRoot, '.claude'), { recursive: true });
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
-  console.log(`  [settings] wrote ${totalAdded} hook update(s) in ${settingsPath}`);
+  console.log(
+    `  [settings] wrote ${totalAdded} new + ${pruned.length} pruned + ${prunedLegacy.length} legacy-removed hook update(s) in ${settingsPath}`,
+  );
+}
+
+/**
+ * Walk settings.hooks and remove any per-repo ai-squad hook registration
+ * whose script no longer ships in the current bundle. Returns the list of
+ * removed entries for logging.
+ *
+ * Detection scope: only commands referencing
+ *   `$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py`
+ * are considered ai-squad-managed. User-placed hooks at other paths (e.g.,
+ * `~/.claude/hooks/...` or absolute paths) are NEVER touched — this is
+ * narrow on purpose so the prune cannot clobber non-ai-squad config.
+ *
+ * Empties: matcher buckets that lose all hooks are removed; events that
+ * lose all buckets are removed from settings.hooks. Cosmetic but keeps the
+ * file tidy.
+ */
+export function pruneOrphanHookRegistrations(hooksRoot, desiredHookFiles) {
+  const removed = [];
+  if (!hooksRoot || typeof hooksRoot !== 'object') return removed;
+
+  for (const eventName of Object.keys(hooksRoot)) {
+    const buckets = Array.isArray(hooksRoot[eventName]) ? hooksRoot[eventName] : [];
+    const keptBuckets = [];
+    for (const bucket of buckets) {
+      const hooks = Array.isArray(bucket?.hooks) ? bucket.hooks : [];
+      const keptHooks = [];
+      for (const h of hooks) {
+        const orphanName = extractAiSquadHookBasename(h?.command ?? '');
+        if (orphanName && !desiredHookFiles.has(orphanName)) {
+          removed.push({ event: eventName, matcher: bucket?.matcher ?? '', command: h.command });
+          continue;
+        }
+        keptHooks.push(h);
+      }
+      if (keptHooks.length > 0) {
+        bucket.hooks = keptHooks;
+        keptBuckets.push(bucket);
+      }
+    }
+    if (keptBuckets.length > 0) {
+      hooksRoot[eventName] = keptBuckets;
+    } else {
+      delete hooksRoot[eventName];
+    }
+  }
+  return removed;
+}
+
+/**
+ * Strip hook registrations matching known-defunct framework patterns
+ * (see LEGACY_REGISTRATIONS). Returns the same {event, matcher, command} shape
+ * as pruneOrphanHookRegistrations, plus `reason` for the deprecation provenance.
+ *
+ * Operates in place on `hooksRoot` (the `settings.hooks` object). Mirrors the
+ * empty-event cleanup behavior of pruneOrphanHookRegistrations.
+ */
+export function pruneLegacyRegistrations(hooksRoot) {
+  const removed = [];
+  if (!hooksRoot || typeof hooksRoot !== 'object') return removed;
+
+  for (const eventName of Object.keys(hooksRoot)) {
+    const buckets = Array.isArray(hooksRoot[eventName]) ? hooksRoot[eventName] : [];
+    const keptBuckets = [];
+    for (const bucket of buckets) {
+      const hooks = Array.isArray(bucket?.hooks) ? bucket.hooks : [];
+      const keptHooks = [];
+      for (const h of hooks) {
+        const cmd = h?.command ?? '';
+        const match = LEGACY_REGISTRATIONS.find((entry) => entry.pattern.test(cmd));
+        if (match) {
+          removed.push({
+            event: eventName,
+            matcher: bucket?.matcher ?? '',
+            command: cmd,
+            reason: `${match.what} — removed ${match.since}`,
+          });
+          continue;
+        }
+        keptHooks.push(h);
+      }
+      if (keptHooks.length > 0) {
+        bucket.hooks = keptHooks;
+        keptBuckets.push(bucket);
+      }
+    }
+    if (keptBuckets.length > 0) {
+      hooksRoot[eventName] = keptBuckets;
+    } else {
+      delete hooksRoot[eventName];
+    }
+  }
+  return removed;
+}
+
+/**
+ * Return the .py basename if `command` references an ai-squad-managed
+ * per-repo hook (`$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py`), else null.
+ * Tolerates the two registration shapes deploy emits — bare `python3 X.py`
+ * and the fail-open guard `[ -f X.py ] || exit 0; python3 X.py`.
+ */
+export function extractAiSquadHookBasename(command) {
+  if (typeof command !== 'string') return null;
+  const m = /\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/([\w.-]+\.py)/.exec(command);
+  return m ? m[1] : null;
 }
 
 /**
