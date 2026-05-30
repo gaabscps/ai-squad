@@ -100,13 +100,36 @@ def main() -> int:
     except (OSError, ValueError):
         return 0
 
-    # The orchestrator may write to .agent-session/<task_id>/ only.
+    # The orchestrator may write to .agent-session/<spec_id>/ only — and NOT to
+    # outputs/, which holds subagent-authored Output Packets. Editing those is
+    # evidence tampering (the FEAT-010 audit-gaming pattern: the orchestrator
+    # patched packets and re-ran the audit until it flipped to done). A blocked
+    # audit is terminal; recovery is /orchestrator --restart, not packet edits.
     session_root = project_root / ".agent-session"
     try:
-        abs_path.relative_to(session_root)
-        return 0  # inside .agent-session/ — allowed
+        rel = abs_path.relative_to(session_root)
     except ValueError:
-        pass
+        rel = None
+    if rel is not None:
+        # rel = <spec_id>/<subdir>/...  — outputs/ is subagent-owned, off-limits.
+        parts = rel.parts
+        if len(parts) >= 2 and parts[1] == "outputs":
+            decision = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"Orchestrator must not write Output Packets. Path '{file_path}' is "
+                        f"under .agent-session/<spec_id>/outputs/, authored exclusively by "
+                        f"subagents. Editing it is evidence tampering — a blocked audit is "
+                        f"terminal; recover with /orchestrator --restart "
+                        f"(see squads/sdd/skills/orchestrator/skill.md step 8)."
+                    ),
+                }
+            }
+            print(json.dumps(decision))
+            return 0
+        return 0  # other .agent-session/ paths (manifest, inputs/, session.yml, ...) — allowed
 
     # Path is outside .agent-session/. Deny.
     decision = {

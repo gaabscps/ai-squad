@@ -98,11 +98,11 @@ Evidence pointers map to two locations, by kind:
 | Kind | Path target |
 |------|-------------|
 | `file` | Repo files (relative to repo root). The repo is the artifact; evidence references it directly. |
-| `command`, `log`, `test` (output_path) | `.agent-session/<task_id>/logs/<role>-<timestamp>.log` — gitignored, ephemeral within the session. |
-| `url` (snapshot_path) | `.agent-session/<task_id>/snapshots/<descriptive-name>.<ext>` — when the external URL might change. |
+| `command`, `log`, `test` (output_path) | `.agent-session/<spec_id>/logs/<role>-<timestamp>.log` — gitignored, ephemeral within the session. |
+| `url` (snapshot_path) | `.agent-session/<spec_id>/snapshots/<descriptive-name>.<ext>` — when the external URL might change. |
 | `absence` (location) | Either repo path or `.agent-session/`, depending on what was checked. |
 
-The `.agent-session/<task_id>/` directory is created by the `spec-writer` Skill at Phase 1 entry, gitignored via the consumer project's root `.gitignore`, and survives until the human runs `/ship FEAT-XXX` after accepting the handoff. Subagents write into it as part of each Phase 4 dispatch.
+The `.agent-session/<spec_id>/` directory is created by the `spec-writer` Skill at Phase 1 entry, gitignored via the consumer project's root `.gitignore`, and survives until the human runs `/ship FEAT-XXX` after accepting the handoff. Subagents write into it as part of each Phase 4 dispatch.
 
 ## Verifiability rule
 

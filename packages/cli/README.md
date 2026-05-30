@@ -1,6 +1,6 @@
 # @ai-squad/cli
 
-CLI to deploy [ai-squad](https://github.com/gaabscps/ai-squad) squads into Claude Code. Skills + agents install user-globally; hooks install per-repo (so the `.agent-session/` telemetry your `@ai-squad/agentops` reports rely on stays consistent with the hook version that produced it).
+CLI to deploy [ai-squad](https://github.com/gaabscps/ai-squad) squads into Claude Code. Skills + agents install user-globally; hooks install per-repo (so the guardrail scripts and the `.agent-session/` pipeline data they validate always ship together).
 
 ## Install
 
@@ -36,7 +36,7 @@ Hook scripts are referenced from component frontmatter as
 
 ### Why per-repo hooks?
 
-- **Telemetry consistency:** the hooks that produced `.agent-session/<id>/dispatch-manifest.json` ship in the same repo, so the report engine and the data always agree on schema.
+- **Schema consistency:** the hooks that validate `.agent-session/<id>/dispatch-manifest.json` ship in the same repo, so the guardrails and the data always agree on schema.
 - **Reproducible CI:** runners don't need a pre-seeded `$HOME` — `ai-squad deploy` in setup works.
 - **Multi-version safe:** different consumer repos can run different ai-squad versions concurrently without `~/.claude/hooks/` collisions.
 - **Inspectable:** `cat <repo>/.claude/hooks/verify-tier-calibration.py` shows exactly what is running, no guessing about which `~/.claude/` version got installed.
@@ -55,14 +55,6 @@ The global skills+agents update automatically on any `ai-squad deploy`.
 
 - **sdd** — Spec-Driven Development pipeline (4 phases: Specify → Plan → Tasks → Implementation). Subagents: `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`.
 - **discovery** — Cagan-style Discovery (Frame → Investigate → Synthesize). Subagents: `codebase-mapper`, `risk-analyst`.
-
-## Companion: observability
-
-For session reports (tokens, cost, AC closure, reviewer findings):
-
-```bash
-npx @ai-squad/agentops report
-```
 
 ## Requirements
 

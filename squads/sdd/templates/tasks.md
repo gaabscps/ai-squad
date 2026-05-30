@@ -10,7 +10,7 @@ parent_plan: PLAN-FEAT-XXX
 # Tasks: <feature name>
 
 > Phase 3 output. Decomposes Spec + Plan into granular work units.
-> Lives at `.agent-session/<task_id>/tasks.md` in the consumer project (gitignored).
+> Lives at `.agent-session/<spec_id>/tasks.md` in the consumer project (gitignored).
 > Format inspired by GitHub Spec Kit. Each task is a unit the orchestrator can dispatch as a Work Packet.
 
 > **Conventions:**

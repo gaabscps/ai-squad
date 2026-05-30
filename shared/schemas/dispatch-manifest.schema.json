@@ -165,7 +165,7 @@
             ]
           },
           "usage": {
-            "description": "Optional: per-dispatch token usage captured by capture-subagent-usage.py Stop hook",
+            "description": "Optional/legacy. Per-dispatch cost is recorded out-of-band in .agent-session/<task_id>/costs/agent-<agentId>.json by capture-subagent-cost.py; not populated here.",
             "oneOf": [
               {
                 "type": "null"
@@ -217,7 +217,7 @@
             ]
           },
           "tier_calibration": {
-            "description": "Optional (v2): Tier x Loop calibration for this dispatch; absent on v1 manifests. When present, used by agentops cost-by-tier rollup (AC-016).",
+            "description": "Optional (v2): Tier x Loop calibration for this dispatch; absent on v1 manifests. Legacy field retained for backward compatibility with historical manifests.",
             "oneOf": [
               {
                 "type": "null"
@@ -270,7 +270,7 @@
     },
     "pm_sessions": {
       "type": "array",
-      "description": "Optional (v2): PM session cost observability entries. Absent on v1 manifests. Populated by capture-pm-usage.py Stop hook when /pm Skill completes (AC-013). agentops report aggregates these under '## Cost by PM session' (AC-015).",
+      "description": "Optional (v2): PM session entries. Absent on v1 manifests. Legacy field retained for backward compatibility with historical manifests.",
       "items": {
         "type": "object",
         "required": [
@@ -334,7 +334,7 @@
               "platform_captured",
               "self_reported"
             ],
-            "description": "Provenance of usage data. platform_captured = from Claude Code session telemetry (preferred). self_reported = written by PM Skill at handoff from pm_handoff.json (fallback)."
+            "description": "Legacy provenance field, retained for backward compatibility with pre-cost-report manifests. Current cost data lives in .agent-session/<task_id>/costs/*.json, not here."
           }
         }
       }

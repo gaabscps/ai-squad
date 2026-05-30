@@ -755,7 +755,7 @@ class TestIsExemptExpandedPaths(unittest.TestCase):
 
     # AC-004 — real source file outside all exempt paths must NOT be exempt
     def test_non_exempt_file_not_skipped(self):
-        f = self._make("packages/agentops/src/index.ts")
+        f = self._make("packages/cli/src/index.ts")
         self.assertFalse(_is_exempt(f, self.root), "non-exempt file must not be skipped (AC-004)")
 
     # AC-004 — file that matches multiple exempt prefixes is still just exempt (no crash)
@@ -900,7 +900,7 @@ class TestIsExemptGlobSupport(unittest.TestCase):
         original = _mod._DEBT_MARKER_EXEMPT_PATHS
         try:
             _mod._DEBT_MARKER_EXEMPT_PATHS = ("docs/*.md",)
-            f = self._make("packages/agentops/src/index.ts")
+            f = self._make("packages/cli/src/index.ts")
             self.assertFalse(
                 _is_exempt(f, self.root),
                 "glob entry must not match unrelated paths (AC-003/AC-004)",

@@ -9,7 +9,6 @@ exposes:
 
 Consumers (AC-002, AC-004):
   - `.claude/hooks/verify-output-packet.py` (hook validation, T-005)
-  - `packages/agentops/src/canonical-statuses.ts` (TS module, T-003; reads schema directly)
 
 Design constraints:
   - NO try/except swallowing: if the schema is missing or malformed, this module raises
@@ -111,7 +110,7 @@ Current values (as of FEAT-006 after T-001):
 
 'partial' is NOT in this set — it is deprecated per AC-005 (FEAT-006 T-001) and
 excluded from the canonical enum. Hook validation in verify-output-packet.py rejects
-'partial' as a new status but agentops accepts it with a deprecation warning.
+'partial' as a new status.
 """
 
 VALID_ROLES: FrozenSet[str] = frozenset(

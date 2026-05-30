@@ -1,10 +1,10 @@
 # Concept — `Output Packet`
 
-> Status: canonical. Vocabulary fixed in [`docs/glossary.md`](../glossary.md). Companion to [`role.md`](role.md), [`skill-vs-subagent.md`](skill-vs-subagent.md), [`evidence.md`](evidence.md), [`spec.md`](spec.md). Mirrored by [`work-packet.md`](work-packet.md) (concept #7).
+> Status: canonical. Vocabulary fixed in [`docs/glossary.md`](../glossary.md) and [`identity.md`](identity.md) (spec_id / task_id / dispatch_id). Companion to [`role.md`](role.md), [`skill-vs-subagent.md`](skill-vs-subagent.md), [`evidence.md`](evidence.md), [`spec.md`](spec.md). Mirrored by [`work-packet.md`](work-packet.md) (concept #7).
 
 ## Definition
 
-The **Output Packet** is the only structured channel from a Subagent back to its parent (orchestrator). It is a JSON file with a fixed schema, written by the Subagent to `.agent-session/<task_id>/outputs/<dispatch_id>.json` **before** returning the final summary string. The platform-level return from the Subagent (the single summary string the `Agent` tool produces) is simply the pointer to this file.
+The **Output Packet** is the only structured channel from a Subagent back to its parent (orchestrator). It is a JSON file with a fixed schema, written by the Subagent to `.agent-session/<spec_id>/outputs/<dispatch_id>.json` **before** returning the final summary string. The platform-level return from the Subagent (the single summary string the `Agent` tool produces) is simply the pointer to this file.
 
 > *Terms used in this doc:*
 > - **dispatch_id:** unique identifier for one specific dispatch of a Role within a Session. Permits distinguishing the Output Packet of the current dispatch from re-runs of the same Role. Format: `<role>-<short-uuid>` or `<role>-<timestamp>`.
@@ -21,7 +21,8 @@ The **Output Packet** is the only structured channel from a Subagent back to its
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `spec_id` | string | yes | The Spec this dispatch was for (`FEAT-XXX`). |
+| `spec_id` | string | yes | The feature/Session this dispatch was for (`FEAT-NNN` / `DISC-NNN`). |
+| `task_id` | string | task-scoped roles only | The task (`T-XXX`) this dispatch worked on. Required for dev/code-reviewer/logic-reviewer/qa/blocker-specialist; omitted by audit-agent/committer (pipeline-scoped). The task, never the feature — see [`identity.md`](identity.md). |
 | `dispatch_id` | string | yes | Unique within Session. Format: `<role>-<short-uuid>` or `<role>-<timestamp>`. |
 | `role` | string | yes | The Role that emitted this packet (must match one of the 8 canonical Roles). |
 | `status` | enum | yes | `done | needs_review | blocked | escalate`. See [Status enum semantics](#status-enum-semantics) below. |
@@ -148,14 +149,14 @@ When unsure, omit the field — the orchestrator handles routing from `status` a
 Every Output Packet lives at:
 
 ```
-.agent-session/<task_id>/outputs/<dispatch_id>.json
+.agent-session/<spec_id>/outputs/<dispatch_id>.json
 ```
 
-Where `<task_id>` is the Spec ID (`FEAT-042`) and `<dispatch_id>` is the unique dispatch identifier (`dev-7b3c1a`, `code-reviewer-1740832455`, etc).
+Where `<spec_id>` is the feature/Session id (`FEAT-042`) and `<dispatch_id>` is the unique dispatch identifier (`dev-7b3c1a`, `code-reviewer-1740832455`, etc). The packet's own `task_id` field carries the task (`T-XXX`) — distinct from the directory, which is keyed by the feature. See [`identity.md`](identity.md).
 
 **Immutability:** an Output Packet is immutable once written. A re-run of the same Role generates a new file with a new `dispatch_id`. The orchestrator can compare consecutive Output Packets across loop iterations to detect "no progress" (same evidence and findings in dev's loop 2 as in loop 1 → escalate).
 
-**Retention:** all Output Packets for a Session are preserved until `/ship FEAT-XXX` removes the `.agent-session/<task_id>/` directory. The orchestrator and the human handoff both reference the full history.
+**Retention:** all Output Packets for a Session are preserved until `/ship FEAT-XXX` removes the `.agent-session/<spec_id>/` directory. The orchestrator and the human handoff both reference the full history.
 
 ## `ac_coverage` (qa-specific)
 
@@ -185,7 +186,7 @@ The orchestrator validates every Output Packet before processing. Rejections are
 
 Rejection conditions:
 
-- Missing required field (`spec_id`, `dispatch_id`, `role`, `status`, `summary`, `evidence`)
+- Missing required field (`spec_id`, `dispatch_id`, `role`, `status`, `summary`, `evidence`; plus `task_id` for task-scoped roles)
 - `status` outside the 4-element enum
 - `role` outside the 8 canonical Roles
 - Evidence with `kind` outside the 6-element enum

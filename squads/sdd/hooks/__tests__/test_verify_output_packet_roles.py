@@ -38,6 +38,7 @@ def _write_packet(tmp_dir: Path, data: dict) -> Path:
 
 BASE_PACKET = {
     "spec_id": "FEAT-002",
+    "task_id": "T-001",  # identity contract: task-scoped roles carry task_id (T-XXX)
     "dispatch_id": "d-001",
     "role": "dev",
     "status": "done",
@@ -156,6 +157,45 @@ class TestValidPacketPerRole(unittest.TestCase):
                 p = _write_packet(self.tmp, data)
                 ok, reason = validate_packet(p)
                 self.assertTrue(ok, f"severity={sev} should be valid: {reason}")
+
+
+class TestTaskIdIdentity(unittest.TestCase):
+    """Identity contract (shared/concepts/identity.md): task-scoped roles carry
+    task_id (T-XXX); pipeline-scoped roles (audit-agent, committer) omit it."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def test_task_scoped_role_missing_task_id_fails(self):
+        data = {k: v for k, v in BASE_PACKET.items() if k != "task_id"}
+        data["role"] = "dev"
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("task_id", reason)
+
+    def test_task_id_holding_feature_id_fails(self):
+        """task_id must be T-XXX, never the feature (FEAT-NNN) — the overload bug."""
+        data = {**BASE_PACKET, "role": "code-reviewer", "findings": [], "task_id": "FEAT-002"}
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("task_id", reason)
+
+    def test_audit_agent_without_task_id_ok(self):
+        """Pipeline-scoped role: no single task, task_id omitted is valid."""
+        data = {k: v for k, v in BASE_PACKET.items() if k != "task_id"}
+        data["role"] = "audit-agent"
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_committer_without_task_id_ok(self):
+        data = {k: v for k, v in BASE_PACKET.items() if k != "task_id"}
+        data["role"] = "committer"
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
 
 
 class TestQaAcCoverageValidation(unittest.TestCase):

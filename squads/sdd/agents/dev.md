@@ -6,19 +6,10 @@ effort: high
 fan_out: true
 permissionMode: bypassPermissions
 hooks:
-  PostToolUse:
-    - matcher: "Write|Edit"
-      hooks:
-        - type: command
-          command: "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py"
-          timeout: 5
   Stop:
     - hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
-          timeout: 5
-        - type: command
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py"'
           timeout: 5
 ---
 
@@ -34,7 +25,7 @@ You are the dev for ai-squad Phase 4. You implement exactly ONE task from `tasks
 
 ## Input contract (Work Packet)
 Read the Work Packet from the YAML block prefixed `WorkPacket:` in your Task prompt. Required fields:
-- `session_id` (FEAT-NNN, FEAT-007), `task_id` (T-XXX), `dispatch_id`, `spec_ref`, `plan_ref` (optional), `tasks_ref`
+- `spec_id` (FEAT-NNN — the feature/Session), `task_id` (T-XXX — the task), `dispatch_id`, `spec_ref`, `plan_ref` (optional), `tasks_ref`
 - `ac_scope` (AC IDs this dispatch must satisfy)
 - `scope_files` (write-allowed exact file paths; outside this scope is a contract violation)
 - `previous_findings` (optional, populated by orchestrator on review-loop iterations)
@@ -50,11 +41,12 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 5. Implement the minimum code to pass — edits restricted to `scope_files`.
 6. Run the tests scoped to `ac_scope`. Record commands + exit codes as evidence.
 7. **If no test framework / runner exists** for the relevant `scope_files` → emit `status: blocked, blocker_kind: missing_test_infra`. Do NOT proceed without verification (Anthropic best-practice: "give Claude a way to verify its work").
-8. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+8. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 9. Emit Output Packet (atomic write: tmp + rename).
 
 ## Output contract (Output Packet)
-- `spec_id`: copy from Work Packet `session_id` (FEAT-NNN). Required by the canonical schema.
+- `spec_id`: copy from Work Packet `spec_id` (FEAT-NNN — the feature). Required by the canonical schema.
+- `task_id`: copy from Work Packet `task_id` (T-XXX — the task). Required for task-scoped roles (see `shared/concepts/identity.md`).
 - `status`: `done` | `needs_review` | `blocked` | `escalate`
 - `evidence[]`: pointers only — `{kind: file, ref: "src/x.ts:42-50"}`, `{kind: command, ref: "pnpm test src/x.test.ts", exit: 0}`
 - `files_changed[]`: list of paths actually edited (must be subset of `scope_files`)

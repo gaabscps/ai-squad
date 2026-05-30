@@ -5,7 +5,7 @@ description: Phase 1 entry point. Interactive spec-writing session — selects p
 
 # Spec Writer — Phase 1 (Specify)
 
-The Skill that turns a feature request into an approved Spec, working interactively with the human. Owns Session creation, `task_id` generation, and `planned_phases` selection.
+The Skill that turns a feature request into an approved Spec, working interactively with the human. Owns Session creation, `spec_id` generation, and `planned_phases` selection.
 
 ## Hard rule — fresh-start mode is ALWAYS interactive (read this BEFORE step 1)
 
@@ -19,26 +19,26 @@ The Skill that turns a feature request into an approved Spec, working interactiv
 This rule supersedes any pattern-matching the model performs on the repo history. Treat it as a precondition for entering step 1.
 
 ## When to invoke
-- `/spec-writer` — fresh start (creates new Session, auto-generates `task_id`).
+- `/spec-writer` — fresh start (creates new Session, auto-generates `spec_id`).
 - `/spec-writer "<feature pitch>"` — fresh start with the human's pitch as first input.
 - `/spec-writer FEAT-NNN` — resume an existing Spec session.
 - `/spec-writer FEAT-NNN --plan="specify,plan,tasks"` — power-user flag override of the interactive checkbox.
 
 ## Refuse when
-- Invoked with `FEAT-NNN` and no Session exists at `.agent-session/<task_id>/` → message: `"No Session at .agent-session/<task_id>/. Start fresh with /spec-writer (no task_id)."`
-- Existing Session is in terminal state (`current_phase: paused | done | escalated`) → message: `"Session <task_id> is <state>. Run /ship FEAT-NNN to clean up, or /orchestrator FEAT-NNN --resume to continue Phase 4."`
+- Invoked with `FEAT-NNN` and no Session exists at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Start fresh with /spec-writer (no task_id)."`
+- Existing Session is in terminal state (`current_phase: paused | done | escalated`) → message: `"Session <spec_id> is <state>. Run /ship FEAT-NNN to clean up, or /orchestrator FEAT-NNN --resume to continue Phase 4."`
 - `.agent-session/` exists but is NOT in repo's `.gitignore` → message: `"`.agent-session/` must be gitignored. Add it to .gitignore before continuing."`
 - `session.yml` has `schema_version` higher than what this Skill knows → message: `"Session schema_version <N> is newer than this Skill's <M>. Upgrade ai-squad before continuing."`
 
 ## Inputs (preconditions)
 - Fresh start: none (this Skill creates the Session).
-- Resume: existing `.agent-session/<task_id>/session.yml` with `current_phase: specify`.
+- Resume: existing `.agent-session/<spec_id>/session.yml` with `current_phase: specify`.
 
 ## Steps
 
-### 1. Resolve `task_id` and Session
+### 1. Resolve `spec_id` and Session
 1. If invoked with explicit `FEAT-NNN`: use it; check Session existence (resume vs refuse per matrix).
-2. If no explicit `task_id`: scan `.agent-session/FEAT-*/` directories, increment from highest existing → new `FEAT-NNN` (3-digit zero-padded; expand to 4 digits past `FEAT-999`).
+2. If no explicit `spec_id`: scan `.agent-session/FEAT-*/` directories, increment from highest existing → new `FEAT-NNN` (3-digit zero-padded; expand to 4 digits past `FEAT-999`).
 3. Verify `.agent-session/` is in `.gitignore` (refuse if not).
 4. **Read constraint (per the top-of-file Hard rule):** when scanning prior `FEAT-*/` directories for step 2 above, the ONLY field you may read from any prior `session.yml` is the directory/file name itself for ID computation. Do NOT open prior `session.yml` content. Do NOT inspect `auto_approved_by`, `pipeline_mode`, `planned_phases`, `phase_history`, or `notes` from any prior Session. Treat prior `.agent-session/FEAT-*/` directories as opaque ID markers, nothing else. If you need any other state from a prior Session, that's a `--resume` flow (item 1 above) on that specific FEAT-ID — never an inference from history.
 
@@ -46,15 +46,17 @@ This rule supersedes any pattern-matching the model performs on the repo history
 
 **MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `planned_phases` is user intent about which Phases will run, NOT an automatable inference. PM bypass (`auto_approved_by=pm`, detected at step 6.5) governs APPROVAL gates only (steps 6.5 and 7) — it does NOT cover intent collection. If you find yourself about to auto-pick `planned_phases` because a previous Session in `.agent-session/` did it that way: STOP and run `AskUserQuestion` regardless. The user may want a different shape this time.
 
-Use `AskUserQuestion` with checkbox. Default all 4 checked, including Implementation:
+Use `AskUserQuestion` with checkbox. **Default = planning only (Specify + Plan + Tasks); Implementation UNCHECKED by default** — recommended path is to run Implementation in a separate session via `/orchestrator FEAT-NNN --resume` for (a) clean per-phase cost attribution in `report.html`, and (b) structural prevention of PM-mode inference from planning history (a recurring bug class — see commits `4a06ff9`, `d91c0a4`).
+
 ```
-Which Phases will this Session run?
+Which Phases will this Session run? (Recommended: leave Implementation UNCHECKED and run it in a fresh `--resume` session.)
 [x] Specify (always; you are here)
 [x] Plan
 [x] Tasks
-[x] Implementation
+[ ] Implementation  — opt-in only; checking this runs everything in this session and gives an APPROXIMATE planning/orchestration cost split (timestamp-bracketed, not session-isolated).
 ```
-Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks"` bypasses the prompt with the same selection semantics.
+
+Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks,implementation"` bypasses the prompt with explicit semantics (use it to opt into single-session implementation).
 
 ### 2.5. Pipeline mode selection (fresh start only)
 
@@ -86,13 +88,13 @@ Save selection to `session.yml.pipeline_mode` (atomic write: tmp + rename). Vali
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
 
 ### 4. Generate first draft (Hybrid drafting — Spec Kit style)
-Produce a full draft of `spec.md` from `squads/sdd/templates/spec.md`, populated from the pitch:
+Produce a full draft of `spec.md` from the bundled template `spec.template.md` (in this skill's base directory — the "Base directory for this skill" path shown on activation), populated from the pitch:
 - Fill all sections you can confidently infer (Problem, Goal, Constraints, Notes).
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 3 — see step 5).
 - Generate at least one `US-001 [P1]` from the pitch.
 - **Lite mode constraint** (`session.yml.pipeline_mode == "lite"`): generate **exactly one** `US-001 [P1]`. If the pitch implies multiple stories, surface this via chat: `"Lite mode allows only one US. The pitch suggests N stories — pick the most important one for this Session, or switch to standard mode."` Standard mode: 1-3 USs as appropriate from the pitch.
 - **Edge-case coverage (mandatory):** for every US-XXX with code-touching ACs, enumerate ACs covering all four categories: **empty state**, **error state**, **concurrent action**, **partial failure**. If a category is genuinely N/A for a US, write `AC-NNN: N/A — <one-line reason>` explicitly (silent omission becomes a finding in step 6.7).
-- Write to `.agent-session/<task_id>/spec.md` (atomic write; `status: draft`).
+- Write to `.agent-session/<spec_id>/spec.md` (atomic write; `status: draft`).
 - Save Spec title to `session.yml.feature_name` for human-readable reference.
 
 ### 5. Clarification pass (one ambiguity at a time)
@@ -138,7 +140,7 @@ Canonical source of truth: `shared/concepts/pm-bypass.md` — the logic below is
            - kind: pm_escalation
              timestamp: <ISO8601-now>
              phase: "specify"
-             artifact_path: ".agent-session/<task_id>/spec.md"
+             artifact_path: ".agent-session/<spec_id>/spec.md"
              open_questions: [<one entry per NEEDS CLARIFICATION block>]
         If the append fails, retry exactly once. If the second attempt
         also fails, raise (do NOT swallow the error silently) — the
@@ -198,14 +200,14 @@ Canonical source of truth: `shared/concepts/pm-bypass.md` — the logic below is
 - kind: pm_decision
   timestamp: "<ISO8601-timestamp>"     # ISO8601, UTC
   phase: "specify"
-  artifact_path: ".agent-session/<task_id>/spec.md"
+  artifact_path: ".agent-session/<spec_id>/spec.md"
   gate_applied: "auto_approved_by=pm"
 ```
 
 **Phase-specific notes for spec-writer:**
 - `[NEEDS CLARIFICATION]` marker ownership: spec-writer MUST insert the marker into `spec.md` BEFORE reaching Step 6.5. The scan in step 3 above is the audit check — not the producer of the marker.
 - `phase` value in `pm_decision`: `"specify"`.
-- `artifact_path`: `.agent-session/<task_id>/spec.md`.
+- `artifact_path`: `.agent-session/<spec_id>/spec.md`.
 
 ### 7. Final approval gate (Hybrid: checklist + AskUserQuestion)
 Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` markers remain AND at least one `US-XXX` is present:
@@ -229,7 +231,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 4. On `No`: return to step 6.
 
 ## Output
-- Path: `.agent-session/<task_id>/spec.md` (template at `squads/sdd/templates/spec.md`).
+- Path: `.agent-session/<spec_id>/spec.md` (template: `spec.template.md` in this skill's base directory).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.specify` populated at approval; `current_phase` advances at approval.

@@ -7,9 +7,6 @@ hooks:
       hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-pm-handoff-clean.py"'
-        - type: command
-          # runs after verify-pm-handoff-clean (debt-check first, capture second)
-          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py"'
 ---
 
 # PM — Autonomous Pipeline Entry
@@ -18,7 +15,7 @@ You are the **Senior Product Manager** for this Session. You own every approval 
 
 ## Preflight: verify ai-squad hooks installed (RUN BEFORE ANYTHING ELSE)
 
-The `/pm` pipeline relies on Stop / PreToolUse / PostToolUse hooks resolved relative to `$CLAUDE_PROJECT_DIR/.claude/hooks/`. If those files are missing in the consumer repo, the pipeline degrades silently (Stop hooks are now wrapped to fail-open) **but loses observability and safety nets** (no `verify-output-packet`, no `block-git-write`, no usage capture). Refuse to proceed without them.
+The `/pm` pipeline relies on Stop / PreToolUse hooks resolved relative to `$CLAUDE_PROJECT_DIR/.claude/hooks/`. If those files are missing in the consumer repo, the pipeline degrades silently (Stop hooks are now wrapped to fail-open) **but loses safety nets** (no `verify-output-packet`, no `block-git-write`, no pipeline-completeness checks). Refuse to proceed without them.
 
 As your **first action**, run this Bash check exactly once:
 
@@ -32,7 +29,7 @@ hooks_dir="$repo_root/.claude/hooks"
 # $required` only word-splits in bash; zsh keeps the variable as a single
 # string and the loop fires once with the whole list concatenated. Setting
 # positional parameters makes the iteration shell-agnostic.
-set -- verify-pm-handoff-clean.py capture-pm-usage.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py capture-subagent-usage.py stamp-session-id.py verify-reviewer-write-path.py
+set -- verify-pm-handoff-clean.py verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py
 missing=""
 for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
@@ -113,7 +110,7 @@ After /task-builder produces `tasks.md`, add a `**Tier:** TX` line to every task
 
 ## Run procedure
 
-1. **Read or initialize the Session.** Read `.agent-session/<task_id>/session.yml` if it exists. On fresh start, write `planned_phases: [specify, plan, tasks, implementation]` and `auto_approved_by: pm` so phase Skills can detect PM autonomy.
+1. **Read or initialize the Session.** Read `.agent-session/<spec_id>/session.yml` if it exists. On fresh start, write `planned_phases: [specify, plan, tasks, implementation]` and `auto_approved_by: pm` so phase Skills can detect PM autonomy.
 2. **Phase 1.** Invoke `/spec-writer FEAT-NNN`. When the phase Skill produces a draft Spec, apply the **Spec gate**. If a phase Skill triggers an `AskUserQuestion` while the PM Skill is active in your context, **answer it inline as the senior PM** rather than escalating to the human — you ARE the PM in this session. Iterate until the gate passes, then write `status: approved`.
 3. **Phase 2.** Invoke `/designer FEAT-NNN`. Apply the **Plan gate**. Same answer-inline rule.
 4. **Phase 3.** Invoke `/task-builder FEAT-NNN`. Apply the **Tasks gate**. **Additionally:** add the `Tier:` line to every task per the classification table. Same answer-inline rule.
@@ -126,10 +123,10 @@ After /task-builder produces `tasks.md`, add a `**Tier:** TX` line to every task
 
 After `/orchestrator` returns the handoff:
 
-1. Read `.agent-session/<task_id>/handoff.md` and extract `verdict`.
+1. Read `.agent-session/<spec_id>/handoff.md` and extract `verdict`.
 2. If `verdict != "done"` → SKIP this step entirely; proceed to Step 6 (Monitor). AC-019.
 3. If `verdict == "done"`:
-   a. Aggregate `ac_scope` from all dev Output Packets in `.agent-session/<task_id>/outputs/`.
+   a. Aggregate `ac_scope` from all dev Output Packets in `.agent-session/<spec_id>/outputs/`.
    b. Aggregate `files_changed` from same (excluding paths within `.agent-session/`).
    c. Dispatch the `committer` Subagent via Task tool with:
       - `subagent_type: "committer"`

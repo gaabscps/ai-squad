@@ -32,6 +32,7 @@ append_warning = _w_mod.append_warning
 
 BASE_PACKET = {
     "spec_id": "FEAT-003",
+    "task_id": "T-001",  # identity contract: task-scoped roles carry task_id (T-XXX)
     "dispatch_id": "d-001",
     "role": "dev",
     "status": "done",

@@ -8,8 +8,8 @@ description: Phase 3 entry point. Interactive task decomposition — reads appro
 The Skill that turns an approved Spec + Plan into an approved Tasks list: granular `T-XXX` units with exact file scope, AC coverage, and `[P]` parallelization markers. Interactive with the human. Style inspired by GitHub Spec Kit's tasks template.
 
 ## When to invoke
-- `/task-builder` — after Spec+Plan approved and `tasks` is in `planned_phases` (auto-detects `task_id` from Session).
-- `/task-builder FEAT-NNN` — explicit `task_id`.
+- `/task-builder` — after Spec+Plan approved and `tasks` is in `planned_phases` (auto-detects `spec_id` from Session).
+- `/task-builder FEAT-NNN` — explicit `spec_id`.
 - `/task-builder FEAT-NNN --rewrite` — discard existing approved Tasks and start over.
 
 ## Refuse when
@@ -20,14 +20,14 @@ The Skill that turns an approved Spec + Plan into an approved Tasks list: granul
 - `session.yml.schema_version` higher than this Skill knows → message: `"Session schema_version <N> newer than this Skill's <M>. Upgrade ai-squad."`
 
 ## Inputs (preconditions)
-- `.agent-session/<task_id>/session.yml` with `tasks` in `planned_phases`.
-- `.agent-session/<task_id>/spec.md` (status: approved).
-- `.agent-session/<task_id>/plan.md` (status: approved) — IF `plan` is in `planned_phases`. Auto-derived stub if Plan was skipped.
+- `.agent-session/<spec_id>/session.yml` with `tasks` in `planned_phases`.
+- `.agent-session/<spec_id>/spec.md` (status: approved).
+- `.agent-session/<spec_id>/plan.md` (status: approved) — IF `plan` is in `planned_phases`. Auto-derived stub if Plan was skipped.
 
 ## Steps
 
 ### 1. Resolve Session and read inputs
-1. Determine `task_id` (explicit arg or current Session from `session.yml`).
+1. Determine `spec_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec; extract User Stories (`US-XXX [P1|P2|P3]`) and ACs (`AC-XXX`).
 3. Read approved Plan (if present); extract Architecture/Data/API/UX decisions and the AC Coverage Map.
 4. Build the **AC universe** (every AC from Spec) — Tasks must cover all of them.
@@ -46,7 +46,7 @@ Decompose using the per-User-Story phase model:
 - Each task gets: monotonic `T-XXX` ID, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths — see step 4), `AC covered:` tags, optional `Depends on:`, `Estimated complexity:`.
 - **Auto skip-reviewers (lite mode only):** for any lite-mode task whose `Files:` set is exactly **one file** AND whose `Estimated complexity:` is `trivial` or `small`, automatically append `Skip reviewers: lite mode — single-file <category>` to the task (category = `fix` | `doc` | `copy` | `single-fn`). This grants the orchestrator's reviewer-skip exception (per `orchestrator/skill.md`) without manual annotation. Multi-file lite tasks still get full reviewers.
 - Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding before any story tasks; optional **Foundational** phase for cross-story prereqs. **Lite mode disallows Setup/Foundational phases** — if scaffolding is needed, lite is the wrong mode.
-- Write to `.agent-session/<task_id>/tasks.md` (atomic; `status: draft`).
+- Write to `.agent-session/<spec_id>/tasks.md` (atomic; `status: draft`).
 
 ### 3. Mark `[P]` (parallelization — Spec Kit dual-rule)
 A task is `[P]`-safe IFF **both**:
@@ -99,7 +99,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
      - kind: pm_escalation
        timestamp: "<ISO8601-now>"
        phase: "tasks"
-       artifact_path: ".agent-session/<task_id>/tasks.md"
+       artifact_path: ".agent-session/<spec_id>/tasks.md"
        open_questions: [<one entry per NEEDS CLARIFICATION block>]
      ```
      If the append fails, retry exactly once. If the second attempt also fails, raise — do NOT swallow silently.
@@ -136,7 +136,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
    - kind: pm_decision
      timestamp: "<ISO8601-now>"       # ISO8601, UTC
      phase: "tasks"
-     artifact_path: ".agent-session/<task_id>/tasks.md"
+     artifact_path: ".agent-session/<spec_id>/tasks.md"
      gate_applied: "auto_approved_by=pm"
    ```
 
@@ -164,7 +164,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 4. On `No`: return to step 7.
 
 ## Output
-- Path: `.agent-session/<task_id>/tasks.md` (template at `squads/sdd/templates/tasks.md`).
+- Path: `.agent-session/<spec_id>/tasks.md` (template: `tasks.template.md` in this skill's base directory).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted change AND on final approval.
 - Each task has: `T-XXX` ID, optional `[P]` marker, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths), `AC covered:`, optional `Depends on:`, `Estimated complexity:`.
@@ -172,7 +172,7 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
 ## Handoff (auto-advance when next Phase is planned)
 After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
 - If `implementation` planned next: print `"Tasks approved. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
-- If `implementation` not planned: `"Tasks approved. Implementation was not planned for this Session — Session is now paused. To execute later: /orchestrator FEAT-NNN --resume. To clean up without executing: /ship FEAT-NNN."`
+- If `implementation` not planned (recommended path): `"Tasks approved. Implementation runs in a separate session for a clean per-phase cost split + structural prevention of PM-mode inference from planning history. Session is now paused. ▶ Next step: /orchestrator FEAT-NNN --resume (autonomous Phase 4; generates .agent-session/FEAT-NNN/report.html at session end with cost + code review). To clean up without executing: /ship FEAT-NNN."`
 
 ## Failure modes
 - **Human abandons mid-Session:** state on disk reflects last atomic write. Next `/task-builder FEAT-NNN` resumes.

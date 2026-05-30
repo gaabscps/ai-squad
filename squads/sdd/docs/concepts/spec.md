@@ -4,7 +4,7 @@
 
 ## Definition
 
-A **Spec** is the contract between the human and the squad — a single Markdown file at `.agent-session/<task_id>/spec.md` (gitignored on the consumer project) that answers WHAT must be built and WHY, never HOW. It is produced by the `spec-writer` Skill in Phase 1 and consumed (read-only) by Phases 2–4 (designer, task-builder, orchestrator, all 6 Subagents). Once `status: approved`, it is the source of truth; agents do not deviate from it without escalating.
+A **Spec** is the contract between the human and the squad — a single Markdown file at `.agent-session/<spec_id>/spec.md` (gitignored on the consumer project) that answers WHAT must be built and WHY, never HOW. It is produced by the `spec-writer` Skill in Phase 1 and consumed (read-only) by Phases 2–4 (designer, task-builder, orchestrator, all 6 Subagents). Once `status: approved`, it is the source of truth; agents do not deviate from it without escalating.
 
 > *Terms used in this doc:*
 > - **EARS** (Easy Approach to Requirements Syntax): a notation invented by Alistair Mavin for unambiguous requirements. Four patterns: `WHEN <trigger> THE SYSTEM SHALL <action>` (event), `WHILE <state> THE SYSTEM SHALL <action>` (state), `IF <unwanted> THEN THE SYSTEM SHALL <mitigation>` (protection), `THE SYSTEM SHALL <continuous behavior>` (ubiquitous). Adopted by Kiro; the emerging standard for Specs consumed by AI agents.
@@ -19,9 +19,9 @@ The Spec is one Markdown file per feature. Not a folder, not multiple files. Jus
 
 - **Loads as one piece of context** for any consumer (`designer`, `task-builder`, `orchestrator`, any Phase 4 Subagent) — no risk of reading half the contract.
 - **Atomic transitions** — a single status change moves one file from `draft` to `approved`.
-- **Plan and Tasks are siblings, not children** — Phase 2 produces `.agent-session/<task_id>/plan.md` and Phase 3 produces `tasks.md`. They live in the same directory but each is its own contract for its own Phase. The Spec does not absorb their concerns.
+- **Plan and Tasks are siblings, not children** — Phase 2 produces `.agent-session/<spec_id>/plan.md` and Phase 3 produces `tasks.md`. They live in the same directory but each is its own contract for its own Phase. The Spec does not absorb their concerns.
 
-The whole `.agent-session/<task_id>/` directory is gitignored on the consumer project — the Spec, Plan, Tasks and all runtime ephemera are framework-internal contracts, not long-term documentation. Long-term tracking belongs in Jira/ClickUp/GitHub PR descriptions; the orchestrator's handoff is what the human copies into those systems.
+The whole `.agent-session/<spec_id>/` directory is gitignored on the consumer project — the Spec, Plan, Tasks and all runtime ephemera are framework-internal contracts, not long-term documentation. Long-term tracking belongs in Jira/ClickUp/GitHub PR descriptions; the orchestrator's handoff is what the human copies into those systems.
 
 ## The canonical structure
 
@@ -114,7 +114,7 @@ in-progress → done      (the orchestrator marks at handoff, end of Phase 4)
 approved → draft        (any material change to acceptance criteria or scope; reopens for human re-approval)
 ```
 
-After `done`, the entire `.agent-session/<task_id>/` is removed by `/ship FEAT-XXX` — there is no `archived` state. If the human delays `/ship`, the artifacts remain on disk indefinitely (gitignored, no impact on the consumer's git).
+After `done`, the entire `.agent-session/<spec_id>/` is removed by `/ship FEAT-XXX` — there is no `archived` state. If the human delays `/ship`, the artifacts remain on disk indefinitely (gitignored, no impact on the consumer's git).
 
 A Spec going from `approved` back to `draft` is a signal — forces a fresh round of human attention before subsequent Phases can resume.
 
@@ -138,11 +138,11 @@ The Spec is **frozen** from Phase 2 onward. The designer, task-builder, orchestr
 
 A Spec does NOT contain:
 
-- **Architecture or implementation decisions** — those are the Plan's job (Phase 2 output at `.agent-session/<task_id>/plan.md`), produced by the `designer` Skill.
-- **Task breakdown or file scope** — that is the Tasks file's job (Phase 3 output at `.agent-session/<task_id>/tasks.md`), produced by the `task-builder` Skill. The `Files:` and `AC covered:` annotations on each task become `scope_files` and `ac_scope` in the orchestrator's Work Packets.
+- **Architecture or implementation decisions** — those are the Plan's job (Phase 2 output at `.agent-session/<spec_id>/plan.md`), produced by the `designer` Skill.
+- **Task breakdown or file scope** — that is the Tasks file's job (Phase 3 output at `.agent-session/<spec_id>/tasks.md`), produced by the `task-builder` Skill. The `Files:` and `AC covered:` annotations on each task become `scope_files` and `ac_scope` in the orchestrator's Work Packets.
 - **File paths or module names from the codebase** — the Spec is implementation-agnostic. Mention "User Service" as an entity if needed; do not mention `src/auth/login.ts`.
 - **Test code** — acceptance criteria are *what* must hold. Test code is *how* to verify, owned by the `dev` (writes tests) and `qa` (runs them) Subagents.
-- **Status updates from Phase 4** — those go to the Session state file (`.agent-session/<task_id>/session.yml`), not to the Spec.
+- **Status updates from Phase 4** — those go to the Session state file (`.agent-session/<spec_id>/session.yml`), not to the Spec.
 
 ## Anti-patterns
 

@@ -20,7 +20,7 @@ You are the committer for ai-squad Phase 4. You are the **only Subagent authoriz
 
 ## Input contract (Work Packet)
 Required fields:
-- `task_id` — Session ID (e.g., `FEAT-006`)
+- `spec_id` — Session ID / feature (e.g., `FEAT-006`)
 - `feature_name` — human-readable feature title from `session.yml` (used in commit header)
 - `ac_scope` — aggregated list of AC IDs covered by all dev Output Packets in this pipeline
 - `files_changed` — aggregated list of paths changed by dev Output Packets (excluding `.agent-session/` paths)
@@ -73,11 +73,11 @@ Construct the commit message in two parts:
 
 **Header** (≤70 chars, hard truncated):
 ```
-feat(<task_id>): <feature_name>
+feat(<spec_id>): <feature_name>
 ```
 Example: `feat(FEAT-006): manifest-status-canonical`
 
-If `feat(<task_id>): <feature_name>` exceeds 70 chars, truncate `<feature_name>` with `…` to fit within 70 chars total (including the `feat(<task_id>): ` prefix).
+If `feat(<spec_id>): <feature_name>` exceeds 70 chars, truncate `<feature_name>` with `…` to fit within 70 chars total (including the `feat(<spec_id>): ` prefix).
 
 **Body** (bullet list of tasks + ACs):
 Build from the `ac_scope` and task context in the Work Packet. Format each line as:
@@ -169,7 +169,7 @@ Capture the SHA. Emit Output Packet:
 - **NEVER** `git reset`, `git checkout`, or any destructive git command on failure (AC-020).
 - **NEVER** dispatch other Subagents — you are a leaf node.
 - **NEVER** edit source files — your only write operation is `git add` + `git commit`.
-- Always: validate Output Packet against `shared/schemas/output-packet.schema.json` before emitting.
+- Always: validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) before emitting.
 - Always: emit exactly one Output Packet at end (atomic write: tmp file + rename).
 
 ## Authorization note

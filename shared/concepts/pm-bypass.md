@@ -104,7 +104,7 @@ The `audit-agent` reconciliation check (`pm_gate_violations`, AC-017) matches `p
 - The `[NEEDS CLARIFICATION]` escalation (AC-012) fires on any unresolved spec questions — e.g., an open question that the `/pm` persona must adjudicate before the Spec can be considered complete.
 - **Marker ownership:** spec-writer MUST insert the `[NEEDS CLARIFICATION]` marker into the artifact BEFORE invoking the bypass step. The bypass step's scan in Step 3 is the audit check — it is not the producer of the marker. If spec-writer reaches Step 6.5 without inserting a required marker, the bypass step will incorrectly approve a deficient artifact.
 - `phase` value in `pm_decision`: `"specify"`.
-- `artifact_path`: the spec.md file under `.agent-session/<task_id>/spec.md`.
+- `artifact_path`: the spec.md file under `.agent-session/<spec_id>/spec.md`.
 
 ### designer (Step 6.5 — before Step 7)
 
@@ -112,7 +112,7 @@ The `audit-agent` reconciliation check (`pm_gate_violations`, AC-017) matches `p
 - The `[NEEDS CLARIFICATION]` escalation (AC-012) in the design context covers **AC coverage gaps** as well: if the Plan does not trace coverage for every AC in the Spec, the designer MUST insert a `[NEEDS CLARIFICATION]` marker into `plan.md` in **Step 6** (AC coverage gate, PM-mode branch) BEFORE reaching Step 6.5. This prevents the PM from auto-approving a Plan with known coverage holes.
 - **Marker ownership:** designer MUST insert the `[NEEDS CLARIFICATION]` marker into `plan.md` in Step 6 — BEFORE invoking the bypass step. The bypass step's scan in Step 3 is the audit check — not the producer of the marker. Step 6 is responsible for detecting AC coverage gaps and inserting the marker atomically (tmp + rename); Step 6.5 only verifies absence.
 - `phase` value in `pm_decision`: `"plan"`.
-- `artifact_path`: the plan.md file under `.agent-session/<task_id>/plan.md`.
+- `artifact_path`: the plan.md file under `.agent-session/<spec_id>/plan.md`.
 
 ### task-builder (Step 9 — bypass — runs before Step 10)
 
@@ -123,7 +123,7 @@ The `audit-agent` reconciliation check (`pm_gate_violations`, AC-017) matches `p
 - **Clarification cap:** in interactive mode, `[NEEDS CLARIFICATION]` markers are capped at 3 (Step 6). In PM-mode there is NO cap — every unresolved ambiguity MUST get its own marker so the bypass scan in Step 9 detects all violations. Demoting excess violations to a `## Decisions deferred` section in PM-mode would hide them from the audit check.
 - **Marker ownership summary:** task-builder (Steps 3, 6, 8) is the PRODUCER of all `[NEEDS CLARIFICATION]` markers. Step 9 (bypass) is the CONSUMER (scanner). The bypass step's scan is the audit — it does not produce markers. If task-builder reaches Step 9 without having inserted required markers, the bypass step will incorrectly approve a deficient artifact.
 - `phase` value in `pm_decision`: `"tasks"`.
-- `artifact_path`: the tasks.md file under `.agent-session/<task_id>/tasks.md`.
+- `artifact_path`: the tasks.md file under `.agent-session/<spec_id>/tasks.md`.
 
 ## Setting `auto_approved_by` in `session.yml`
 

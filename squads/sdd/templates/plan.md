@@ -9,7 +9,7 @@ parent_spec: FEAT-XXX
 # Plan: <feature name>
 
 > Phase 2 output. Translates the approved Spec into structural design decisions.
-> Lives at `.agent-session/<task_id>/plan.md` in the consumer project (gitignored).
+> Lives at `.agent-session/<spec_id>/plan.md` in the consumer project (gitignored).
 >
 > **Convention:** every decision tags the ACs it satisfies inline — `(covers: AC-001, AC-003)`. The AC Coverage Map at the end aggregates and verifies these.
 

@@ -49,18 +49,6 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-session-id.py\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "",
@@ -71,15 +59,15 @@
           },
           {
             "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-pm-usage.py\""
-          },
-          {
-            "type": "command",
             "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py\""
           },
           {
             "type": "command",
-            "command": "npx @ai-squad/agentops capture"
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\""
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\""
           }
         ]
       }
@@ -94,7 +82,7 @@
           },
           {
             "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-usage.py\""
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-cost.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-subagent-cost.py\""
           }
         ]
       }
