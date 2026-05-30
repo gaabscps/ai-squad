@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.0 — 2026-05-30
+
+Post-mortem of the `[Soundwave] Orchestrator FEAT-010` run surfaced a cluster of governance, identity, and packaging bugs. This release fixes them.
+
+### Breaking changes
+
+- **Canonical identity vocabulary (`spec_id` / `task_id` / `dispatch_id`).** `task_id` was overloaded — the feature in `session.yml` / manifest / audit Work Packet, but a task elsewhere — and the feature itself had three names (`task_id` / `spec_id` / `session_id`). Now: `spec_id` = the feature/Session (`FEAT-NNN`), `task_id` = one task (`T-XXX`), `dispatch_id` = one dispatch. Single source of truth: `shared/concepts/identity.md`.
+  - Output Packet schema gains `task_id` (`T-XXX`), **required** for task-scoped roles (dev, code-reviewer, logic-reviewer, qa, blocker-specialist); pipeline-scoped roles (audit-agent, committer) omit it.
+  - Work Packet, manifest, and `session.yml` use `spec_id`. Hooks read it with `session_id` / legacy-`task_id` read-compat, so Sessions created before the rename keep working.
+
+### Bug fixes
+
+- **audit-agent Check 3 false-positive — the FEAT-010 root cause.** The audit demanded a `task_id` the Output Packet schema (`additionalProperties: false`) forbade, so every reviewer packet was flagged as "likely fabrication"; the orchestrator then hand-edited 96 packets and re-ran the audit 4× until it passed. Check 3 now correlates by `dispatch_id` and validates `role` + `task_id` (task-scoped only).
+- **Cost report claimed `complete: true` with $0.** Two causes: `model_prices.json` was never deployed (the hook copy loop only took `.py` files), and `build_cost_report` treated zero captures as complete. Now the price table ships per-repo and global, `pricing.load_prices` resolves local → global, token capture is decoupled from pricing (tokens are recorded even with no price table — the model is flagged unpriced), and `complete` requires `subagent_count > 0`.
+- **Skill templates were not deployed.** `spec-writer` / `designer` / `task-builder` / `discovery-lead` read their templates from the source-repo path, so a clean install fell back to the ai-squad source tree. Deploy now bundles each template into the skill's own dir as `<name>.template.md`.
+
+### Hardening
+
+- **A `blocked` audit verdict is now terminal.** The orchestrator may not edit `outputs/` or re-dispatch the audit to flip a verdict; `guard-session-scope.py` mechanically blocks orchestrator writes under `outputs/`. Recovery from a blocked audit is `/orchestrator FEAT-NNN --restart`.
+
 ## 0.7.2 — 2026-05-16
 
 ### Bug fixes
