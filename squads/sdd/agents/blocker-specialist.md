@@ -39,7 +39,7 @@ If any required field is missing → emit `status: escalate, blocker_kind: contr
 4. Choose ONE of two paths:
    - **Resolvable** → write decision memo at `.agent-session/<spec_id>/decisions/<topic>-<timestamp>.md` (see "Memo schema"); emit `status: done` with the memo path as evidence.
    - **Unresolvable** → emit `status: escalate` with structured `blockers[]` for human review (task enters `pending_human` terminal state; other tasks continue independently).
-5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
+5. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit).
 
 ## Memo schema (Nygard ADR — 5 fields, ≤40 lines)
 Use Nygard's canonical ADR fields. Keep each section to 1-3 lines.

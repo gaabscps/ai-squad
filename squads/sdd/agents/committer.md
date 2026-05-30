@@ -169,7 +169,7 @@ Capture the SHA. Emit Output Packet:
 - **NEVER** `git reset`, `git checkout`, or any destructive git command on failure (AC-020).
 - **NEVER** dispatch other Subagents — you are a leaf node.
 - **NEVER** edit source files — your only write operation is `git add` + `git commit`.
-- Always: validate Output Packet against `shared/schemas/output-packet.schema.json` before emitting.
+- Always: validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) before emitting.
 - Always: emit exactly one Output Packet at end (atomic write: tmp file + rename).
 
 ## Authorization note

@@ -41,7 +41,7 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 5. Implement the minimum code to pass — edits restricted to `scope_files`.
 6. Run the tests scoped to `ac_scope`. Record commands + exit codes as evidence.
 7. **If no test framework / runner exists** for the relevant `scope_files` → emit `status: blocked, blocker_kind: missing_test_infra`. Do NOT proceed without verification (Anthropic best-practice: "give Claude a way to verify its work").
-8. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+8. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 9. Emit Output Packet (atomic write: tmp + rename).
 
 ## Output contract (Output Packet)

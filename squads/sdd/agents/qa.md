@@ -38,7 +38,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
    - **(b)** If no existing test: write an ephemeral validation probe at `.agent-session/<spec_id>/qa/<ac_id>.<ext>` (shell script, curl invocation, harness call) and run it. Probes are NEVER committed to the source tree.
    - **(c)** If the AC is unreachable both ways (e.g., requires manual UI inspection or runtime not available): emit `status: blocked, blocker_kind: missing_test_for_ac, missing_for: [AC-XXX]`. Cascades back to dev (orchestrator routes).
 4. Aggregate `ac_coverage` map: every AC ID in `ac_scope` → list of evidence IDs that validate it.
-5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+5. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)
@@ -48,7 +48,7 @@ Write the Output Packet to `.agent-session/<spec_id>/outputs/<dispatch_id>-qa-*.
 - `task_id`: copy from Work Packet `task_id` (T-XXX — the task). Required for task-scoped roles (see `shared/concepts/identity.md`).
 - `status`: `done` (all ACs pass) | `needs_review` (some ACs fail) | `blocked` | `escalate`
 - `evidence[]`: `{kind: test, ref: "<command>", exit: <int>, ac_ref: "FEAT-XXX/AC-XXX"}` — one per AC validated
-- `ac_coverage`: **MANDATORY** top-level field — object keyed by `"FEAT-NNN/AC-NNN"` or `"DISC-NNN/AC-NNN"` (both prefixes valid per schema `^(FEAT|DISC)-\d{3,}/AC-\d{3,}$`) mapping to an array of evidence IDs (see `shared/schemas/output-packet.schema.json:128-138`); every AC in `ac_scope` MUST appear as a key. Each value array MUST be non-empty — every AC key must have at least one evidence id. Empty object, missing key, or empty value array is an error — the verify-output-packet.py hook (post-Stop) enforces this (previously unchecked, which allowed FEAT-009/010/011 to silently produce empty reports). Example: `{"FEAT-002/AC-001": ["e-001", "e-003"], "FEAT-002/AC-002": ["e-002"]}`.
+- `ac_coverage`: **MANDATORY** top-level field — object keyed by `"FEAT-NNN/AC-NNN"` or `"DISC-NNN/AC-NNN"` (both prefixes valid per schema `^(FEAT|DISC)-\d{3,}/AC-\d{3,}$`) mapping to an array of evidence IDs (enforced by `verify-output-packet.py`); every AC in `ac_scope` MUST appear as a key. Each value array MUST be non-empty — every AC key must have at least one evidence id. Empty object, missing key, or empty value array is an error — the verify-output-packet.py hook (post-Stop) enforces this (previously unchecked, which allowed FEAT-009/010/011 to silently produce empty reports). Example: `{"FEAT-002/AC-001": ["e-001", "e-003"], "FEAT-002/AC-002": ["e-002"]}`.
 - `notes`: ≤80 chars
 
 ## Hard rules

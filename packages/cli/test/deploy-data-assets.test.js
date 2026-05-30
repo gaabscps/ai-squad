@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { copyHookDataAssets } from '../lib/deploy.js';
+import { copyHookDataAssets, copySkillTemplates } from '../lib/deploy.js';
 
 async function exists(p) {
   try {
@@ -42,4 +42,30 @@ test('copyHookDataAssets: no-op when asset absent (no crash)', async () => {
 
   assert.deepEqual(copied, []);
   assert.ok(!(await exists(join(destDir, 'model_prices.json'))));
+});
+
+test('copySkillTemplates: copies the mapped template into the skill dir, renamed', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'aisquad-tpl-'));
+  const squadRoot = join(base, 'sdd');
+  await mkdir(join(squadRoot, 'templates'), { recursive: true });
+  await writeFile(join(squadRoot, 'templates', 'spec.md'), '# spec template');
+  const destDir = join(base, 'spec-writer');
+  await mkdir(destDir, { recursive: true });
+
+  const copied = await copySkillTemplates({ squadRoot, skill: 'spec-writer', destDir });
+
+  assert.deepEqual(copied, ['spec.template.md']);
+  assert.equal(await readFile(join(destDir, 'spec.template.md'), 'utf8'), '# spec template');
+});
+
+test('copySkillTemplates: no-op for a skill with no mapped template', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'aisquad-tpl-'));
+  const squadRoot = join(base, 'sdd');
+  await mkdir(join(squadRoot, 'templates'), { recursive: true });
+  const destDir = join(base, 'orchestrator');
+  await mkdir(destDir, { recursive: true });
+
+  const copied = await copySkillTemplates({ squadRoot, skill: 'orchestrator', destDir });
+
+  assert.deepEqual(copied, []);
 });

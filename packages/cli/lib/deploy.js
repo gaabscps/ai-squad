@@ -35,6 +35,18 @@ const GITIGNORE_BLOCK = '\n# ai-squad per-repo hook install (managed by `ai-squa
 // cost capture degrades to tokens-only. This was the FEAT-010 cost-report gap.
 const HOOK_DATA_ASSETS = ['model_prices.json'];
 
+// Templates a skill READS/POPULATES at runtime. They live in <squad>/templates/
+// (organized source of truth) but the skill can only resolve paths relative to
+// its own base dir once deployed — so deploy copies each into the skill's dir as
+// <name>.template.md. Without this, the skill falls back to the source repo (the
+// "spec-writer looked in the local ai-squad repo" bug). Map: skill -> [[src, as]].
+const SKILL_TEMPLATES = {
+  'spec-writer': [['spec.md', 'spec.template.md']],
+  'designer': [['plan.md', 'plan.template.md']],
+  'task-builder': [['tasks.md', 'tasks.template.md']],
+  'discovery-lead': [['memo.md', 'memo.template.md']],
+};
+
 /**
  * Known-defunct ai-squad hook registrations. Older deploys may have written
  * these into <repo>/.claude/settings.local.json; we strip them on every deploy
@@ -106,6 +118,23 @@ export async function copyHookDataAssets({ hooksSrc, destDir }) {
   return copied;
 }
 
+/**
+ * Copy the runtime templates a skill populates (per SKILL_TEMPLATES) from
+ * <squadRoot>/templates/ into the deployed skill dir, renamed to <name>.template.md.
+ * Returns the copied destination basenames. Exported for unit testing.
+ */
+export async function copySkillTemplates({ squadRoot, skill, destDir }) {
+  const copied = [];
+  for (const [srcName, dstName] of SKILL_TEMPLATES[skill] || []) {
+    const src = join(squadRoot, 'templates', srcName);
+    if (await exists(src)) {
+      await cp(src, join(destDir, dstName));
+      copied.push(dstName);
+    }
+  }
+  return copied;
+}
+
 async function checkLength(file, cap, label) {
   if (!(await exists(file))) return;
   const lines = await lineCount(file);
@@ -140,6 +169,9 @@ async function deployClaudeCodeGlobal({ componentsRoot, squads }) {
       await checkLength(join(src, 'skill.md'), SKILL_LINE_CAP, `${skill}/skill.md`);
       await mkdir(dst, { recursive: true });
       await cp(src, dst, { recursive: true });
+      for (const tpl of await copySkillTemplates({ squadRoot, skill, destDir: dst })) {
+        console.log(`  [template]       ${skill}/${tpl}`);
+      }
     }
 
     const agentsSrc = join(squadRoot, 'agents');

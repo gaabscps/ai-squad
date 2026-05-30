@@ -88,7 +88,7 @@ Save selection to `session.yml.pipeline_mode` (atomic write: tmp + rename). Vali
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
 
 ### 4. Generate first draft (Hybrid drafting — Spec Kit style)
-Produce a full draft of `spec.md` from `squads/sdd/templates/spec.md`, populated from the pitch:
+Produce a full draft of `spec.md` from the bundled template `spec.template.md` (in this skill's base directory — the "Base directory for this skill" path shown on activation), populated from the pitch:
 - Fill all sections you can confidently infer (Problem, Goal, Constraints, Notes).
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 3 — see step 5).
 - Generate at least one `US-001 [P1]` from the pitch.
@@ -231,7 +231,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 4. On `No`: return to step 6.
 
 ## Output
-- Path: `.agent-session/<spec_id>/spec.md` (template at `squads/sdd/templates/spec.md`).
+- Path: `.agent-session/<spec_id>/spec.md` (template: `spec.template.md` in this skill's base directory).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.specify` populated at approval; `current_phase` advances at approval.

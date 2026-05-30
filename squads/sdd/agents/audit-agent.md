@@ -42,7 +42,7 @@ If any required field is missing → emit `status: blocked, blocker_kind: contra
 4. List files in `outputs_dir_ref` — every file should be `<dispatch_id>.json`.
 5. Run the **6 reconciliation checks** below. Each check that fails contributes one finding.
 6. Run the **Phase 4 sweep** — role-specific Output Packet validation for qa, code-reviewer, logic-reviewer dispatches. Collect all gaps; emit one consolidated finding if any exist.
-7. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit).
+7. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit).
 8. Emit Output Packet (atomic write).
 
 ## The 6 reconciliation checks

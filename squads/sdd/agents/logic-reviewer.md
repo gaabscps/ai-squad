@@ -50,7 +50,7 @@ Your verdict is about THIS task's contract, not the PR's final state. The task's
    - **Partial-failure paths** — cleanup, rollback, retries, idempotency
    - **Race conditions** — concurrent access, ordering, atomicity
    - **Broken invariants** — assumptions the code violates
-5. Validate Output Packet against `shared/schemas/output-packet.schema.json` (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
+5. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)

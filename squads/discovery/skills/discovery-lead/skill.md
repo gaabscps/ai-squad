@@ -48,7 +48,7 @@ Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Pow
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the opportunity? One paragraph — the problem signal you saw, who it might affect, and what would make this worth pursuing."`
 
 ### 4. Generate first draft (Hybrid drafting)
-Produce a full draft of `memo.md` from `squads/discovery/templates/memo.md`, populated from the pitch. The Frame fills **Q1–Q9 of Cagan's Opportunity Assessment** (10 canonical questions from *Inspired* 2nd ed., Ch. 35; Q10 is reserved for Phase 3):
+Produce a full draft of `memo.md` from the bundled template `memo.template.md` (in this skill's base directory — the "Base directory for this skill" path shown on activation), populated from the pitch. The Frame fills **Q1–Q9 of Cagan's Opportunity Assessment** (10 canonical questions from *Inspired* 2nd ed., Ch. 35; Q10 is reserved for Phase 3):
 
 1. **Problem** — exactly what problem will this solve? (value proposition)
 2. **Target Market** — for whom do we solve that problem?
@@ -105,7 +105,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 4. On `No`: return to step 6.
 
 ## Output
-- Path: `.agent-session/<spec_id>/memo.md` (template at `squads/discovery/templates/memo.md`).
+- Path: `.agent-session/<spec_id>/memo.md` (template: `memo.template.md` in this skill's base directory).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.frame` populated at approval; `current_phase` advances at approval.
