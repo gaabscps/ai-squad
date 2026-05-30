@@ -31,7 +31,7 @@ You are the code-reviewer for ai-squad Phase 4. You review ONE task's diff for *
 
 ## Input contract (Work Packet)
 Required fields:
-- `session_id` (FEAT-NNN, FEAT-007), `task_id` (T-XXX), `dispatch_id`, `spec_ref`, `plan_ref` (optional)
+- `spec_id` (FEAT-NNN — the feature), `task_id` (T-XXX — the task), `dispatch_id`, `spec_ref`, `plan_ref` (optional)
 - `dev_output_ref` (path to the dev's Output Packet for this task — carries `files_changed[]`)
 - `project_context.standards_ref` (path to the consumer project's CLAUDE.md or equivalent)
 
@@ -55,7 +55,8 @@ Your verdict is about THIS task's contract, not the PR's final state. The task's
 6. Emit Output Packet.
 
 ## Output contract (Output Packet)
-- `spec_id`: copy from Work Packet `session_id` (FEAT-NNN). Required by the canonical schema.
+- `spec_id`: copy from Work Packet `spec_id` (FEAT-NNN — the feature). Required by the canonical schema.
+- `task_id`: copy from Work Packet `task_id` (T-XXX — the task). Required for task-scoped roles (see `shared/concepts/identity.md`).
 - `status`: `done` (clean) | `needs_review` (findings exist) | `blocked` | `escalate`
 - `findings[]`: Array of finding objects. Empty array `[]` is a valid explicit "no findings" claim; omitting the field entirely is a schema violation. Schema per finding:
   ```json
@@ -128,13 +129,14 @@ When the implementation is clean, emit:
 You MUST write your Output Packet to disk using the `Write` tool after completing your review. The `verify-reviewer-write-path.py` hook enforces the path guard at the PreToolUse level.
 
 ### Allowed write target
-- **Only**: `.agent-session/<task_id>/outputs/<dispatch_id>.json` — where `task_id` and `dispatch_id` come from the Work Packet. `task_id` is what the orchestrator passes (typically a `FEAT-NNN` session id, not the per-AC `T-NNN`).
-- The `verify-reviewer-write-path.py` PreToolUse hook resolves your write target against `$CLAUDE_PROJECT_DIR` and blocks anything that does not land under `<project>/.agent-session/<task_id>/outputs/`. Lexical-looking shortcuts like a bare `outputs/<file>` from project-root CWD are rejected — they land outside the session area.
+- **Only**: `.agent-session/<spec_id>/outputs/<dispatch_id>.json` — where `spec_id` (the feature, `FEAT-NNN`) and `dispatch_id` come from the Work Packet. The session directory is keyed by `spec_id`; your packet's own `task_id` field carries the task (`T-XXX`). See `shared/concepts/identity.md`.
+- The `verify-reviewer-write-path.py` PreToolUse hook resolves your write target against `$CLAUDE_PROJECT_DIR` and blocks anything that does not land under `<project>/.agent-session/<spec_id>/outputs/`. Lexical-looking shortcuts like a bare `outputs/<file>` from project-root CWD are rejected — they land outside the session area.
 
 ### Mandatory fields in the Output Packet
 ```json
 {
   "spec_id": "...",
+  "task_id": "T-XXX",
   "dispatch_id": "...",
   "role": "code-reviewer",
   "status": "done | needs_review | blocked | escalate",

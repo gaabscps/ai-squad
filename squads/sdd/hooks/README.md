@@ -21,7 +21,7 @@ in the markdown components, exactly where the rules are.
 | Script | Wired to | Event | What it enforces |
 |--------|----------|-------|------------------|
 | [`hook_runtime.py`](hook_runtime.py) | *(library)* | — | Shared `resolve_project_root()` (Claude `CLAUDE_PROJECT_DIR` vs Cursor `workspace_roots` / `cwd`), helpers, `should_run_audit_manifest_verify()` for global `stop` hooks. |
-| [`guard-session-scope.py`](guard-session-scope.py) | `skills/orchestrator` | `PreToolUse` (Edit\|Write\|MultiEdit) | Orchestrator can edit only inside `.agent-session/<task_id>/`. Any source-tree edit is denied. |
+| [`guard-session-scope.py`](guard-session-scope.py) | `skills/orchestrator` | `PreToolUse` (Edit\|Write\|MultiEdit) | Orchestrator can edit only inside `.agent-session/<spec_id>/`. Any source-tree edit is denied. |
 | [`block-git-write.py`](block-git-write.py) | `skills/orchestrator` | `PreToolUse` (Bash) | Orchestrator cannot run git write commands (commit, add, reset, push, branch -d, etc.). Read-only commands (status, diff, log) are allowed. |
 | [`verify-audit-dispatch.py`](verify-audit-dispatch.py) | `skills/orchestrator` | `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json`'s `actual_dispatches[]` with `status: done`. |
 | [`verify-output-packet.py`](verify-output-packet.py) | every Phase 4 Subagent (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) | `Stop` (auto-becomes `SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json` (parsed dispatch_id from its prompt). Validates required fields + status enum. |

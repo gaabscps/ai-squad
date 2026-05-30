@@ -110,7 +110,7 @@ After /task-builder produces `tasks.md`, add a `**Tier:** TX` line to every task
 
 ## Run procedure
 
-1. **Read or initialize the Session.** Read `.agent-session/<task_id>/session.yml` if it exists. On fresh start, write `planned_phases: [specify, plan, tasks, implementation]` and `auto_approved_by: pm` so phase Skills can detect PM autonomy.
+1. **Read or initialize the Session.** Read `.agent-session/<spec_id>/session.yml` if it exists. On fresh start, write `planned_phases: [specify, plan, tasks, implementation]` and `auto_approved_by: pm` so phase Skills can detect PM autonomy.
 2. **Phase 1.** Invoke `/spec-writer FEAT-NNN`. When the phase Skill produces a draft Spec, apply the **Spec gate**. If a phase Skill triggers an `AskUserQuestion` while the PM Skill is active in your context, **answer it inline as the senior PM** rather than escalating to the human — you ARE the PM in this session. Iterate until the gate passes, then write `status: approved`.
 3. **Phase 2.** Invoke `/designer FEAT-NNN`. Apply the **Plan gate**. Same answer-inline rule.
 4. **Phase 3.** Invoke `/task-builder FEAT-NNN`. Apply the **Tasks gate**. **Additionally:** add the `Tier:` line to every task per the classification table. Same answer-inline rule.
@@ -123,10 +123,10 @@ After /task-builder produces `tasks.md`, add a `**Tier:** TX` line to every task
 
 After `/orchestrator` returns the handoff:
 
-1. Read `.agent-session/<task_id>/handoff.md` and extract `verdict`.
+1. Read `.agent-session/<spec_id>/handoff.md` and extract `verdict`.
 2. If `verdict != "done"` → SKIP this step entirely; proceed to Step 6 (Monitor). AC-019.
 3. If `verdict == "done"`:
-   a. Aggregate `ac_scope` from all dev Output Packets in `.agent-session/<task_id>/outputs/`.
+   a. Aggregate `ac_scope` from all dev Output Packets in `.agent-session/<spec_id>/outputs/`.
    b. Aggregate `files_changed` from same (excluding paths within `.agent-session/`).
    c. Dispatch the `committer` Subagent via Task tool with:
       - `subagent_type: "committer"`

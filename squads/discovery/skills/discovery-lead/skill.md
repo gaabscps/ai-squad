@@ -16,15 +16,15 @@ The Frame artifact follows Marty Cagan's **Opportunity Assessment** 1-pager — 
 - `/discovery-lead DISC-NNN --plan="frame,investigate,decide"` — power-user flag override of the interactive checkbox.
 
 ## Refuse when
-- Invoked with `DISC-NNN` and no Session exists at `.agent-session/<task_id>/` → message: `"No Session at .agent-session/<task_id>/. Start fresh with /discovery-lead (no task_id)."`
-- Existing Session is in terminal state (`current_phase: paused | done | escalated`) → message: `"Session <task_id> is <state>. Run /ship DISC-NNN to clean up, or /discovery-orchestrator DISC-NNN --resume to continue Phase 2."`
+- Invoked with `DISC-NNN` and no Session exists at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Start fresh with /discovery-lead (no task_id)."`
+- Existing Session is in terminal state (`current_phase: paused | done | escalated`) → message: `"Session <spec_id> is <state>. Run /ship DISC-NNN to clean up, or /discovery-orchestrator DISC-NNN --resume to continue Phase 2."`
 - `.agent-session/` exists but is NOT in repo's `.gitignore` → message: `"`.agent-session/` must be gitignored. Add it to .gitignore before continuing."`
 - `session.yml` has `schema_version` higher than what this Skill knows → message: `"Session schema_version <N> is newer than this Skill's <M>. Upgrade ai-squad before continuing."`
-- `session.yml.squad` exists and is NOT `discovery` → message: `"Session <task_id> belongs to squad '<squad>', not discovery. Use the entry Skill for that squad."`
+- `session.yml.squad` exists and is NOT `discovery` → message: `"Session <spec_id> belongs to squad '<squad>', not discovery. Use the entry Skill for that squad."`
 
 ## Inputs (preconditions)
 - Fresh start: none (this Skill creates the Session).
-- Resume: existing `.agent-session/<task_id>/session.yml` with `squad: discovery` and `current_phase: frame`.
+- Resume: existing `.agent-session/<spec_id>/session.yml` with `squad: discovery` and `current_phase: frame`.
 
 ## Steps
 
@@ -32,7 +32,7 @@ The Frame artifact follows Marty Cagan's **Opportunity Assessment** 1-pager — 
 1. If invoked with explicit `DISC-NNN`: use it; check Session existence (resume vs refuse per matrix).
 2. If no explicit `task_id`: scan `.agent-session/DISC-*/` directories, increment from highest existing → new `DISC-NNN` (3-digit zero-padded; expand to 4 digits past `DISC-999`).
 3. Verify `.agent-session/` is in `.gitignore` (refuse if not).
-4. On fresh start: create `.agent-session/<task_id>/session.yml` from `shared/templates/session.yml` with `squad: discovery`, `current_phase: frame`, `current_owner: discovery-lead` (atomic write).
+4. On fresh start: create `.agent-session/<spec_id>/session.yml` from `shared/templates/session.yml` with `squad: discovery`, `current_phase: frame`, `current_owner: discovery-lead` (atomic write).
 
 ### 2. Plan the Phases (fresh start only)
 Use `AskUserQuestion` with checkbox. Default all 3 checked, including Decide:
@@ -64,7 +64,7 @@ Conventions:
 - Fill all sections you can confidently infer from the pitch.
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 5 — see step 5).
 - Leave placeholder sections empty for the next Phases (`## Investigate Findings`, `## Decide`) — populated later by `discovery-orchestrator` and `discovery-synthesizer`.
-- Write to `.agent-session/<task_id>/memo.md` (atomic write; `status: draft`, `phase_completed: none`).
+- Write to `.agent-session/<spec_id>/memo.md` (atomic write; `status: draft`, `phase_completed: none`).
 - Save the opportunity title to `session.yml.feature_name` for human-readable reference.
 
 ### 5. Clarification pass (one ambiguity at a time)
@@ -105,7 +105,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 4. On `No`: return to step 6.
 
 ## Output
-- Path: `.agent-session/<task_id>/memo.md` (template at `squads/discovery/templates/memo.md`).
+- Path: `.agent-session/<spec_id>/memo.md` (template at `squads/discovery/templates/memo.md`).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Session updates: `session.yml.feature_name` populated at step 4; `phase_history.frame` populated at approval; `current_phase` advances at approval.

@@ -31,7 +31,7 @@ The Skill that runs the autonomous Implementation Pipeline. Dispatches the 6 Sub
 
 **Sole writer invariant:** in Phase 4, the orchestrator is the only Skill that writes `session.yml`. Subagents return Output Packets; the orchestrator reads them, merges state, and atomically rewrites `session.yml` (tmp + rename). This eliminates concurrent-write races without file locks (Buck2's single-coordinator pattern).
 
-**Non-edit invariant (issue #1 mitigation):** the orchestrator MUST NOT edit any consumer-repo source file. Its only writes are to `.agent-session/<task_id>/` (manifest, inputs, session.yml). All source edits flow through `dev` Subagent dispatches. The `audit-agent` (step 8 below) verifies this mechanically before handoff.
+**Non-edit invariant (issue #1 mitigation):** the orchestrator MUST NOT edit any consumer-repo source file. Its only writes are to `.agent-session/<spec_id>/` (manifest, inputs, session.yml). All source edits flow through `dev` Subagent dispatches. The `audit-agent` (step 8 below) verifies this mechanically before handoff.
 
 ## Preflight: verify ai-squad hooks installed (RUN BEFORE ANYTHING ELSE)
 
@@ -71,7 +71,7 @@ Skip this check on `--resume` after the first turn of the same Session has confi
 ## When to invoke
 - `/orchestrator FEAT-NNN` — fresh start of Phase 4.
 - `/orchestrator FEAT-NNN --resume` — resume from `paused` (planned but not started) OR from `escalated` (per-task state preserved). Default behavior when re-invoked on an existing Session.
-- `/orchestrator FEAT-NNN --restart` — wipes `.agent-session/<task_id>/inputs/` and `outputs/` (preserves spec/plan/tasks). Used when human edits invalidated prior work.
+- `/orchestrator FEAT-NNN --restart` — wipes `.agent-session/<spec_id>/inputs/` and `outputs/` (preserves spec/plan/tasks). Used when human edits invalidated prior work.
 
 ## Refuse when
 - `implementation` not in `planned_phases` → message: `"Implementation was not planned for this Session. Edit planned_phases in session.yml or restart with /spec-writer."`
@@ -81,15 +81,15 @@ Skip this check on `--resume` after the first turn of the same Session has confi
 - `session.yml.schema_version` higher than this Skill knows → message: `"Session schema_version <N> newer than this Skill's <M>. Upgrade ai-squad."`
 
 ## Inputs (preconditions)
-- `.agent-session/<task_id>/spec.md` (status: approved) — always required.
-- `.agent-session/<task_id>/plan.md` (status: approved) — IF `plan` in `planned_phases`.
-- `.agent-session/<task_id>/tasks.md` (status: approved) — IF `tasks` in `planned_phases`.
+- `.agent-session/<spec_id>/spec.md` (status: approved) — always required.
+- `.agent-session/<spec_id>/plan.md` (status: approved) — IF `plan` in `planned_phases`.
+- `.agent-session/<spec_id>/tasks.md` (status: approved) — IF `tasks` in `planned_phases`.
 - If Plan or Tasks were skipped: orchestrator auto-derives a minimal structure from the Spec (single-task default; flat AC coverage).
 
 ## Steps
 
 ### 1. Resolve Session and read inputs
-1. Determine `task_id` (explicit arg or current Session from `session.yml`).
+1. Determine `spec_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec/Plan/Tasks (auto-derive if Plan/Tasks were skipped per `planned_phases`).
 2a. **Read `session.yml.pipeline_mode`** (defaults to `standard` if absent — pre-v0.7 sessions). Valid values: `lite` | `standard`. The mode governs two clamps applied in this skill:
     - **Fan-out cap (step 3):** `lite` clamps concurrent dispatches to 1 (sequential); `standard` keeps the 5-cap.
@@ -108,12 +108,12 @@ Skip this check on `--resume` after the first turn of the same Session has confi
 5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
 ### 1b. Write the dispatch manifest (Outbox + GitHub required-checks pattern)
-Before any `Task` dispatch, atomically write `.agent-session/<task_id>/dispatch-manifest.json` (JSON, not YAML — hook scripts parse this with Python stdlib `json` module, no yaml dependency):
+Before any `Task` dispatch, atomically write `.agent-session/<spec_id>/dispatch-manifest.json` (JSON, not YAML — hook scripts parse this with Python stdlib `json` module, no yaml dependency):
 
 ```json
 {
   "schema_version": 1,
-  "task_id": "FEAT-NNN",
+  "spec_id": "FEAT-NNN",
   "plan_generated_at": "<iso8601>",
   "expected_pipeline": [
     {
@@ -129,7 +129,8 @@ Before any `Task` dispatch, atomically write `.agent-session/<task_id>/dispatch-
       "tasksCovered": ["T-002"]
     },
     {
-      "task_id": "audit-agent",
+      "task_id": null,
+      "role_label": "audit-agent",
       "required_roles": ["audit-agent"],
       "acScope": [],
       "tasksCovered": ["T-001", "T-002"]
@@ -245,7 +246,7 @@ When ready queue empty AND no task in-flight (every task is `done` or `pending_h
 ### 8. Audit gate (mandatory reconciliation — issue #1 mitigation)
 **Before** computing `current_phase` or emitting handoff, dispatch `audit-agent` (singleton, no fan-out) with this Work Packet. When appending the audit-agent dispatch entry to `actual_dispatches[]`, always set `review_loop: 1` — the audit-agent is a singleton with no retry semantics and has no `task_states` association.
 ```yaml
-task_id: FEAT-NNN
+spec_id: FEAT-NNN
 dispatch_id: <uuid>
 manifest_ref: .agent-session/FEAT-NNN/dispatch-manifest.json
 outputs_dir_ref: .agent-session/FEAT-NNN/outputs/
@@ -256,17 +257,17 @@ Append the audit-agent's own dispatch to `actual_dispatches[]`. The audit-agent 
 
 Branch on the audit-agent's Output Packet:
 - **`status: done`** (all checks pass) → proceed to step 9 (handoff).
-- **`status: blocked, blocker_kind: bypass_detected`** → DO NOT emit normal handoff. Set `current_phase: escalated`. Emit a **refusal handoff** (see "Audit-failure handoff" below) listing every finding. Save to `.agent-session/<task_id>/handoff.md`. Stop.
+- **`status: blocked, blocker_kind: bypass_detected`** → DO NOT emit normal handoff. Set `current_phase: escalated`. Emit a **refusal handoff** (see "Audit-failure handoff" below) listing every finding. Save to `.agent-session/<spec_id>/handoff.md`. Stop.
 - **`status: escalate`** (audit could not run — manifest unreadable, etc.) → set `current_phase: escalated`; emit refusal handoff with audit-agent's blockers. Stop.
 
-The audit-agent's verdict is binding. The orchestrator MUST NOT emit a "uniform success" handoff if the audit returned `blocked` or `escalate`.
+The audit-agent's verdict is binding **and terminal**. On `blocked`/`escalate`, the orchestrator MUST NOT: (a) emit a "uniform success" or "mixed status" handoff; (b) edit, patch, or rewrite any file under `outputs/` to make the audit pass — those are subagent-authored evidence, and `guard-session-scope.py` blocks it mechanically; or (c) re-dispatch `audit-agent` in the same run for a second opinion. The ONLY recovery is human review + `/orchestrator FEAT-NNN --restart` (which wipes `outputs/` and re-runs the real subagents). Re-running the audit over hand-edited packets was the FEAT-010 failure — 4 audit runs until it flipped to `done`.
 
 ### 9. Pipeline-end handoff (only if step 8 passed)
 - Set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
 - **Cost report.** Before emitting the handoff (you have write authority; the read-only audit-agent does not):
   1. **Backfill any missed capture.** Locate this session's subagent transcripts (`~/.claude/projects/<project-slug>/<sessionId>/subagents/agent-*.jsonl`) and run the write-capable backfill so a missed `SubagentStop` is recovered (the cost runtime is vendored in the per-repo hooks dir, so it resolves in any consumer repo):
      ```sh
-     python3 - "$PWD/.agent-session/<task_id>" <<'PY'
+     python3 - "$PWD/.agent-session/<spec_id>" <<'PY'
      import sys, glob, os
      sys.path.insert(0, ".claude/hooks")
      import cost_report, pricing
@@ -275,9 +276,9 @@ The audit-agent's verdict is binding. The orchestrator MUST NOT emit a "uniform 
      print("backfilled:", cost_report.backfill_missing(session_dir, tps, pricing.load_prices()))
      PY
      ```
-  2. **Emit the report:** `python3 .claude/hooks/cost-report.py <task_id>` — writes `.agent-session/<task_id>/cost-report.json` and prints the planning/orchestration/implementation table.
+  2. **Emit the report:** `python3 .claude/hooks/cost-report.py <spec_id>` — writes `.agent-session/<spec_id>/cost-report.json` and prints the planning/orchestration/implementation table.
   3. Include the one-line total in the handoff message, and if the audit raised `cost_capture_incomplete` OR the report's `complete` is false, flag the gap (unpriced models / uncaptured agents) explicitly — never present an incomplete total as final.
-- Emit handoff message (see "Handoff" section); also save to `.agent-session/<task_id>/handoff.md`.
+- Emit handoff message (see "Handoff" section); also save to `.agent-session/<spec_id>/handoff.md`.
 
 ## Dispatch contract (Work Packet embedded in `Task` prompt)
 Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in `agents/`), `description` (short), `prompt` (free-form string), AND `model` (enum: `sonnet` | `opus` | `haiku`). The `model` parameter is **mandatory for tiered roles** (`dev`, `code-reviewer`, `logic-reviewer`, `qa`) — see "Task tool `model` parameter" below. The Work Packet is embedded as a fenced YAML block inside `prompt`:
@@ -286,7 +287,7 @@ Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in
 WorkPacket:
 ```yaml
 # --- Stable block (cache-friendly prefix; keep order identical across all dispatches in this Session) ---
-session_id: FEAT-NNN     # FEAT-007: feature scope; used by hooks for direct lookup
+spec_id: FEAT-NNN        # the feature/Session id (FEAT-007); used by hooks for direct lookup. (Legacy alias: session_id — readers accept both.)
 spec_ref: ./.agent-session/FEAT-NNN/spec.md
 plan_ref: ./.agent-session/FEAT-NNN/plan.md
 tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
@@ -413,10 +414,10 @@ Every Phase 4 dispatch reuses the same large context: `spec.md` + `plan.md` + `t
 The orchestrator's responsibility is prefix stability; Claude Code's runtime applies `cache_control` automatically when the prefix matches. No explicit cache markers needed in the Work Packet.
 
 ## Output
-- Per dispatch: Work Packet snapshot at `.agent-session/<task_id>/inputs/<dispatch_id>.json` (orchestrator writes for traceability); Output Packet at `.agent-session/<task_id>/outputs/<dispatch_id>.json` (Subagent writes via atomic write).
+- Per dispatch: Work Packet snapshot at `.agent-session/<spec_id>/inputs/<dispatch_id>.json` (orchestrator writes for traceability); Output Packet at `.agent-session/<spec_id>/outputs/<dispatch_id>.json` (Subagent writes via atomic write).
 - Per task: state machine in `session.yml.task_states[T-XXX]`.
 - Pipeline-level: `session.yml` fields (`pipeline_started_at`, `pipeline_completed_at`, `escalation_metrics`).
-- Final: human-readable handoff Markdown printed to console + saved to `.agent-session/<task_id>/handoff.md`.
+- Final: human-readable handoff Markdown printed to console + saved to `.agent-session/<spec_id>/handoff.md`.
 
 ## Handoff (3 shapes; one skeleton — Conventional Commits + 4 fixed sections)
 **Title:** `<type>(<scope>): <imperative summary>` (Conventional Commits — renders cleanly in GitHub/Linear/Jira).
@@ -445,7 +446,7 @@ The orchestrator's responsibility is prefix stability; Claude Code's runtime app
 **Four shape variants (closing line varies):**
 - **Uniform success** (all tasks done, audit clean): `"Implementation done. Changes are unstaged in the working tree — review with git diff / git status, then commit when ready. Run /ship FEAT-NNN to clean up the session."`
 - **Mixed status** (some pending_human, audit clean): `"Partial completion. <N> done, <M> awaiting human decision. Changes are unstaged — review before committing. After resolving the blockers: /orchestrator FEAT-NNN --resume (default) | /orchestrator FEAT-NNN --restart (if prior work is invalidated)."`
-- **Full escalate** (all pending_human): `"Pipeline escalated. All tasks blocked. See decision memos at .agent-session/<task_id>/decisions/ and resolve before /orchestrator FEAT-NNN --resume."`
+- **Full escalate** (all pending_human): `"Pipeline escalated. All tasks blocked. See decision memos at .agent-session/<spec_id>/decisions/ and resolve before /orchestrator FEAT-NNN --resume."`
 - **Audit-failure handoff** (step 8 returned `blocked` or `escalate` — issue #1 mitigation): emit a refusal handoff, NOT one of the three above. Skeleton:
   ```
   ## Pipeline integrity audit FAILED — handoff refused
@@ -464,8 +465,10 @@ The orchestrator's responsibility is prefix stability; Claude Code's runtime app
   ```
 
 ## Hard rules
-- Never: edit any file in the consumer-repo source tree. The orchestrator's writes are restricted to `.agent-session/<task_id>/` (manifest, inputs/, session.yml, handoff.md). All source edits flow through `dev` Subagent dispatches.
+- Never: edit any file in the consumer-repo source tree. The orchestrator's writes are restricted to `.agent-session/<spec_id>/` (manifest, inputs/, session.yml, handoff.md). All source edits flow through `dev` Subagent dispatches.
 - Never: skip step 8 (audit gate). The audit-agent's verdict is binding before any handoff.
+- Never: edit, patch, or rewrite any file under `.agent-session/<spec_id>/outputs/` — those are subagent-authored Output Packets (evidence). A `blocked` audit is terminal; recover via `/orchestrator FEAT-NNN --restart`, never by editing packets. Mechanically blocked by `guard-session-scope.py`.
+- Never: re-dispatch `audit-agent` in the same run to flip a `blocked` verdict to `done`. One audit per run; the verdict is terminal. (Re-running over hand-edited packets was the FEAT-010 failure.)
 - Never: emit a "uniform success" or "mixed status" handoff if the audit-agent returned `blocked` or `escalate`. Emit the audit-failure handoff instead.
 - Never: append to `actual_dispatches[]` without a corresponding real `Task` tool dispatch. Manifest entries must be backed by real subagent invocations.
 - Always: write the dispatch manifest in step 1b BEFORE any `Task` dispatch. Manifest-first; dispatch-second.
@@ -479,9 +482,9 @@ The orchestrator's responsibility is prefix stability; Claude Code's runtime app
 - **Cap hit on a task with `--resume`:** cap counters preserved across resume — they do not reset. Hard cap is hard.
 - **Concurrent `/orchestrator` on same `FEAT-NNN`:** undefined behavior. Sole-writer invariant assumes one orchestrator process per Session. Lockfile is TODO Phase 5 — relies on human discipline for MVP.
 - **Audit-agent itself bypassed:** mechanically blocked. The orchestrator's frontmatter declares a `Stop` hook (`verify-audit-dispatch.py`) that reads `dispatch-manifest.json` and refuses to allow the orchestrator session to end without an `audit-agent` entry in `actual_dispatches[]` with `status: done`. The hook honors `stop_hook_active` to avoid infinite loops. See `squads/sdd/hooks/verify-audit-dispatch.py`.
-- **Orchestrator edits source files directly:** mechanically blocked. The orchestrator's frontmatter declares a `PreToolUse` hook (`guard-session-scope.py`) that denies any `Edit`/`Write`/`MultiEdit` whose path is outside `.agent-session/<task_id>/`. A second `PreToolUse` hook (`block-git-write.py`) denies `Bash` calls running git write commands.
+- **Orchestrator edits source files directly:** mechanically blocked. The orchestrator's frontmatter declares a `PreToolUse` hook (`guard-session-scope.py`) that denies any `Edit`/`Write`/`MultiEdit` whose path is outside `.agent-session/<spec_id>/`. A second `PreToolUse` hook (`block-git-write.py`) denies `Bash` calls running git write commands.
 - **Subagent claims `done` without emitting Output Packet:** mechanically blocked. Each Phase 4 Subagent's frontmatter declares a `Stop` hook (`verify-output-packet.py`) that extracts the `dispatch_id` from the transcript and refuses to allow the subagent to finish unless `outputs/<dispatch_id>.json` exists and passes minimum schema checks (required fields + valid status).
-- **False-positive audit (clean run flagged as bypass):** recoverable — human reviews `.agent-session/<task_id>/outputs/<audit-dispatch-id>.json`, files the issue, re-runs after fix. Audit-agent is biased toward `blocked` because false-negative defeats the entire layer.
+- **False-positive audit (clean run flagged as bypass):** recoverable — human reviews `.agent-session/<spec_id>/outputs/<audit-dispatch-id>.json`, files the issue, re-runs after fix. Audit-agent is biased toward `blocked` because false-negative defeats the entire layer.
 
 ## Why a Skill (not a Subagent)
 Subagents in Claude Code cannot spawn other Subagents (platform constraint). The orchestrator must run in the main session to dispatch the workers via the `Task` tool. Also satisfies "dispatches Subagents" criterion (see `shared/concepts/skill-vs-subagent.md`).

@@ -89,7 +89,7 @@ The audit-agent itself is a Subagent — descriptive markdown. The orchestrator 
 
 | Hook | Wired to | Enforces |
 |------|----------|----------|
-| `guard-session-scope.py` | orchestrator Skill `PreToolUse` (Edit/Write/MultiEdit) | Orchestrator may edit only inside `.agent-session/<task_id>/`. Source-tree edits → denied. |
+| `guard-session-scope.py` | orchestrator Skill `PreToolUse` (Edit/Write/MultiEdit) | Orchestrator may edit only inside `.agent-session/<spec_id>/`. Source-tree edits → denied. |
 | `block-git-write.py` | orchestrator Skill `PreToolUse` (Bash) | Orchestrator may not run git write commands. Read-only git allowed. |
 | `verify-audit-dispatch.py` | orchestrator Skill `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json` with `status: done`. |
 | `verify-output-packet.py` | each Phase 4 Subagent `Stop` (auto-`SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json`. |
@@ -192,7 +192,7 @@ The orchestrator queues the cascade dispatch and starts it once any required pre
 When `blocker-specialist` resolves a blocker, it writes a decision memo to:
 
 ```
-.agent-session/<task_id>/decisions/<topic>-<timestamp>.md
+.agent-session/<spec_id>/decisions/<topic>-<timestamp>.md
 ```
 
 (Gitignored on the consumer project; removed by `/ship FEAT-XXX` along with the rest of the Session.)
@@ -242,7 +242,7 @@ After a `status: escalate` handoff, the human edits whatever needs editing in Sp
 | Command | Behavior | When to use |
 |---------|----------|-------------|
 | `/orchestrator --resume FEAT-XXX` | Continues from current Session state. Reuses prior valid dispatches (other tasks already `done` stay `done`). Only `pending_human` tasks restart from their last known state with the human's edits as new input. | **Default.** Preserves the work already validated. |
-| `/orchestrator --restart FEAT-XXX` | Wipes `.agent-session/<task_id>/inputs/` and `outputs/` (preserves spec/plan/tasks). Starts Phase 4 from scratch. | When the human's edit invalidates earlier work (e.g. `AC-003` changed semantically; everything `dev` did against it is no longer valid). |
+| `/orchestrator --restart FEAT-XXX` | Wipes `.agent-session/<spec_id>/inputs/` and `outputs/` (preserves spec/plan/tasks). Starts Phase 4 from scratch. | When the human's edit invalidates earlier work (e.g. `AC-003` changed semantically; everything `dev` did against it is no longer valid). |
 
 The decision is the human's. The framework does not auto-decide.
 

@@ -128,7 +128,9 @@ def main() -> int:
 
     wp = _parse_wp(prompt if isinstance(prompt, str) else "")
     task_id = wp.get("task_id", "")
-    session_id = wp.get("session_id", "")
+    # Identity (shared/concepts/identity.md): WP carries spec_id (canonical)
+    # since the rename; accept legacy session_id too.
+    session_id = wp.get("spec_id") or wp.get("session_id", "")
     if not task_id or not session_id:
         return 0  # cannot verify without identifiers — fail open
 

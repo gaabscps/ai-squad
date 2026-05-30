@@ -65,6 +65,10 @@ def _try_append_warning(task_id: str, reason: str, metadata: dict | None = None)
         print(f"verify-output-packet: warning append skipped ({exc})", file=sys.stderr)
 
 REQUIRED_FIELDS = {"spec_id", "dispatch_id", "role", "status", "summary", "evidence"}
+# Identity contract (shared/concepts/identity.md): task-scoped roles carry
+# task_id as T-XXX; pipeline-scoped roles (audit-agent, committer) omit it.
+TASK_SCOPED_ROLES = {"dev", "code-reviewer", "logic-reviewer", "qa", "blocker-specialist"}
+_TASK_ID_RE = re.compile(r"^T-\d{3,}$")
 # VALID_STATUSES derived from canonical source — do NOT hardcode here.
 # Single source: shared/schemas/dispatch-manifest.schema.json via shared/lib/canonical_statuses.py (T-002).
 # AC-002, AC-013: extending the schema enum propagates automatically to this hook without edits.
@@ -248,6 +252,31 @@ def _validate_usage_field(packet: dict) -> tuple[bool, str]:
     return True, "valid"
 
 
+def _validate_task_id_field(packet: dict) -> tuple[bool, str]:
+    """Identity contract (shared/concepts/identity.md): task-scoped roles MUST
+    carry task_id as T-XXX (the task, not the feature — the feature is spec_id).
+    Pipeline-scoped roles (audit-agent, committer) have no single task and omit it.
+    """
+    role = packet.get("role", "")
+    if role not in TASK_SCOPED_ROLES:
+        return True, "valid"
+    dispatch_id = packet.get("dispatch_id", "<unknown>")
+    task_id = packet.get("task_id")
+    if not task_id:
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: {role} Output Packet missing required field "
+            "'task_id' (T-XXX — the task this packet belongs to; see identity.md)",
+        )
+    if not _TASK_ID_RE.match(str(task_id)):
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: {role} 'task_id' = '{task_id}' must match "
+            r"^T-\d{3,}$ — that is the task, not the feature (the feature is spec_id)",
+        )
+    return True, "valid"
+
+
 def validate_packet(packet_path: Path) -> tuple[bool, str]:
     try:
         packet = json.loads(packet_path.read_text())
@@ -264,6 +293,10 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
     # AC-001: usage field enforcement (universal, pm-orchestrator exempt).
     # Checked separately from REQUIRED_FIELDS to emit role-specific error message.
     ok, reason = _validate_usage_field(packet)
+    if not ok:
+        return False, reason
+    # Identity contract: task-scoped roles must carry task_id (T-XXX).
+    ok, reason = _validate_task_id_field(packet)
     if not ok:
         return False, reason
     # Discriminated-union role-specific validation (qa, code-reviewer, logic-reviewer).

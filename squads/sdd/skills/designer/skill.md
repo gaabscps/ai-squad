@@ -8,8 +8,8 @@ description: Phase 2 entry point. Interactive design session — reads approved 
 The Skill that turns an approved Spec into an approved Plan: architecture, data model, API/contracts, UX surface, risks. Interactive with the human.
 
 ## When to invoke
-- `/designer` — after Spec approved and `plan` is in `planned_phases` (auto-detects `task_id` from current Session).
-- `/designer FEAT-NNN` — explicit `task_id`.
+- `/designer` — after Spec approved and `plan` is in `planned_phases` (auto-detects `spec_id` from current Session).
+- `/designer FEAT-NNN` — explicit `spec_id`.
 - `/designer FEAT-NNN --rewrite` — discard existing Plan and start over (only allowed if Plan is `status: approved`).
 
 ## Refuse when
@@ -20,13 +20,13 @@ The Skill that turns an approved Spec into an approved Plan: architecture, data 
 - `session.yml.schema_version` higher than this Skill knows → message: `"Session schema_version <N> newer than this Skill's <M>. Upgrade ai-squad."`
 
 ## Inputs (preconditions)
-- `.agent-session/<task_id>/session.yml` with `plan` in `planned_phases`.
-- `.agent-session/<task_id>/spec.md` with `status: approved` and zero `[NEEDS CLARIFICATION]`.
+- `.agent-session/<spec_id>/session.yml` with `plan` in `planned_phases`.
+- `.agent-session/<spec_id>/spec.md` with `status: approved` and zero `[NEEDS CLARIFICATION]`.
 
 ## Steps
 
 ### 1. Resolve Session and Spec
-1. Determine `task_id` (explicit arg or current Session from `session.yml`).
+1. Determine `spec_id` (explicit arg or current Session from `session.yml`).
 2. Read approved Spec; extract the full set of `AC-XXX` IDs from all User Stories — this is the **AC universe** the Plan must cover.
 
 ### 2. Generate first draft (Hybrid drafting — Spec Kit/Kiro pattern)
@@ -36,7 +36,7 @@ Produce a full draft of `plan.md` from `squads/sdd/templates/plan.md`, populated
 - For uncertain decisions: insert `[NEEDS CLARIFICATION] <specific question>` markers (cap: 3).
 - **Auto-populate Risks** by fixed categories (STRIDE + ATAM lineage): `Security`, `Performance`, `Migration / data`, `Backwards compatibility`, `Regulatory / compliance`. Derive at least one concrete risk per category from Spec content; if none applies, write `(none — <one-line reason>)` to make the consideration explicit.
 - Generate the **AC Coverage Map** section at the end of the Plan: every AC → Plan section(s) that cover it.
-- Write to `.agent-session/<task_id>/plan.md` (atomic write; `status: draft`).
+- Write to `.agent-session/<spec_id>/plan.md` (atomic write; `status: draft`).
 
 ### 3. Record alternatives (MADR-style, post-hoc — not interactive)
 For any decision where alternatives were considered, append to `## Notes` using MADR format:
@@ -77,7 +77,7 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
            - kind: pm_escalation
              timestamp: <ISO8601-now>
              phase: "plan"
-             artifact_path: ".agent-session/<task_id>/plan.md"
+             artifact_path: ".agent-session/<spec_id>/plan.md"
              open_questions: [<one entry per NEEDS CLARIFICATION block>]
         If the append fails, retry exactly once. If the second attempt
         also fails, raise (do NOT swallow the error silently) — the
@@ -132,14 +132,14 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 - kind: pm_decision
   timestamp: "2026-05-11T05:42:00Z"   # ISO8601, UTC
   phase: "plan"
-  artifact_path: ".agent-session/<task_id>/plan.md"
+  artifact_path: ".agent-session/<spec_id>/plan.md"
   gate_applied: "auto_approved_by=pm"
 ```
 
 **Phase-specific notes for designer:**
 - `[NEEDS CLARIFICATION]` marker ownership: designer MUST insert the marker into `plan.md` in Step 6 (AC coverage gate) — BEFORE reaching Step 6.5. The scan in step 3 above is the audit check — not the producer of the marker. AC coverage gaps are detected and marked in Step 6; the bypass step only verifies absence.
 - `phase` value in `pm_decision`: `"plan"`.
-- `artifact_path`: `.agent-session/<task_id>/plan.md`.
+- `artifact_path`: `.agent-session/<spec_id>/plan.md`.
 
 ### 7. Final approval gate (Hybrid: checklist + AskUserQuestion — Kiro/Spec Kit pattern)
 1. Print visual checklist summary:
@@ -164,7 +164,7 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 4. On `No`: return to step 5.
 
 ## Output
-- Path: `.agent-session/<task_id>/plan.md` (template at `squads/sdd/templates/plan.md`).
+- Path: `.agent-session/<spec_id>/plan.md` (template at `squads/sdd/templates/plan.md`).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
 - Required sections at approval: Architecture, Data model, API surface, UX (if applicable), Risks (5 categories), AC Coverage Map. Notes optional but holds MADR alternatives.

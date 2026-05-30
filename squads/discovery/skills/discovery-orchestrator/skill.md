@@ -16,16 +16,16 @@ The dispatch shape follows two industry-validated patterns:
 - `/discovery-orchestrator DISC-NNN --resume` — resume a paused or escalated Phase 2 (re-reads aggregated state from `memo.md` + `session.yml`; does NOT re-dispatch already-completed Subagents).
 
 ## Refuse when
-- No Session at `.agent-session/<task_id>/` → message: `"No Session at .agent-session/<task_id>/. Run /discovery-lead to start Phase 1 first."`
-- `session.yml.squad ≠ discovery` → message: `"Session <task_id> belongs to squad '<squad>', not discovery. Use the orchestrator Skill for that squad."`
-- `session.yml.current_phase ≠ investigate` → message: `"Session <task_id> is in phase '<current_phase>'. Phase 2 entry requires current_phase: investigate."`
+- No Session at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Run /discovery-lead to start Phase 1 first."`
+- `session.yml.squad ≠ discovery` → message: `"Session <spec_id> belongs to squad '<squad>', not discovery. Use the orchestrator Skill for that squad."`
+- `session.yml.current_phase ≠ investigate` → message: `"Session <spec_id> is in phase '<current_phase>'. Phase 2 entry requires current_phase: investigate."`
 - `memo.md` missing OR `memo.md.phase_completed ≠ frame` → message: `"Frame is not approved. Run /discovery-lead DISC-NNN to complete Phase 1 first."`
-- Existing Session is in terminal state (`paused | done | escalated`) and `--resume` not passed → message: `"Session <task_id> is <state>. Pass --resume to continue, or /ship DISC-NNN to clean up."`
+- Existing Session is in terminal state (`paused | done | escalated`) and `--resume` not passed → message: `"Session <spec_id> is <state>. Pass --resume to continue, or /ship DISC-NNN to clean up."`
 - `session.yml.schema_version` newer than this Skill knows → message: `"Session schema_version <N> is newer than this Skill's <M>. Upgrade ai-squad before continuing."`
 
 ## Inputs (preconditions)
-- `.agent-session/<task_id>/session.yml` with `squad: discovery`, `current_phase: investigate`, `planned_phases` includes `investigate`.
-- `.agent-session/<task_id>/memo.md` with `status: approved`, `phase_completed: frame`, Q1–Q9 populated.
+- `.agent-session/<spec_id>/session.yml` with `squad: discovery`, `current_phase: investigate`, `planned_phases` includes `investigate`.
+- `.agent-session/<spec_id>/memo.md` with `status: approved`, `phase_completed: frame`, Q1–Q9 populated.
 
 ## Steps
 
@@ -33,18 +33,18 @@ The dispatch shape follows two industry-validated patterns:
 Verify all preconditions in the refusal matrix. On any failure, refuse and exit cleanly (no Session mutation).
 
 ### 2. Dispatch `codebase-mapper` (sequential bootstrap)
-Emit one Work Packet to `.agent-session/<task_id>/inputs/codebase-mapper-<dispatch_id>.json`:
+Emit one Work Packet to `.agent-session/<spec_id>/inputs/codebase-mapper-<dispatch_id>.json`:
 - `to_role: "codebase-mapper"`
 - `objective`: "Map the technical surface area relevant to this Discovery opportunity. Output: surface map covering modules touched, integration points, current architecture constraints. No risk analysis — that is the next step."
 - `input_refs: ["./memo.md"]`
 - `scope_files`: derived from Frame Q9 (Critical Success Factors) hints, OR empty (mapper decides surface).
 
-Wait for Output Packet at `.agent-session/<task_id>/outputs/codebase-mapper-<dispatch_id>.json`. Validate against canonical Output Packet schema.
+Wait for Output Packet at `.agent-session/<spec_id>/outputs/codebase-mapper-<dispatch_id>.json`. Validate against canonical Output Packet schema.
 
 **On `status: blocked` from mapper** → cascade to `blocker-specialist` (Subagent reused from SDD squad) with the failing Output Packet. If `blocker-specialist` cannot resolve → escalate (jump to step 8, `escalation_summary` populated).
 
 ### 3. Dispatch 4× `risk-analyst` in parallel (fan-out)
-Emit 4 Work Packets in parallel, one per Cagan Big Risk. All written to `.agent-session/<task_id>/inputs/risk-analyst-<risk_category>-<dispatch_id>.json`:
+Emit 4 Work Packets in parallel, one per Cagan Big Risk. All written to `.agent-session/<spec_id>/inputs/risk-analyst-<risk_category>-<dispatch_id>.json`:
 
 | Risk category | Objective focus |
 |---------------|-----------------|
@@ -137,7 +137,7 @@ See Handoff section below.
 
 ## Output
 - `memo.md` populated with `## Investigate Findings` (codebase map + 4 risk analyses); `phase_completed: investigate`
-- `.agent-session/<task_id>/inputs/` and `outputs/` carry the 5 dispatch packets (audit trail)
+- `.agent-session/<spec_id>/inputs/` and `outputs/` carry the 5 dispatch packets (audit trail)
 - `session.yml` advanced to `decide` (or `paused`/`escalated`)
 
 ## Handoff (dynamic, based on planned_phases + outcomes)

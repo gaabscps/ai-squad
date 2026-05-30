@@ -4,15 +4,15 @@
 
 ## Definition
 
-The **Session** is the runtime persistent state of one feature in flight, living in a single YAML file at `.agent-session/<task_id>/session.yml` on the consumer project (gitignored). It is the framework's only persistent state — everything else is either runtime ephemera (Work Packets, Output Packets, logs in `.agent-session/<task_id>/`) or human input (Spec/Plan/Tasks).
+The **Session** is the runtime persistent state of one feature in flight, living in a single YAML file at `.agent-session/<spec_id>/session.yml` on the consumer project (gitignored). It is the framework's only persistent state — everything else is either runtime ephemera (Work Packets, Output Packets, logs in `.agent-session/<spec_id>/`) or human input (Spec/Plan/Tasks).
 
 Single source of truth for: current Phase, planned Phases, per-task state in Phase 4, loop counters, hashes for progress detection, escalation metrics. Owned by exactly one Role at a time (the Phase's conducting Skill, or the orchestrator in Phase 4).
 
 > *Terms used in this doc:*
 > - **session ownership:** convention of which Role has write authority over `session.yml` during each Phase (Phase 1: spec-writer; Phase 2: designer; Phase 3: task-builder; Phase 4: orchestrator). Other Roles read for context but never write.
 > - **atomic write (tmp + rename):** file write pattern where new content is first written to a temporary file (`.session.yml.tmp`), then renamed to the destination (`session.yml`). Renames are atomic on POSIX filesystems — readers never see a partially written file.
-> - **recovery flow:** the interactive behavior any Skill follows when invoked and detects that `.agent-session/<task_id>/` already exists (a prior Session was abandoned, interrupted, or paused). Always asks the human: resume / restart / cancel.
-> - **multi-session:** multiple features being worked in parallel (e.g. `FEAT-042` and `FEAT-043` in different Claude Code sessions), each with its own `.agent-session/<task_id>/`. Permitted; conflict management between parallel sessions is the human's responsibility.
+> - **recovery flow:** the interactive behavior any Skill follows when invoked and detects that `.agent-session/<spec_id>/` already exists (a prior Session was abandoned, interrupted, or paused). Always asks the human: resume / restart / cancel.
+> - **multi-session:** multiple features being worked in parallel (e.g. `FEAT-042` and `FEAT-043` in different Claude Code sessions), each with its own `.agent-session/<spec_id>/`. Permitted; conflict management between parallel sessions is the human's responsibility.
 > - **planned_phases:** array of Phases the human selected to run for this Session at entry time (via `AskUserQuestion` in the spec-writer Skill). Allows skipping any Phase, including Implementation ("plan now, execute later" workflow).
 > - **paused state:** Session is in a terminal-but-resumable state when all planned Phases have completed but `planned_phases` did not include all 4. The human can resume later by re-invoking the next Skill with `--resume`.
 
@@ -28,7 +28,7 @@ Single source of truth for: current Phase, planned Phases, per-task state in Pha
 
 ## Multi-session policy
 
-Multiple Sessions are permitted. The human can have `FEAT-042` and `FEAT-043` open in different Claude Code sessions, each with its own `.agent-session/<task_id>/`. The framework does not enforce serialization.
+Multiple Sessions are permitted. The human can have `FEAT-042` and `FEAT-043` open in different Claude Code sessions, each with its own `.agent-session/<spec_id>/`. The framework does not enforce serialization.
 
 **Conflict management is the human's responsibility.** Two parallel Sessions might dispatch `dev` Subagents that touch the same files (rare but possible if `scope_files` overlap across features). The framework cannot detect this globally — same as git: humans manage merge conflicts, framework manages the agent flow.
 
@@ -70,8 +70,8 @@ Exactly one Role has write authority at any time. Others read for context but ne
 Any Skill (`/spec-writer`, `/designer`, `/task-builder`, `/orchestrator`, `/ship`) follows this behavior on invocation:
 
 ```
-1. Determine task_id (from argument: /spec-writer FEAT-042; or default: derive from current state)
-2. Check if .agent-session/<task_id>/session.yml exists.
+1. Determine spec_id (from argument: /spec-writer FEAT-042; or default: derive from current state)
+2. Check if .agent-session/<spec_id>/session.yml exists.
 
 3a. If NOT exists:
     - This Skill must be the entry point for the planned phase
@@ -170,7 +170,7 @@ Skipped Phases are visible in the final handoff so the human (and any future rev
 
 ```yaml
 # Identification
-task_id: "FEAT-042"                             # required, must match folder name; sequential FEAT-NNN scoped per project
+spec_id: "FEAT-042"                             # required, must match folder name; sequential FEAT-NNN scoped per project. (Legacy sessions used `task_id` for this field — readers accept both; see shared/concepts/identity.md.)
 feature_name: "User-authenticated photo uploads" # human-readable Spec title; populated by spec-writer at first draft
 schema_version: 1                                # for future migration; see "Schema versioning" below
 

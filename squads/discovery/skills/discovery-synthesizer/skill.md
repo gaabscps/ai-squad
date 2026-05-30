@@ -18,17 +18,17 @@ The Skill that turns Frame + Investigate Findings into a structured Decision and
 - `/discovery-synthesizer DISC-NNN --resume` — resume after a gate `Stop` or escalation.
 
 ## Refuse when
-- No Session at `.agent-session/<task_id>/` → message: `"No Session at .agent-session/<task_id>/. Run /discovery-lead to start Phase 1 first."`
-- `session.yml.squad ≠ discovery` → message: `"Session <task_id> belongs to squad '<squad>', not discovery."`
-- `session.yml.current_phase ≠ decide` → message: `"Session <task_id> is in phase '<current_phase>'. Phase 3 entry requires current_phase: decide."`
+- No Session at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Run /discovery-lead to start Phase 1 first."`
+- `session.yml.squad ≠ discovery` → message: `"Session <spec_id> belongs to squad '<squad>', not discovery."`
+- `session.yml.current_phase ≠ decide` → message: `"Session <spec_id> is in phase '<current_phase>'. Phase 3 entry requires current_phase: decide."`
 - `memo.md` missing OR `memo.md.phase_completed ≠ investigate` → message: `"Investigate is not approved. Run /discovery-orchestrator DISC-NNN to complete Phase 2 first."`
-- Existing Session is in terminal state (`paused | done | escalated`) and `--resume` not passed → message: `"Session <task_id> is <state>. Pass --resume to continue, or /ship DISC-NNN to clean up."`
+- Existing Session is in terminal state (`paused | done | escalated`) and `--resume` not passed → message: `"Session <spec_id> is <state>. Pass --resume to continue, or /ship DISC-NNN to clean up."`
 - `session.yml.schema_version` newer than this Skill knows → standard schema-mismatch refusal.
 
 ## Inputs (preconditions)
-- `.agent-session/<task_id>/session.yml` with `squad: discovery`, `current_phase: decide`, `planned_phases` includes `decide`.
-- `.agent-session/<task_id>/memo.md` with `phase_completed: investigate`, Q1–Q9 + `## Investigate Findings` populated.
-- The 5 Output Packets from Phase 2 still on disk at `.agent-session/<task_id>/outputs/` (audit trail for evidence citation).
+- `.agent-session/<spec_id>/session.yml` with `squad: discovery`, `current_phase: decide`, `planned_phases` includes `decide`.
+- `.agent-session/<spec_id>/memo.md` with `phase_completed: investigate`, Q1–Q9 + `## Investigate Findings` populated.
+- The 5 Output Packets from Phase 2 still on disk at `.agent-session/<spec_id>/outputs/` (audit trail for evidence citation).
 
 ## Steps
 

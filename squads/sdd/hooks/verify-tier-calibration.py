@@ -925,7 +925,9 @@ def main() -> int:
     # -----------------------------------------------------------------
     task_id = fields.get("task_id", "")
     tier = fields.get("tier", "")
-    session_id = fields.get("session_id", "") or None
+    # Identity (shared/concepts/identity.md): the Work Packet carries spec_id
+    # (canonical feature id) since the rename; accept legacy session_id too.
+    session_id = fields.get("spec_id") or fields.get("session_id", "") or None
 
     result = _verify_tier_calibration_for_task(
         task_id=task_id,

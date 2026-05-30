@@ -4,7 +4,7 @@
 
 ## Definition
 
-A **Phase** is a discrete unit of work in a squad's flow, conducted by exactly one Skill, ending with an explicit human-approved gate (or, in fully autonomous Phases, with a one-shot handoff to the human). Each Phase produces one persistent runtime artifact under `.agent-session/<task_id>/`.
+A **Phase** is a discrete unit of work in a squad's flow, conducted by exactly one Skill, ending with an explicit human-approved gate (or, in fully autonomous Phases, with a one-shot handoff to the human). Each Phase produces one persistent runtime artifact under `.agent-session/<spec_id>/`.
 
 **Phases are squad-scoped — each squad declares its own Phase enum:**
 
@@ -32,7 +32,7 @@ The squad-specific Phase enum lives in `session.yml.current_phase` and is interp
 | 2 | **Plan** | `designer` | `.agent-session/FEAT-NNN/plan.md` | In-the-loop (validates design decisions) | `status: approved` on `plan.md` + next Skill invocation |
 | 3 | **Tasks** | `task-builder` | `.agent-session/FEAT-NNN/tasks.md` | In-the-loop (reviews task decomposition) | `status: approved` on `tasks.md` + next Skill invocation |
 | 4 | **Implementation** | `orchestrator` (dispatches 6 Subagents) | Repo files + Output Packets + handoff | **Absent** until handoff | (orchestrator emits handoff after audit-agent reconciliation passes; pipeline ends) |
-| post | (cleanup) | `/ship FEAT-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<task_id>/` |
+| post | (cleanup) | `/ship FEAT-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<spec_id>/` |
 
 ## Discovery squad — 3 Phases
 
@@ -41,7 +41,7 @@ The squad-specific Phase enum lives in `session.yml.current_phase` and is interp
 | 1 | **Frame** | `discovery-lead` | `.agent-session/DISC-NNN/memo.md` (Q1-Q9 of Cagan's Opportunity Assessment) | In-the-loop (refines Frame interactively) | `status: approved` on `memo.md` + next Skill invocation |
 | 2 | **Investigate** | `discovery-orchestrator` (dispatches `codebase-mapper` sequentially → 4× `risk-analyst` in parallel, one per Cagan Big Risk) | `## Investigate Findings` block in `memo.md` | **Conditional** — auto-advance if all risks validated/refuted/N/A and severities low/medium; gate if any inconclusive or any high-severity | Auto-advance OR explicit human approval per gate policy |
 | 3 | **Decide** | `discovery-synthesizer` | `## Decide` block in `memo.md` (Options table + Recommendation + Decision + Open Questions for Delivery) | In-the-loop as RAPID Decider (synthesizer is Recommender) | Human chooses option via `AskUserQuestion`; `phase_completed: decide` |
-| post | (cleanup) | `/ship DISC-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<task_id>/` |
+| post | (cleanup) | `/ship DISC-XXX` | — | Confirms acceptance, runs cleanup | Removes `.agent-session/<spec_id>/` |
 
 The Discovery squad's output (memo) is **handed off purely** to the SDD squad — not auto-fed (per industry-validated Path A: Discovery → Delivery batch handoff requires human re-validation of Open Questions for Delivery before scoping the Spec).
 
@@ -105,7 +105,7 @@ Total across both squads: **15 canonical Roles** (7 Skills + 8 Subagents). `bloc
 
 ## Artifacts per Phase — runtime, gitignored
 
-All artifacts live in `.agent-session/<task_id>/` on the consumer project. The framework expects this directory to be **gitignored** by the consumer project.
+All artifacts live in `.agent-session/<spec_id>/` on the consumer project. The framework expects this directory to be **gitignored** by the consumer project.
 
 ```
 <consumer-project>/
@@ -216,7 +216,7 @@ Alternative terminal: escalated
 
 ## Phase as Session state
 
-The current Phase is a field in the Session state file (`.agent-session/<task_id>/session.yml`):
+The current Phase is a field in the Session state file (`.agent-session/<spec_id>/session.yml`):
 
 ```yaml
 current_phase: implementation   # specify | plan | tasks | implementation | paused | done | escalated
