@@ -320,7 +320,7 @@ The Subagent body's "Input contract" specifies which fields are required for tha
 **`session_id` (FEAT-007):** mandatory for task-scoped dispatches (`dev`, `code-reviewer`, `logic-reviewer`, `qa`); optional for `audit-agent` (pipeline-scoped). Derived from the orchestrator's cwd — when running from `.agent-session/<FEAT-NNN>/`, emit `session_id: FEAT-NNN`. The `verify-tier-calibration.py` hook uses it for direct `<session_dir>/<session_id>/tasks.md` lookup; without it the hook falls back to mtime-ordered manifest scanning (legacy backward-compat path, slower).
 
 ### Task tool `model` parameter (run-model enforcement — AC-009)
-**The `model` parameter of the Task tool itself controls the actual run-model of the subagent.** The Work Packet YAML is descriptive metadata — it does NOT control which model runs the subagent. If the orchestrator omits the Task tool's `model` parameter, Claude Code inherits the parent session's model (the orchestrator's own model, typically `opus`), bypassing the Tier × Loop table entirely. This was the root cause of severe cost amplification observed in early FEAT-* sessions (qa tasks calibrated for `haiku` running in `opus`, multiplying real cost 3-12×).
+**The `model` parameter of the Task tool itself controls the actual run-model of the subagent.** The Work Packet YAML is descriptive metadata — it does NOT control which model runs the subagent. If the orchestrator omits the Task tool's `model` parameter, Claude Code inherits the parent session's model (the orchestrator's own model, typically `opus`), bypassing the Tier × Loop table entirely. This was the root cause of severe cost amplification observed in early FEAT-* sessions (tasks calibrated for a cheap model running in `opus`, multiplying real cost 3-12×).
 
 **Invariant:** for every `dev` / `code-reviewer` / `logic-reviewer` / `qa` dispatch, the orchestrator MUST pass the `model` parameter to the Task tool with the exact canonical model value derived from the Tier × Loop table (see algorithm below). The `verify-tier-calibration.py` PreToolUse hook enforces this: dispatches without `model`, or with a wrong `model`, are blocked with `task_tool_model_missing` / `task_tool_model_mismatch` before they run.
 
@@ -340,9 +340,9 @@ On every Subagent dispatch, the orchestrator MUST (a) pass the Task tool `model`
 | **dev L3**             | Final retry (`review_loops_max = 3`)       | sonnet, high ¹  | sonnet, high    | sonnet, high    | **opus, high** ²  |
 | **dev qa-L1**          | Retry after qa fail (skips reviewers)      | sonnet, medium  | sonnet, high    | sonnet, high    | sonnet, high      |
 | **dev qa-L2**          | Final retry after qa fail                  | sonnet, high    | sonnet, high    | sonnet, high    | **opus, high** ²  |
-| **code-reviewer**      | Any loop (L1/L2/L3)                        | haiku, high     | haiku, high     | sonnet, medium  | sonnet, medium    |
+| **code-reviewer**      | Any loop (L1/L2/L3)                        | sonnet, medium  | sonnet, medium  | sonnet, medium  | sonnet, medium    |
 | **logic-reviewer**     | Any loop (L1/L2/L3)                        | sonnet, medium  | sonnet, medium  | sonnet, high    | opus, high        |
-| **qa**                 | Any attempt                                | haiku, high     | haiku, high     | sonnet, medium  | **sonnet, high**  |
+| **qa**                 | Any attempt                                | sonnet, medium  | sonnet, medium  | sonnet, medium  | **sonnet, high**  |
 | **blocker-specialist** | Any trigger (cap, stall, conflict)         | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³     |
 | **audit-agent**        | Singleton pre-handoff                      | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴   |
 
