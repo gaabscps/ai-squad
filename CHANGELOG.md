@@ -14,10 +14,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Canonical status enum as single source-of-truth (FEAT-006): `shared/schemas/dispatch-manifest.schema.json` is the exclusive definition. Python and TypeScript consumers derive their enums automatically via runtime schema import.
 - `committer` role: new Subagent (model: haiku) for auto-commit of working tree at end of Phase 4 when `verdict: done`.
+- Cost-report read-scoping (cli 0.9.0). New `register-impl-session.py` orchestrator Stop hook records the implementation session id into `implementation_sessions:` in `session.yml`; `build_cost_report` uses it (with a disk cross-validation fallback for pre-registry features) to scope which subagent cost files belong to the feature, and reports `excluded_subagents` for any out-of-scope files it ignored.
 
 ### Fixed
 
 - Silent drop of dispatches in agentops report when status is non-canonical. Now emits warning with structured error message + `unknown_status` bucket preserving total count (FEAT-006).
+- Cost report counted out-of-scope subagents on read (cli 0.9.0). `build_cost_report` ignored provenance and counted every `agent-*.json` in `costs/`, so historical contamination (FEAT-005: 60 real agents among 2804) inflated the report until the strays were deleted by hand. The reader now scopes agent files by their transcript's parent session — authoritatively via `implementation_sessions:` when present, else by disk cross-validation against the `session-*.json` files present — making contamination inert without manual cleanup. Complements the 0.8.1 write-side fixes.
 - Cost report contamination and `planning $0` (cli 0.8.1). Subagent backfill now scopes to the current session's `subagents/` dir instead of a machine-wide `projects/*/*` glob (which counted other projects' agents); `<synthetic>` non-billable messages are skipped instead of flagging the report incomplete; and historical entries captured before a model was priced are re-priced from their tokens at report time instead of staying frozen at $0.
 
 ## 0.3.0 — 2026-05-06

@@ -276,3 +276,87 @@ def test_tokens_absent_when_no_by_model(tmp_path):
         "scope": "implementation", "total_cost_usd": 2.0, "unpriced_models": []}))
     rep = cr.build_cost_report(tmp_path)
     assert rep["tokens"]["total"] == 0
+
+
+# --- Gap A: read-scoping of subagent provenance --------------------------------
+# build_cost_report must ignore agent-*.json that don't belong to this feature,
+# so historical contamination in costs/ is inert WITHOUT manual deletion. Two
+# legs: an authoritative `implementation_sessions:` allow-list in session.yml
+# (recorded by the orchestrator Stop hook), and a disk cross-validation fallback
+# for features that predate the registry.
+
+def _agent(aid, parent, cost):
+    return json.dumps({
+        "scope": "implementation", "agent_id": aid, "total_cost_usd": cost,
+        "transcript_path": f"/u/.claude/projects/-{parent[:3]}/{parent}/subagents/agent-{aid}.jsonl",
+        "unpriced_models": []})
+
+
+def test_read_scoping_registry_drops_foreign_agents(tmp_path):
+    # Authoritative leg: session.yml lists the legit implementation session(s).
+    # An agent whose transcript parent-session is NOT listed is dropped at read.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "AAA"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-mine.json").write_text(_agent("mine", "AAA", 2.0))
+    (costs / "agent-foreign.json").write_text(_agent("foreign", "BBB", 99.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["implementation_cost_usd"] == 2.0
+    assert rep["excluded_subagents"] == 1
+
+
+def test_read_scoping_fallback_uses_present_session_files(tmp_path):
+    # No registry (old feature). Fallback: an agent is in-scope iff its parent
+    # session has a session-*.json here. The 2804->60 self-heal, on READ.
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "session-AAA.json").write_text(json.dumps({
+        "scope": "session", "planning": {"total_cost_usd": 1.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []}}))
+    (costs / "agent-mine.json").write_text(_agent("mine", "AAA", 2.0))
+    (costs / "agent-foreign.json").write_text(_agent("foreign", "BBB", 99.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["implementation_cost_usd"] == 2.0
+    assert rep["excluded_subagents"] == 1
+
+
+def test_read_scoping_registry_overrides_present_session_files(tmp_path):
+    # When BOTH a registry and a (leaked) foreign session-*.json exist, the
+    # registry wins — closing the wholesale-session-leak hole the fallback can't.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "AAA"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "session-BBB.json").write_text(json.dumps({  # leaked foreign session
+        "scope": "session", "planning": {"total_cost_usd": 0.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []}}))
+    (costs / "agent-mine.json").write_text(_agent("mine", "AAA", 2.0))
+    (costs / "agent-foreign.json").write_text(_agent("foreign", "BBB", 99.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1            # BBB present but not registered
+    assert rep["excluded_subagents"] == 1
+
+
+def test_read_scoping_keeps_all_without_any_signal(tmp_path):
+    # No registry and no session files → no basis to judge provenance; keep all
+    # (backward compat with synthetic/legacy cost files lacking a transcript).
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "AAA", 2.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["excluded_subagents"] == 0
+
+
+def test_read_scoping_keeps_agents_without_transcript_in_fallback(tmp_path):
+    # Fallback must not punish a legacy agent file that has no transcript_path
+    # (can't be proven foreign) — keep it. Guards the existing unit fixtures.
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "session-AAA.json").write_text(json.dumps({
+        "scope": "session", "planning": {"total_cost_usd": 0.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []}}))
+    (costs / "agent-legacy.json").write_text(json.dumps({
+        "scope": "implementation", "agent_id": "legacy", "total_cost_usd": 3.0,
+        "unpriced_models": []}))  # no transcript_path
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["excluded_subagents"] == 0
