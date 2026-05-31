@@ -20,11 +20,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
 const REPO_ROOT = resolve(PKG_ROOT, '..', '..');
 const SQUADS_SRC = join(REPO_ROOT, 'squads');
+const SHARED_SRC = join(REPO_ROOT, 'shared');
 const COMPONENTS_DST = join(PKG_ROOT, 'components');
 
 // Subdirs of each squad to bundle. Hooks include .py scripts;
 // skills/agents are markdown; templates/docs are referenced by skills.
 const SQUAD_SUBDIRS = ['skills', 'agents', 'hooks', 'templates', 'docs'];
+
+// The `shared` tier holds cross-squad assets that must ship regardless of
+// which squad is installed. Only `skills` (e.g. /ship) need bundling today;
+// concepts/schemas/lib are docs/runtime read by deployed prompts, not copied
+// into ~/.claude. Bundled into components/shared/ and deployed unconditionally.
+const SHARED_SUBDIRS = ['skills'];
 
 async function exists(p) {
   try {
@@ -55,8 +62,22 @@ async function syncSquad(squad) {
   }
 }
 
+async function syncShared() {
+  const dstRoot = join(COMPONENTS_DST, 'shared');
+  await mkdir(dstRoot, { recursive: true });
+
+  for (const sub of SHARED_SUBDIRS) {
+    const src = join(SHARED_SRC, sub);
+    if (!(await exists(src))) continue;
+    const dst = join(dstRoot, sub);
+    await rm(dst, { recursive: true, force: true });
+    await cp(src, dst, { recursive: true, filter: PYCACHE_FILTER });
+    console.log(`  [sync] shared/${sub}`);
+  }
+}
+
 async function main() {
-  console.log('ai-squad cli: syncing components from squads/ -> packages/cli/components/');
+  console.log('ai-squad cli: syncing components from squads/ + shared/ -> packages/cli/components/');
   await rm(COMPONENTS_DST, { recursive: true, force: true });
   await mkdir(COMPONENTS_DST, { recursive: true });
   const squads = await listSquads();
@@ -64,7 +85,9 @@ async function main() {
     console.log(`[squad: ${squad}]`);
     await syncSquad(squad);
   }
-  console.log(`Done. squads bundled: ${squads.join(', ')}`);
+  console.log('[shared tier]');
+  await syncShared();
+  console.log(`Done. squads bundled: ${squads.join(', ')}; shared tier bundled.`);
 }
 
 main().catch((err) => {

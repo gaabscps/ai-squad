@@ -198,6 +198,28 @@ async function deployClaudeCodeGlobal({ componentsRoot, squads }) {
   }
 }
 
+// Deploy the cross-squad `shared` tier's skills (e.g. /ship) into the same
+// user-global skills dir. Called unconditionally (not per-squad) so cleanup
+// skills survive a single-squad install like `deploy --squad sdd`. Shared
+// skills carry no squad-bound templates, so copySkillTemplates is not invoked.
+async function deploySharedSkills({ componentsRoot }) {
+  const skillsSrc = join(componentsRoot, 'shared', 'skills');
+  if (!(await isDir(skillsSrc))) return;
+  const skillsDst = join(homedir(), '.claude', 'skills');
+  await mkdir(skillsDst, { recursive: true });
+
+  console.log('[shared tier]');
+  for (const skill of await listDirs(skillsSrc)) {
+    const src = join(skillsSrc, skill);
+    const dst = join(skillsDst, skill);
+    const action = (await exists(dst)) ? '[update skill]' : '[install skill]';
+    console.log(`  ${action}   ${skill}`);
+    await checkLength(join(src, 'skill.md'), SKILL_LINE_CAP, `${skill}/skill.md`);
+    await mkdir(dst, { recursive: true });
+    await cp(src, dst, { recursive: true });
+  }
+}
+
 async function deployHooksLocal({ componentsRoot, squads, repoRoot }) {
   const hooksDst = join(repoRoot, '.claude', 'hooks');
   await mkdir(hooksDst, { recursive: true });
@@ -610,10 +632,14 @@ export async function runDeploy({ pkgRoot, squads = [], cursor = false, repoRoot
     );
   }
 
-  const available = await listDirs(componentsRoot);
+  // `shared` is a cross-squad tier, not a selectable squad: it is never a
+  // valid `--squad` target and is always deployed (below), regardless of which
+  // squads are selected. Excluding it here keeps `--squad sdd` from dropping it.
+  const available = (await listDirs(componentsRoot)).filter((d) => d !== 'shared');
   if (available.length === 0) {
     throw new Error(`no squads found under ${componentsRoot}`);
   }
+  const hasShared = await isDir(join(componentsRoot, 'shared'));
 
   let target;
   if (squads.length > 0) {
@@ -631,6 +657,9 @@ export async function runDeploy({ pkgRoot, squads = [], cursor = false, repoRoot
 
   if (!hooksOnly) {
     await deployClaudeCodeGlobal({ componentsRoot, squads: target });
+    if (hasShared) {
+      await deploySharedSkills({ componentsRoot });
+    }
   }
 
   if (!globalOnly) {
