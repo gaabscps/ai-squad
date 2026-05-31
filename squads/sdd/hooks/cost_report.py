@@ -9,6 +9,35 @@ sys.path.append(str(Path(__file__).resolve().parent))
 
 _AGENT_FILE_RE = re.compile(r"agent-(.+)\.jsonl$")
 
+_TOKEN_TYPES = ("input", "output", "cache_read", "cache_creation")
+_BUCKET_FOR_TYPE = {
+    "input": "input_tokens", "output": "output_tokens",
+    "cache_read": "cache_read_input_tokens", "cache_creation": "cache_creation_input_tokens",
+}
+
+
+def fmt_tokens(n):
+    """Compact human token count: 1.4M / 775K / 500."""
+    n = int(n or 0)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}K"
+    return str(n)
+
+
+def _load_prices_safe():
+    """Prices for the legacy reprice fallback; None if unavailable (degrade to tokens-only)."""
+    try:
+        from pricing import load_prices
+        return load_prices()
+    except Exception:
+        return None
+
+
+def _empty_typemap():
+    return {t: 0 for t in _TOKEN_TYPES}
+
 
 def backfill_missing(session_dir, transcript_paths, prices):
     """Write costs/agent-<id>.json for any subagent transcript lacking one.
@@ -44,6 +73,30 @@ def build_cost_report(session_dir):
     planning = orchestration = implementation = 0.0
     subagents = 0
     unpriced = set()
+    tok_phase = {p: _empty_typemap() for p in ("planning", "orchestration", "implementation")}
+    cost_phase = {p: {t: 0.0 for t in _TOKEN_TYPES} for p in ("planning", "orchestration", "implementation")}
+    _prices = {"v": None, "loaded": False}  # lazy holder for the reprice fallback
+
+    def _absorb(by_model, phase):
+        if not isinstance(by_model, dict):
+            return
+        for model, entry in by_model.items():
+            if not isinstance(entry, dict):
+                continue
+            for t, bkey in _BUCKET_FOR_TYPE.items():
+                tok_phase[phase][t] += entry.get(bkey, 0) or 0
+            cbt = entry.get("cost_by_type")
+            if cbt is None:
+                if not _prices["loaded"]:
+                    _prices["v"] = _load_prices_safe()
+                    _prices["loaded"] = True
+                if _prices["v"] is not None:
+                    from pricing import cost_for_usage
+                    cbt = cost_for_usage(entry, model, _prices["v"]).get("cost_by_type")
+            if cbt:
+                for t in _TOKEN_TYPES:
+                    cost_phase[phase][t] += cbt.get(t, 0) or 0
+
     if costs.is_dir():
         for f in sorted(costs.glob("*.json")):
             try:
@@ -56,11 +109,22 @@ def build_cost_report(session_dir):
                 orchestration += (d.get("orchestration") or {}).get("total_cost_usd") or 0.0
                 for sub in ("planning", "orchestration"):
                     unpriced.update((d.get(sub) or {}).get("unpriced_models") or [])
+                _absorb((d.get("planning") or {}).get("by_model"), "planning")
+                _absorb((d.get("orchestration") or {}).get("by_model"), "orchestration")
             elif scope == "implementation":
                 implementation += d.get("total_cost_usd") or 0.0
                 subagents += 1
                 unpriced.update(d.get("unpriced_models") or [])
+                _absorb(d.get("by_model"), "implementation")
     total = round(planning + orchestration + implementation, 6)
+    tokens_by_type = _empty_typemap()
+    cost_by_type = {t: 0.0 for t in _TOKEN_TYPES}
+    for p in tok_phase:
+        for t in _TOKEN_TYPES:
+            tokens_by_type[t] += tok_phase[p][t]
+            cost_by_type[t] += cost_phase[p][t]
+        tok_phase[p]["total"] = sum(tok_phase[p][t] for t in _TOKEN_TYPES)
+    tokens_total = sum(tokens_by_type[t] for t in _TOKEN_TYPES)
     return {
         "planning_cost_usd": round(planning, 6),
         "orchestration_cost_usd": round(orchestration, 6),
@@ -73,6 +137,12 @@ def build_cost_report(session_dir):
         # the old `len(unpriced) == 0` reported complete:true for a $0/0-subagent
         # report, masking a capture failure as a clean run (the FEAT-010 bug).
         "complete": subagents > 0 and not unpriced,
+        "tokens": {"by_phase": tok_phase, "by_type": tokens_by_type, "total": tokens_total},
+        "token_cost": {
+            "by_phase": {p: {**{t: round(cost_phase[p][t], 6) for t in _TOKEN_TYPES},
+                             "total": round(sum(cost_phase[p].values()), 6)} for p in cost_phase},
+            "by_type": {t: round(cost_by_type[t], 6) for t in _TOKEN_TYPES},
+        },
     }
 
 
@@ -80,12 +150,12 @@ def render_markdown(rep, task_id):
     lines = [
         f"## Cost report — {task_id}",
         "",
-        "| Phase | Cost (USD) |",
-        "|---|---|",
-        f"| Planning (spec/design/tasks) | ${rep['planning_cost_usd']:.4f} |",
-        f"| Orchestration (Phase 4 driver) | ${rep['orchestration_cost_usd']:.4f} |",
-        f"| Implementation ({rep['subagent_count']} subagents) | ${rep['implementation_cost_usd']:.4f} |",
-        f"| **Total** | **${rep['total_cost_usd']:.4f}** |",
+        "| Phase | Cost (USD) | Tokens |",
+        "|---|---|---|",
+        f"| Planning (spec/design/tasks) | ${rep['planning_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['planning']['total'])} |",
+        f"| Orchestration (Phase 4 driver) | ${rep['orchestration_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['orchestration']['total'])} |",
+        f"| Implementation ({rep['subagent_count']} subagents) | ${rep['implementation_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['implementation']['total'])} |",
+        f"| **Total** | **${rep['total_cost_usd']:.4f}** | **{fmt_tokens(rep['tokens']['total'])}** |",
     ]
     if not rep["complete"]:
         lines += ["", f"> WARNING: Unpriced models (cost incomplete): {', '.join(rep['unpriced_models'])}"]

@@ -74,12 +74,20 @@ def cost_for_usage(usage, model, prices):
     w5, w1 = _write_buckets(usage)
     if rates is None:
         return {"cost_usd": None, "priced": False, "model": model,
-                "billable_input_tokens": inp, "output_tokens": output}
+                "billable_input_tokens": inp, "output_tokens": output,
+                "cost_by_type": None}
     in_rate = rates["input_per_mtok"] / 1_000_000
     out_rate = rates["output_per_mtok"] / 1_000_000
-    cost = (inp
-            + w5 * CACHE_WRITE_5M_MULT
-            + w1 * CACHE_WRITE_1H_MULT
-            + read * CACHE_READ_MULT) * in_rate + output * out_rate
+    input_cost = inp * in_rate
+    output_cost = output * out_rate
+    cache_read_cost = read * CACHE_READ_MULT * in_rate
+    cache_creation_cost = (w5 * CACHE_WRITE_5M_MULT + w1 * CACHE_WRITE_1H_MULT) * in_rate
+    cost = input_cost + output_cost + cache_read_cost + cache_creation_cost
     return {"cost_usd": round(cost, 6), "priced": True, "model": model,
-            "billable_input_tokens": inp, "output_tokens": output}
+            "billable_input_tokens": inp, "output_tokens": output,
+            "cost_by_type": {
+                "input": round(input_cost, 6),
+                "output": round(output_cost, 6),
+                "cache_read": round(cache_read_cost, 6),
+                "cache_creation": round(cache_creation_cost, 6),
+            }}

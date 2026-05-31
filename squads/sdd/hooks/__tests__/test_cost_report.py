@@ -107,3 +107,55 @@ def test_backfill_skips_existing(tmp_path):
     backfilled = cr.backfill_missing(tmp_path, [str(tr)], {"m": {"input_per_mtok": 1.0, "output_per_mtok": 1.0}})
     assert backfilled == []  # already present, untouched
     assert json.loads((tmp_path / "costs" / "agent-zzz.json").read_text())["total_cost_usd"] == 5.0
+
+
+def _bm(inp, out, cr_, cc):
+    return {"m": {"input_tokens": inp, "output_tokens": out,
+                  "cache_read_input_tokens": cr_, "cache_creation_input_tokens": cc,
+                  "cost_by_type": {"input": float(inp), "output": float(out) * 2,
+                                   "cache_read": float(cr_) * 0.10, "cache_creation": float(cc) * 1.25},
+                  "cost_usd": inp + out * 2 + cr_ * 0.10 + cc * 1.25, "messages": 1}}
+
+
+def test_tokens_aggregated_by_phase_and_type(tmp_path):
+    costs = tmp_path / "costs"; costs.mkdir()
+    # file total_cost_usd derives from by_model cost_usd so reconciliation holds.
+    pl, orch, impl = _bm(100, 50, 1000, 80), _bm(200, 60, 2000, 90), _bm(300, 70, 3000, 100)
+    (costs / "session-s1.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {"total_cost_usd": pl["m"]["cost_usd"], "unpriced_models": [], "by_model": pl},
+        "orchestration": {"total_cost_usd": orch["m"]["cost_usd"], "unpriced_models": [], "by_model": orch},
+    }))
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": impl["m"]["cost_usd"], "unpriced_models": [],
+        "by_model": impl}))
+    rep = cr.build_cost_report(tmp_path)
+    tok = rep["tokens"]
+    assert tok["by_phase"]["planning"]["input"] == 100
+    assert tok["by_type"]["input"] == 600         # 100+200+300
+    assert tok["by_type"]["output"] == 180        # 50+60+70
+    assert tok["total"] == 600 + 180 + 6000 + 270
+    tc = rep["token_cost"]
+    assert round(sum(tc["by_type"].values()), 6) == rep["total_cost_usd"]
+
+
+def test_tokens_fallback_reprice_when_cost_by_type_absent(tmp_path, monkeypatch):
+    costs = tmp_path / "costs"; costs.mkdir()
+    bm = {"m": {"input_tokens": 10, "output_tokens": 5,
+                "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+                "cost_usd": 20.0, "messages": 1}}  # no cost_by_type
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 20.0, "unpriced_models": [], "by_model": bm}))
+    monkeypatch.setattr(cr, "_load_prices_safe",
+                        lambda: {"m": {"input_per_mtok": 1_000_000.0, "output_per_mtok": 2_000_000.0}})
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["token_cost"]["by_type"]["input"] == 10.0
+    assert rep["token_cost"]["by_type"]["output"] == 10.0
+
+
+def test_tokens_absent_when_no_by_model(tmp_path):
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 2.0, "unpriced_models": []}))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["tokens"]["total"] == 0

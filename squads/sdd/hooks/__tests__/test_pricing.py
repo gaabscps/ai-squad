@@ -51,6 +51,25 @@ def test_unknown_model_is_flagged_not_zeroed():
     assert r["cost_usd"] is None
 
 
+def test_cost_by_type_components_sum_to_total():
+    usage = {"input_tokens": 10, "output_tokens": 5,
+             "cache_read_input_tokens": 100,
+             "cache_creation": {"ephemeral_5m_input_tokens": 100,
+                                "ephemeral_1h_input_tokens": 100}}
+    r = pricing.cost_for_usage(usage, "m", PRICES)
+    cbt = r["cost_by_type"]
+    assert cbt["input"] == 10.0          # 10 * $1
+    assert cbt["output"] == 10.0         # 5 * $2
+    assert cbt["cache_read"] == 10.0     # 100 * 0.10 * $1
+    assert cbt["cache_creation"] == 325.0  # (100*1.25 + 100*2.0) * $1
+    assert round(sum(cbt.values()), 6) == r["cost_usd"]
+
+
+def test_cost_by_type_none_for_unknown_model():
+    r = pricing.cost_for_usage({"input_tokens": 10}, "unknown", PRICES)
+    assert r["cost_by_type"] is None
+
+
 def test_load_prices_explicit_path(tmp_path):
     p = tmp_path / "model_prices.json"
     p.write_text('{"models": {"m": {"input_per_mtok": 1.0, "output_per_mtok": 2.0}}}')

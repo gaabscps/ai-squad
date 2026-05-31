@@ -70,6 +70,7 @@ def extract_transcript_cost(path, prices, since=None, until=None):
         entry = dict(buckets)
         entry["messages"] = counts[model]
         entry["cost_usd"] = priced["cost_usd"]
+        entry["cost_by_type"] = priced.get("cost_by_type")
         if priced["priced"]:
             total += priced["cost_usd"]
         else:
