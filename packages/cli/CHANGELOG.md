@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 — 2026-05-31
+
+### Bug fixes
+
+- **HTML report crashed on `findings` emitted as a dict.** A packet that emits `findings` as a name-keyed object instead of the canonical list (e.g. a fact-finding dev returning `{discrepancy: {...}, raw_data: {...}}`) made `session_report._split_findings` iterate the string keys and raise on `fd.get(...)`, crashing `build_html_report`. Because `generate-session-report` is a fail-open Stop hook, the crash silently left a **stale `report.html`** (one cause of the old-template report on FEAT-005). `_finding_list` now coerces a dict to its values and keeps only dict entries; `_finding_li` gained an `issue` text fallback so dict-keyed findings still render.
+
 ## 0.8.1 — 2026-05-31
 
 Cost-reporting fixes surfaced by a consumer-repo `/orchestrator` run whose deployed hooks were a stale SDD version (one report showed 2804 subagents / ~$821, another showed `planning $0`, both wrong).

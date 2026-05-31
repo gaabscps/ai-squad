@@ -63,3 +63,34 @@ def test_missing_costs_returns_none(tmp_path):
     sd = tmp_path / ".agent-session" / "FEAT-002"  # no costs/ dir
     sd.mkdir(parents=True)
     assert sr.build_html_report(sd, task_id="FEAT-002") is None
+
+
+def test_findings_as_dict_does_not_crash(tmp_path):
+    # Some packets emit `findings` as a name-keyed DICT instead of the canonical
+    # list (a T-001 fact-finding dev did this). `for fd in findings` then
+    # iterates the string KEYS and `fd.get` blew up — crashing the report and,
+    # because generate-session-report is fail-open, leaving a stale report.html.
+    sd = tmp_path / ".agent-session" / "FEAT-001"
+    _seed(sd)
+    (sd / "outputs" / "dev-fact.json").write_text(json.dumps({
+        "dispatch_id": "dev-2", "role": "dev", "status": "needs_review",
+        "task_id": "T-009", "summary": "fact-finding",
+        "findings": {
+            "discrepancy": {"severity": "high", "rationale": "id mismatch"},
+            "raw_data": {"id": "anya", "profession": "farmer"},  # no severity
+        }}))
+    html = sr.build_html_report(sd, task_id="FEAT-001")  # must not raise
+    assert "<html" in html.lower()
+    assert "id mismatch" in html       # dict-keyed finding still surfaced
+
+
+def test_split_findings_normalizes_dict(tmp_path):
+    # Unit-level: a dict `findings` is normalized to its dict values; string
+    # keys / non-dict entries are dropped, never iterated as findings.
+    pkt = {"dispatch_id": "d-l1", "role": "logic-reviewer",
+           "findings": {"a": {"severity": "low", "rationale": "x"}, "b": "junk-string"}}
+    resolved, open_ = sr._split_findings([pkt])
+    flat = [fd for _, fd in resolved + open_]
+    assert all(isinstance(fd, dict) for fd in flat)   # no bare strings
+    assert {"severity": "low", "rationale": "x"} in flat
+    assert "junk-string" not in flat
