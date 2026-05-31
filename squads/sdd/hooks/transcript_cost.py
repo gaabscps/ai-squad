@@ -10,6 +10,13 @@ from pricing import cost_for_usage  # noqa: E402
 
 _BUCKET_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
 
+# Claude Code tags messages that are NOT real billable API calls (context
+# summaries, synthetic API errors, harness interruptions) with this sentinel
+# model id. They carry a `usage` block but were never charged, so they must be
+# skipped entirely — counting them as "unpriced" falsely flags the report
+# incomplete; pricing them would inflate the total with phantom tokens.
+_NONBILLABLE_MODELS = {"<synthetic>"}
+
 
 def _accumulate(agg, usage):
     for k in _BUCKET_KEYS:
@@ -55,8 +62,10 @@ def extract_transcript_cost(path, prices, since=None, until=None):
                 usage = m.get("usage")
                 if not mid or not isinstance(usage, dict) or mid in seen:
                     continue
-                seen.add(mid)
                 model = m.get("model", "unknown")
+                if model in _NONBILLABLE_MODELS:
+                    continue
+                seen.add(mid)
                 _accumulate(per_model.setdefault(model, {}), usage)
                 counts[model] = counts.get(model, 0) + 1
     except OSError as e:

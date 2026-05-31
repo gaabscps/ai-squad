@@ -99,6 +99,63 @@ def test_captured_but_unpriced_is_incomplete(tmp_path):
     assert rep["complete"] is False
 
 
+def test_backfill_rejects_foreign_session_transcripts(tmp_path):
+    # Regression for the $821/2804-agent bug: a wide glob fed backfill_missing
+    # transcripts from OTHER projects/sessions. An already-captured cost file
+    # pins which subagents dir is ours; anything outside it must be rejected.
+    proj = tmp_path / "projects"
+    ours = proj / "-repo" / "sess-AAA" / "subagents"
+    theirs = proj / "-other" / "sess-BBB" / "subagents"
+    ours.mkdir(parents=True)
+    theirs.mkdir(parents=True)
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    # a captured agent anchors the session (carries the subagents path)
+    (costs / "agent-anchor.json").write_text(json.dumps({
+        "agent_id": "anchor", "scope": "implementation", "total_cost_usd": 1.0,
+        "transcript_path": str(ours / "agent-anchor.jsonl"), "unpriced_models": []}))
+    line = ('{"type":"assistant","message":{"id":"q","model":"m",'
+            '"usage":{"input_tokens":10,"output_tokens":0}}}\n')
+    (ours / "agent-mine.jsonl").write_text(line)       # same session, uncaptured
+    (theirs / "agent-foreign.jsonl").write_text(line)  # different session
+    prices = {"m": {"input_per_mtok": 1_000_000.0, "output_per_mtok": 2_000_000.0}}
+
+    backfilled = cr.backfill_missing(
+        tmp_path,
+        [str(ours / "agent-mine.jsonl"), str(theirs / "agent-foreign.jsonl")],
+        prices)
+
+    assert backfilled == ["mine"]                       # foreign one rejected
+    assert (costs / "agent-mine.json").exists()
+    assert not (costs / "agent-foreign.json").exists()
+
+
+def test_session_transcripts_scopes_to_this_session(tmp_path):
+    proj = tmp_path / "projects"
+    ours = proj / "-repo" / "sess-AAA" / "subagents"
+    theirs = proj / "-other" / "sess-BBB" / "subagents"
+    ours.mkdir(parents=True)
+    theirs.mkdir(parents=True)
+    (ours / "agent-1.jsonl").write_text("{}\n")
+    (ours / "agent-2.jsonl").write_text("{}\n")
+    (theirs / "agent-x.jsonl").write_text("{}\n")
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "agent-1.json").write_text(json.dumps({
+        "agent_id": "1", "scope": "implementation", "total_cost_usd": 0.0,
+        "transcript_path": str(ours / "agent-1.jsonl"), "unpriced_models": []}))
+
+    got = sorted(Path(p).name for p in cr.session_transcripts(tmp_path))
+    assert got == ["agent-1.jsonl", "agent-2.jsonl"]   # foreign session excluded
+
+
+def test_session_transcripts_empty_when_unanchored(tmp_path):
+    # No captured cost file to derive the session from → return nothing rather
+    # than fall back to a wide glob (which was the contamination bug).
+    (tmp_path / "costs").mkdir()
+    assert cr.session_transcripts(tmp_path) == []
+
+
 def test_backfill_skips_existing(tmp_path):
     (tmp_path / "costs").mkdir()
     (tmp_path / "costs" / "agent-zzz.json").write_text('{"agent_id":"zzz","total_cost_usd":5.0}')

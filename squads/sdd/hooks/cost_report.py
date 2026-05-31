@@ -39,19 +39,63 @@ def _empty_typemap():
     return {t: 0 for t in _TOKEN_TYPES}
 
 
+def _session_subagents_dir(session_dir):
+    """Derive THIS session's `.../<sessionId>/subagents/` dir, or None.
+
+    Every subagent of one orchestrator session lives under the same
+    `~/.claude/projects/<project-slug>/<sessionId>/subagents/` directory, and
+    the SubagentStop hook records that full path in each `costs/agent-*.json`.
+    We read any already-captured cost file to recover the dir — this anchors
+    backfill/globbing to the current session instead of trusting a caller's
+    (historically wide) glob. Returns None when nothing is captured yet.
+    """
+    costs = Path(session_dir) / "costs"
+    if not costs.is_dir():
+        return None
+    for f in sorted(costs.glob("agent-*.json")):
+        try:
+            tp = json.loads(f.read_text(encoding="utf-8")).get("transcript_path")
+        except (json.JSONDecodeError, OSError):
+            continue
+        if tp and "/subagents/" in str(tp):
+            return Path(tp).parent
+    return None
+
+
+def session_transcripts(session_dir):
+    """List THIS session's subagent transcript paths for backfill.
+
+    Replaces the wide `~/.claude/projects/*/*/subagents/agent-*.jsonl` glob that
+    scooped up every project/session on the machine (the $821/2804-agent bug).
+    Returns [] when the session can't be anchored — deliberately NOT falling
+    back to a wide glob, since an empty backfill beats a contaminated total.
+    """
+    d = _session_subagents_dir(session_dir)
+    if d is None or not d.is_dir():
+        return []
+    return [str(p) for p in sorted(d.glob("agent-*.jsonl"))]
+
+
 def backfill_missing(session_dir, transcript_paths, prices):
     """Write costs/agent-<id>.json for any subagent transcript lacking one.
 
     Write-capable recovery path — invoked by the orchestrator (NOT the read-only
     audit-agent). Returns the list of agent ids that were backfilled.
+
+    Defense in depth: if the session can be anchored (see _session_subagents_dir),
+    transcripts outside its subagents dir are rejected, so a caller passing a
+    contaminated list (other projects/sessions) cannot inflate this report.
     """
     from transcript_cost import extract_transcript_cost
 
     session_dir = Path(session_dir)
     out_dir = session_dir / "costs"
     out_dir.mkdir(parents=True, exist_ok=True)
+    expected_dir = _session_subagents_dir(session_dir)
     done = []
     for tp in transcript_paths:
+        if expected_dir is not None and Path(tp).parent != expected_dir:
+            continue
         m = _AGENT_FILE_RE.search(str(tp))
         if not m:
             continue
