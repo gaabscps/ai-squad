@@ -40,7 +40,14 @@ const HOOK_DATA_ASSETS = ['model_prices.json'];
 // its own base dir once deployed — so deploy copies each into the skill's dir as
 // <name>.template.md. Without this, the skill falls back to the source repo (the
 // "spec-writer looked in the local ai-squad repo" bug). Map: skill -> [[src, as]].
-const SKILL_TEMPLATES = {
+// Maps each skill to the runtime templates it populates: [sourceName in
+// <squad>/templates/, destName injected into the deployed skill dir]. A skill's
+// skill.md references the destName ("<name>.template.md in this skill's base
+// directory") — copySkillTemplates puts it there at deploy time. The
+// template-consistency test enforces that every referenced template is mapped
+// here AND has a real source file, so a future skill can't ship a dead
+// template reference that only surfaces in a consumer repo. Exported for that test.
+export const SKILL_TEMPLATES = {
   'spec-writer': [['spec.md', 'spec.template.md']],
   'designer': [['plan.md', 'plan.template.md']],
   'task-builder': [['tasks.md', 'tasks.template.md']],

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 — 2026-05-31
+
+### Added
+
+- **Template-reference consistency guard.** New `test/template-consistency.test.js` enforces that every `*.template.md` a `skill.md` references has a `SKILL_TEMPLATES` mapping (so `copySkillTemplates` injects it at deploy) AND a real source file under the squad's `templates/` dir — plus the reverse (no mapping points at a missing skill or source). Investigated after the skills refactor flagged `tasks.template.md` / `plan.template.md` as "missing": they are **not** dead — templates live centrally in `squads/<squad>/templates/{spec,plan,tasks,memo}.md` and are renamed/injected into each skill dir at deploy time (verified). The gap was the absence of a guard: a future skill could reference a template with no mapping, and nothing would catch it until a consumer-repo deploy. `SKILL_TEMPLATES` is now exported for the test. No runtime/behavior change.
+
 ## 0.11.0 — 2026-05-31
 
 All 8 skills + 9 agents migrated to Anthropic's official Agent Skills authoring standard (progressive disclosure). Structure/quality level-up — no behavior change.

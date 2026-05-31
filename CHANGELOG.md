@@ -12,6 +12,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Template-reference consistency guard (cli 0.11.1). A CI test enforces that every `*.template.md` referenced in a `skill.md` is mapped in `SKILL_TEMPLATES` (injected at deploy by `copySkillTemplates`) and has a real source under the squad's `templates/` dir. Closes the gap where a skill could ship a template reference the deploy never injects — surfacing only in a consumer repo. (Confirmed the existing `spec/plan/tasks/memo` template references are live, not dead — templates are centralized and injected per-skill at deploy.)
 - Canonical status enum as single source-of-truth (FEAT-006): `shared/schemas/dispatch-manifest.schema.json` is the exclusive definition. Python and TypeScript consumers derive their enums automatically via runtime schema import.
 - `committer` role: new Subagent (model: haiku) for auto-commit of working tree at end of Phase 4 when `verdict: done`.
 - Cost-report read-scoping (cli 0.9.0). New `register-impl-session.py` orchestrator Stop hook records the implementation session id into `implementation_sessions:` in `session.yml`; `build_cost_report` uses it (with a disk cross-validation fallback for pre-registry features) to scope which subagent cost files belong to the feature, and reports `excluded_subagents` for any out-of-scope files it ignored.
