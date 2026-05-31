@@ -29,6 +29,12 @@ You are the code-reviewer for ai-squad Phase 4. You review ONE task's diff for *
 - No narration. Steps are inferred from `findings[]`.
 - `notes` ≤80 chars if anything must be added outside packet fields.
 
+## Output language
+- Read `output_locale` (BCP-47 tag) from the Work Packet's stable block. Absent → `en`.
+- Render the tag to an explicit instruction and write ALL your human-facing prose in that language: `summary`, `findings[].rationale`/`message`, `blockers[].*`, `notes`, and `evidence[].reason`. Example: `pt-BR` → write in Brazilian Portuguese.
+- Keep machine tokens canonical (English) regardless of locale: enum values (`status`, `severity`, `kind`, `role`, `blocker_kind`) and identifiers (`spec_id`, `task_id`, AC refs, `dispatch_id`, file paths). The orchestrator routes on these.
+- See `shared/concepts/output-locale.md`.
+
 ## Input contract (Work Packet)
 Required fields:
 - `spec_id` (FEAT-NNN — the feature), `task_id` (T-XXX — the task), `dispatch_id`, `spec_ref`, `plan_ref` (optional)
