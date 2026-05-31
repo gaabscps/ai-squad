@@ -23,6 +23,7 @@ This rule supersedes any pattern-matching the model performs on the repo history
 - `/spec-writer "<feature pitch>"` — fresh start with the human's pitch as first input.
 - `/spec-writer FEAT-NNN` — resume an existing Spec session.
 - `/spec-writer FEAT-NNN --plan="specify,plan,tasks"` — power-user flag override of the interactive checkbox.
+- `/spec-writer FEAT-NNN --locale="pt-BR"` — power-user flag override of the interactive locale confirmation (BCP-47, hyphen).
 
 ## Refuse when
 - Invoked with `FEAT-NNN` and no Session exists at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Start fresh with /spec-writer (no task_id)."`
@@ -83,6 +84,35 @@ What's the scope of this change?
 Save selection to `session.yml.pipeline_mode` (atomic write: tmp + rename). Valid values: `lite`, `standard`. Power-user flag `--mode=lite|standard` bypasses the prompt with the same semantics.
 
 **Recommendation surfaced after the answer:** if `lite` selected and `planned_phases` still includes `plan`, print a short note: `"Lite mode typically skips the Plan Phase. Current planned_phases keeps it — that's fine if you have a real architecture decision to capture; otherwise re-run /spec-writer with --plan='specify,tasks,implementation' to drop it."` Do not auto-mutate `planned_phases`; respect the user's earlier choice.
+
+### 2.6. Output locale (detect + confirm)
+
+`output_locale` is the language of ALL human-facing prose the pipeline will emit
+(summaries, findings, blockers, the report content, `handoff.md`). It is detected
+from the conversation, NOT pattern-matched from prior Sessions.
+
+1. **Detect:** infer the language the human is using in this conversation/pitch.
+   Express it as a BCP-47 tag with a hyphen (e.g. `pt-BR`, `en-US`, `es`).
+   Normalize any underscore form (`pt_BR`) to hyphen.
+2. **Interactive mode** (no PM bypass): confirm via `AskUserQuestion` (binary),
+   defaulting to the detected tag:
+   ```
+   I'll generate all human-facing content (summaries, findings, report, handoff)
+   in <language name> (<tag>). Use this language?
+   [ ] Yes, use <tag>
+   [ ] No, choose another  (free-form: enter a BCP-47 tag)
+   ```
+   On a free-form answer, normalize to a hyphenated BCP-47 tag.
+3. **PM bypass** (`session.yml.auto_approved_by == "pm"`, detected later at 6.5):
+   there is no human to confirm. Write the **detected** tag directly. If detection
+   is inconclusive, write `en`. Do NOT run `AskUserQuestion`.
+4. **Fallback:** if detection yields nothing usable and you are interactive, offer
+   `en` as the default in the question. The stored value is never empty — absent
+   downstream means `en`, but spec-writer always writes an explicit value.
+5. Save to `session.yml.output_locale` (atomic write: tmp + rename).
+
+Power-user flag `--locale=<tag>` bypasses detection and the prompt with explicit
+semantics (normalized to hyphen). See [`shared/concepts/output-locale.md`](../../../../shared/concepts/output-locale.md).
 
 ### 3. Capture initial pitch (if not provided)
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
@@ -234,7 +264,7 @@ Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` marke
 - Path: `.agent-session/<spec_id>/spec.md` (template: `spec.template.md` in this skill's base directory).
 - Status field: `draft` → `approved` (no `in-progress` mid-state).
 - Atomic write: tmp + rename, on every accepted section change AND on final approval.
-- Session updates: `session.yml.feature_name` populated at step 4; `phase_history.specify` populated at approval; `current_phase` advances at approval.
+- Session updates: `session.yml.feature_name` populated at step 4; `session.yml.output_locale` populated at step 2.6; `phase_history.specify` populated at approval; `current_phase` advances at approval.
 
 ## Handoff (auto-advance when next Phase is planned)
 After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
