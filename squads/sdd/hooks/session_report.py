@@ -26,12 +26,11 @@ _TIMELINE_ORDER = ("dev", "code-reviewer", "logic-reviewer", "qa")
 _ROLE_ABBR = {"dev": "D", "code-reviewer": "CR", "logic-reviewer": "LR", "qa": "QA"}
 # Worst (lowest rank) wins when deriving a task's final verdict.
 _STATUS_RANK = {"escalate": 0, "blocked": 1, "needs_review": 2, "done": 3}
-# Display labels (pt-BR) for the canonical English enums. The CSS class keeps the
-# canonical value; only the visible text is translated (audience: human reviewer).
-_STATUS_PT = {"done": "concluído", "needs_review": "requer revisão",
-              "blocked": "bloqueado", "escalate": "escalado"}
-_SEV_PT = {"blocker": "bloqueador", "critical": "crítico", "error": "erro",
-           "major": "maior", "warning": "aviso", "minor": "menor", "info": "info"}
+# Fixed labels are English (tool chrome — neutral canonical). Dynamic agent prose
+# embedded below arrives already localized from the Output Packets (output_locale);
+# this stdlib generator only passes it through. See shared/concepts/output-locale.md.
+_STATUS_LABEL = {"done": "done", "needs_review": "needs review",
+                 "blocked": "blocked", "escalate": "escalated"}
 _LOOP_RE = re.compile(r"-l(\d+)$")
 _TASK_RE = re.compile(r"(T-\d+)")
 
@@ -111,15 +110,15 @@ def _narrative(packets):
                  for r in _REVIEWER_ROLES for p in by_role.get(r, []))
     max_loop = _max_loop(packets)
     if max_loop >= 2 and n_find:
-        parts.append(f"Os reviewers apontaram {n_find} achado(s); "
-                     f"o dev corrigiu e reentregou no loop {max_loop}.")
+        parts.append(f"Reviewers raised {n_find} finding(s); "
+                     f"dev fixed and re-delivered in loop {max_loop}.")
     elif n_find:
-        parts.append(f"Os reviewers apontaram {n_find} achado(s).")
+        parts.append(f"Reviewers raised {n_find} finding(s).")
     else:
-        parts.append("Entregue em loop único, sem achados dos reviewers.")
+        parts.append("Delivered in a single loop, no reviewer findings.")
     qa = by_role.get("qa", [])
     if qa and qa[-1].get("status") == "done":
-        parts.append("O QA validou os ACs no fim.")
+        parts.append("QA validated the ACs at the end.")
     return " ".join(parts)
 
 
@@ -188,9 +187,9 @@ def _finding_li(packet, fd, resolved):
                 or packet.get("summary", ""))
     ref = _finding_ref(fd)
     cls = "find resolved" if resolved else "find open"
-    tag = "✓ resolvido" if resolved else "aberto"
+    tag = "✓ resolved" if resolved else "open"
     ref_html = f" <em>({ref})</em>" if ref else ""
-    sev_lbl = _SEV_PT.get(fd.get("severity", ""), sev)
+    sev_lbl = sev
     return (f"<li class='{cls}'><span class='sev sev-{sev}'>{sev_lbl} · {tag}</span> "
             f"{text}{ref_html}</li>")
 
@@ -222,29 +221,29 @@ def _dashboard(rep, task_verdicts, open_count, ac_count):
     needs = sum(1 for v in task_verdicts if v == "needs_review")
     bad = total - done - needs
     ok = total and done == total and open_count == 0
-    verdict = "✓ Pronto" if ok else f"⚠ {total - done} pendente(s)"
+    verdict = "✓ Ready" if ok else f"⚠ {total - done} pending"
     vclass = "verdict-ok" if ok else "verdict-warn"
     donut = _donut_svg([("#2e9e2e", done), ("#e0b000", needs), ("#cc3b3b", bad)], total)
-    open_lbl = f"{open_count} achado aberto" if open_count == 1 else f"{open_count} achados abertos"
+    open_lbl = f"{open_count} open finding" if open_count == 1 else f"{open_count} open findings"
     cost_warn = ("" if rep["complete"]
-                 else "<div class='legend warn'>⚠ custo incompleto</div>")
+                 else "<div class='legend warn'>⚠ cost incomplete</div>")
     return (
         "<section class='dash'>"
-        f"<div class='kpi'><div class='lbl'>Veredito</div>"
+        f"<div class='kpi'><div class='lbl'>Verdict</div>"
         f"<div class='big {vclass}'>{verdict}</div>"
-        f"<div class='legend'>{done}/{total} concluídas · {bad} bloqueada/escalada · {open_lbl}</div></div>"
-        f"<div class='kpi'><div class='lbl'>Status das tarefas</div>"
-        f"<div class='donutwrap'>{donut}<div class='legend'>🟢 {done} concluídas<br>"
-        f"🟡 {needs} requer revisão<br>🔴 {bad} bloqueada/escalada</div></div></div>"
-        f"<div class='kpi'><div class='lbl'>Custo · ${rep['total_cost_usd']:.2f}</div>"
+        f"<div class='legend'>{done}/{total} done · {bad} blocked/escalated · {open_lbl}</div></div>"
+        f"<div class='kpi'><div class='lbl'>Task status</div>"
+        f"<div class='donutwrap'>{donut}<div class='legend'>🟢 {done} done<br>"
+        f"🟡 {needs} needs review<br>🔴 {bad} blocked/escalated</div></div></div>"
+        f"<div class='kpi'><div class='lbl'>Cost · ${rep['total_cost_usd']:.2f}</div>"
         f"{_cost_bar(rep)}"
-        f"<div class='legend'>🔵 planejamento ${rep['planning_cost_usd']:.2f} · "
-        f"🔷 orquestração ${rep['orchestration_cost_usd']:.2f} · "
-        f"🟢 implementação ${rep['implementation_cost_usd']:.2f} ({rep['subagent_count']} subagentes)</div>"
+        f"<div class='legend'>🔵 planning ${rep['planning_cost_usd']:.2f} · "
+        f"🔷 orchestration ${rep['orchestration_cost_usd']:.2f} · "
+        f"🟢 implementation ${rep['implementation_cost_usd']:.2f} ({rep['subagent_count']} subagents)</div>"
         f"{cost_warn}</div>"
-        f"<div class='kpi'><div class='lbl'>Achados · cobertura de AC</div>"
-        f"<div class='big'>{open_count} <span class='unit'>abertos</span></div>"
-        f"<div class='legend'>{ac_count} ACs cobertos pelo qa</div></div>"
+        f"<div class='kpi'><div class='lbl'>Findings · AC coverage</div>"
+        f"<div class='big'>{open_count} <span class='unit'>open</span></div>"
+        f"<div class='legend'>{ac_count} ACs covered by qa</div></div>"
         "</section>")
 
 
@@ -255,11 +254,11 @@ def _integrity_section(pipeline_packets):
     for p in sorted(pipeline_packets, key=lambda p: p.get("dispatch_id", "")):
         role = _esc(p.get("role", "?"))
         status = p.get("status", "?")
-        status_lbl = _STATUS_PT.get(status, status)
+        status_lbl = _STATUS_LABEL.get(status, status)
         summary = _esc(p.get("summary", ""))
         rows.append(f"<div class='intg-row'><span class='st st-{_esc(status)}'>{role}: "
                     f"{_esc(status_lbl)}</span> {summary}</div>")
-    return ("<section><h2>Integridade do pipeline</h2>"
+    return ("<section><h2>Pipeline integrity</h2>"
             f"<div class='intg'>{''.join(rows)}</div></section>")
 
 
@@ -269,7 +268,7 @@ def _task_card(task_id, packets, diff_provider):
              "blocked": "b-block", "escalate": "b-block"}.get(verdict, "b-rev")
     by_role = _loops_by_role(packets)
     devs = by_role.get("dev", [])
-    title = _esc(devs[0].get("summary", "")) if devs else "(sem descrição)"
+    title = _esc(devs[0].get("summary", "")) if devs else "(no description)"
     files = sorted({f for p in devs for f in (p.get("files_changed") or [])})
     # Header shows basenames (compact); full paths stay in the title/hover + diff.
     files_lbl = _esc(", ".join(f.rsplit("/", 1)[-1] for f in files)) if files else ""
@@ -287,20 +286,20 @@ def _task_card(task_id, packets, diff_provider):
         except Exception:
             diff = ""
         if diff:
-            diff_html = (f"<details class='diff'><summary>▸ Ver alterações ({len(files)} arquivo(s))"
+            diff_html = (f"<details class='diff'><summary>▸ View changes ({len(files)} file(s))"
                          f"</summary>{_render_diff(diff)}</details>")
 
     acs = {}
     for p in by_role.get("qa", []):
         acs.update(p.get("ac_coverage") or {})
-    ac_html = (f"<div class='ac'>✓ {_esc(' · '.join(sorted(acs.keys())))} validados por qa</div>"
+    ac_html = (f"<div class='ac'>✓ {_esc(' · '.join(sorted(acs.keys())))} validated by qa</div>"
                if acs else "")
 
     open_flag = " open" if verdict != "done" else ""
     return (
         f"<details class='task'{open_flag}>"
         f"<summary><span class='tid'>{_esc(task_id)}</span>"
-        f"<span class='badge {badge}'>{_esc(_STATUS_PT.get(verdict, verdict))}</span>"
+        f"<span class='badge {badge}'>{_esc(_STATUS_LABEL.get(verdict, verdict))}</span>"
         f"<span class='ttl' title='{title}'>{title}</span>"
         f"<span class='files' title='{files_full}'>{files_lbl}</span></summary>"
         f"<div class='body'>"
@@ -317,7 +316,7 @@ def _handoff_section(session_dir):
         text = hf.read_text(encoding="utf-8")
     except OSError:
         return ""
-    return ("<section><details class='handoff'><summary>Repasse (handoff)</summary>"
+    return ("<section><details class='handoff'><summary>Handoff</summary>"
             f"<pre>{_esc(text)}</pre></details></section>")
 
 
@@ -405,14 +404,14 @@ def build_html_report(session_dir, task_id="", diff_provider=None):
     cards = "".join(_task_card(t, by_task[t], diff_provider) for t in order)
 
     parts = [
-        f"<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'>"
-        f"<title>Relatório da sessão — {_esc(task_id)}</title><style>{_CSS}</style></head><body>",
-        f"<h1>Relatório da sessão — {_esc(task_id)}</h1>",
-        f"<div class='sub'>{len(by_task)} tarefas · {rep['subagent_count']} subagentes · "
-        f"Fase 4 (Implementação)</div>",
+        f"<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+        f"<title>Session report — {_esc(task_id)}</title><style>{_CSS}</style></head><body>",
+        f"<h1>Session report — {_esc(task_id)}</h1>",
+        f"<div class='sub'>{len(by_task)} tasks · {rep['subagent_count']} subagents · "
+        f"Phase 4 (Implementation)</div>",
         _dashboard(rep, list(verdicts.values()), open_count, len(ac_keys)),
         _integrity_section(pipeline),
-        "<h2>Tarefas</h2>",
+        "<h2>Tasks</h2>",
         cards,
         _handoff_section(session_dir),
         "</body></html>",
