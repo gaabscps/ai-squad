@@ -14,3 +14,6 @@ __pycache__/
 .env
 # ai-squad per-repo hook install (managed by `ai-squad deploy`)
 .claude/hooks/
+
+# brainstorm visual companion (temporário)
+.superpowers/
