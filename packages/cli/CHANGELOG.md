@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 — 2026-05-31
+
+Orchestrator no longer forces a manual `session.yml` edit when a human starts an unplanned implementation (Gap B).
+
+### Changed
+
+- **`/orchestrator` recognizes explicit human invocation as authorization.** The recommended SDD flow scopes a Session at `/spec-writer` time and often defers implementation to a later session, so `planned_phases` frequently lacks `implementation`. Previously the orchestrator hard-refused ("Implementation was not planned… edit planned_phases in session.yml"), forcing every such feature to be edited by hand (hit on FEAT-005 and FEAT-006). The refusal now branches on `auto_approved_by`: a non-null value (an autonomous driver like `pm` is steering) still hard-refuses — reaching there without declaring implementation is a real misconfiguration; a null value (a human typed `/orchestrator` directly) is treated as the authorization. The orchestrator confirms once via `AskUserQuestion`, then self-appends `implementation` to `planned_phases` with a `phase_history.implementation` audit note, and proceeds. The confirm runs at the entry point (human present), preserving the HOTL guarantee. All other gates (Spec/Plan/Tasks approval) are unchanged, and `--resume` on a never-planned implementation is routed through the same confirm-once path instead of erroring. `pm` is unaffected — it already declares `implementation` upfront, so it never reaches this branch.
+
 ## 0.9.0 — 2026-05-31
 
 Cost-report read-scoping (Gap A). The 0.8.1 fixes hardened the **write** side (backfill + capture no longer scoop other projects), but `build_cost_report` still trusted everything already on disk — so historical contamination in `costs/` (from old wide globs, or `capture-session-cost`'s mtime-based feature attribution) kept inflating the report until the files were deleted by hand. This release makes the **read** side scope provenance, so contamination is inert without manual cleanup.

@@ -16,6 +16,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `committer` role: new Subagent (model: haiku) for auto-commit of working tree at end of Phase 4 when `verdict: done`.
 - Cost-report read-scoping (cli 0.9.0). New `register-impl-session.py` orchestrator Stop hook records the implementation session id into `implementation_sessions:` in `session.yml`; `build_cost_report` uses it (with a disk cross-validation fallback for pre-registry features) to scope which subagent cost files belong to the feature, and reports `excluded_subagents` for any out-of-scope files it ignored.
 
+### Changed
+
+- Orchestrator recognizes explicit human `/orchestrator` invocation as authorization to run an unplanned implementation (cli 0.10.0). When `implementation` is absent from `planned_phases`, the refusal now branches on `auto_approved_by`: autonomous drivers (`pm`) still hard-refuse, but a human-driven Session (`auto_approved_by: null`) is confirmed once via `AskUserQuestion` and the orchestrator self-appends `implementation` + an audit note — no manual `session.yml` edit. Removes the friction every plan/tasks-only feature hit (FEAT-005, FEAT-006).
+
 ### Fixed
 
 - Silent drop of dispatches in agentops report when status is non-canonical. Now emits warning with structured error message + `unknown_status` bucket preserving total count (FEAT-006).
