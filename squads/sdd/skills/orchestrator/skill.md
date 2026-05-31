@@ -257,8 +257,12 @@ Append the audit-agent's own dispatch to `actual_dispatches[]`. The audit-agent 
 
 Branch on the audit-agent's Output Packet:
 - **`status: done`** (all checks pass) → proceed to step 9 (handoff).
-- **`status: blocked, blocker_kind: bypass_detected`** → DO NOT emit normal handoff. Set `current_phase: escalated`. Emit a **refusal handoff** (see "Audit-failure handoff" below) listing every finding. Save to `.agent-session/<spec_id>/handoff.md`. Stop.
-- **`status: escalate`** (audit could not run — manifest unreadable, etc.) → set `current_phase: escalated`; emit refusal handoff with audit-agent's blockers. Stop.
+- **`status: blocked`** (ANY `blocker_kind`) → DO NOT emit normal handoff. Set `current_phase: escalated`. Emit a **refusal handoff** (see "Audit-failure handoff" below) listing every finding, and select the handoff narrative by `blocker_kind`. Save to `.agent-session/<spec_id>/handoff.md`. Stop. Do not infer or special-case a single `blocker_kind` — the audit-agent always populates it (enforced by the schema + write hook), so read it and branch:
+  - `bypass_detected` → bypass/forgery narrative (orchestrator did work directly or fabricated outputs).
+  - `schema_violation` → artifact-format narrative (the pipeline ran but one or more Output Packets are malformed; this is recoverable by `--restart`, NOT a bypass — do not accuse the pipeline of fabrication).
+  - `pipeline_stage_skipped` → missing-stage narrative (a required stage did not run for some task).
+  - any other / `incomplete_audit` → generic refusal narrative.
+- **`status: escalate`** (audit itself could not run — manifest unreadable, etc.; `blocker_kind: audit_inconclusive`) → set `current_phase: escalated`; emit refusal handoff with audit-agent's blockers. Stop.
 
 The audit-agent's verdict is binding **and terminal**. On `blocked`/`escalate`, the orchestrator MUST NOT: (a) emit a "uniform success" or "mixed status" handoff; (b) edit, patch, or rewrite any file under `outputs/` to make the audit pass — those are subagent-authored evidence, and `guard-session-scope.py` blocks it mechanically; or (c) re-dispatch `audit-agent` in the same run for a second opinion. The ONLY recovery is human review + `/orchestrator FEAT-NNN --restart` (which wipes `outputs/` and re-runs the real subagents). Re-running the audit over hand-edited packets was the FEAT-010 failure — 4 audit runs until it flipped to `done`.
 
@@ -447,11 +451,15 @@ The orchestrator's responsibility is prefix stability; Claude Code's runtime app
 - **Uniform success** (all tasks done, audit clean): `"Implementation done. Changes are unstaged in the working tree — review with git diff / git status, then commit when ready. Run /ship FEAT-NNN to clean up the session."`
 - **Mixed status** (some pending_human, audit clean): `"Partial completion. <N> done, <M> awaiting human decision. Changes are unstaged — review before committing. After resolving the blockers: /orchestrator FEAT-NNN --resume (default) | /orchestrator FEAT-NNN --restart (if prior work is invalidated)."`
 - **Full escalate** (all pending_human): `"Pipeline escalated. All tasks blocked. See decision memos at .agent-session/<spec_id>/decisions/ and resolve before /orchestrator FEAT-NNN --resume."`
-- **Audit-failure handoff** (step 8 returned `blocked` or `escalate` — issue #1 mitigation): emit a refusal handoff, NOT one of the three above. Skeleton:
+- **Audit-failure handoff** (step 8 returned `blocked` or `escalate` — issue #1 mitigation): emit a refusal handoff, NOT one of the three above. The opening line varies by the audit-agent's `blocker_kind` (do NOT default to the bypass narrative — it is wrong and alarming for a format defect). Skeleton:
   ```
   ## Pipeline integrity audit FAILED — handoff refused
 
-  The audit-agent detected that the dispatch manifest does not reconcile with the actual pipeline execution. This usually means the orchestrator bypassed Subagent dispatch and did the work directly (or fabricated outputs).
+  <opening line, selected by blocker_kind:>
+  - bypass_detected:   The dispatch manifest does not reconcile with actual execution — the orchestrator likely bypassed Subagent dispatch and did the work directly (or fabricated outputs).
+  - schema_violation:  The pipeline ran and the work may be correct, but one or more Output Packets are malformed (missing required fields). This is an artifact-format defect, not a bypass.
+  - pipeline_stage_skipped: A required pipeline stage did not run for one or more tasks.
+  - audit_inconclusive / other: The audit gate could not confirm pipeline integrity (see findings).
 
   ## Audit findings
   | gap_kind                    | severity | ref                                |
@@ -460,7 +468,8 @@ The orchestrator's responsibility is prefix stability; Claude Code's runtime app
 
   ## What to do
   1. Inspect `.agent-session/FEAT-NNN/dispatch-manifest.json` and `outputs/` directly.
-  2. If findings reflect a real bypass: discard the working-tree changes (`git restore .`) and re-run `/orchestrator FEAT-NNN --restart`.
+  2. For `bypass_detected`: if findings reflect a real bypass, discard the working-tree changes (`git restore .`) and re-run `/orchestrator FEAT-NNN --restart`.
+  2b. For `schema_violation`: the source changes are likely sound; re-run `/orchestrator FEAT-NNN --restart` to re-dispatch the real subagents so they re-emit well-formed packets (do NOT hand-edit packets under `outputs/` — `guard-session-scope.py` blocks it and it was the FEAT-010 gaming pattern).
   3. If findings are false positives: file an issue with the audit-agent's Output Packet attached (`.agent-session/FEAT-NNN/outputs/<audit-dispatch-id>.json`).
   ```
 

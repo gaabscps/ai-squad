@@ -97,10 +97,10 @@ Run this sweep **after** the 6 reconciliation checks and **before** emitting the
 
 **For each entry in `actual_dispatches[]` whose `role` is one of the three above:**
 
-1. **Locate the packet file.** The expected filename pattern is `outputs/<dispatch_id>-<role-marker>-*.json` where `<role-marker>` is `qa` for qa, `cr` for code-reviewer, or `lr` for logic-reviewer. Use a glob (`Bash: ls outputs/<dispatch_id>-<marker>*.json 2>/dev/null`) to find the file. Fallback: if the glob returns no results, also try the bare `outputs/<dispatch_id>.json` path (some pipelines omit the role marker on single-role dispatches).
+1. **Locate the packet file.** The canonical filename is the bare `outputs/<dispatch_id>.json` — the `dispatch_id` already embeds the role marker and loop (e.g. `d-T-001-qa-l1`, `d-T-003-cr-l2`), so there is NO extra marker suffix on the file. Use `Bash: ls outputs/<dispatch_id>.json 2>/dev/null`. Fallback (legacy pipelines that appended the marker as a separate filename suffix): if the bare path is absent, glob `outputs/<dispatch_id>-<marker>*.json` where `<marker>` is `qa`/`cr`/`lr`.
 
 2. **If no matching file is found:**
-   Record a gap entry: `dispatch_id=<id> role=<role> — Output Packet file missing (expected outputs/<dispatch_id>-<marker>*.json)`.
+   Record a gap entry: `dispatch_id=<id> role=<role> — Output Packet file missing (expected outputs/<dispatch_id>.json)`.
 
 3. **If a file is found, re-validate it via the hook:**
    Run:
@@ -119,7 +119,7 @@ Run this sweep **after** the 6 reconciliation checks and **before** emitting the
    ```
    The full gap list goes into the consolidated finding's `note` field (NOT the Output Packet's top-level `notes` field, which has a `maxLength: 80` schema constraint that cannot hold multi-entry gap lists). Format the `note` value as a semicolon-separated inline list:
    ```
-   Gap 1: dispatch_id=d-003 role=qa — Output Packet file missing (expected outputs/d-003-qa*.json); Gap 2: dispatch_id=d-005 role=code-reviewer — dispatch_id=d-005-cr: code-reviewer Output Packet missing required field 'findings' (array required; empty list [] is valid as an explicit 'no findings' claim)
+   Gap 1: dispatch_id=d-T-003-qa-l1 role=qa — Output Packet file missing (expected outputs/d-T-003-qa-l1.json); Gap 2: dispatch_id=d-T-005-cr-l1 role=code-reviewer — code-reviewer Output Packet missing required field 'findings' (array required; empty list [] is valid as an explicit 'no findings' claim)
    ```
    The session status MUST be `blocked` (not `done`) when any gap is recorded.
 
@@ -175,9 +175,19 @@ Run this check **as part of** the Phase 4 sweep, **after** role-specific Output 
 
 ## Output contract (Output Packet)
 - `status`:
-  - `done` — all applicable checks pass AND Phase 4 sweep finds no gaps; orchestrator may emit handoff
-  - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human (`blocker_kind: bypass_detected`)
-  - `escalate` — audit cannot run (manifest unreadable, outputs dir missing); orchestrator escalates to human
+  - `done` — all applicable checks pass AND Phase 4 sweep finds no gaps; orchestrator may emit handoff. No `blocker_kind`.
+  - `blocked` — one or more findings from any check or the Phase 4 sweep; orchestrator MUST refuse handoff and surface findings to human. **`blocker_kind` is MANDATORY and chosen by cause** (see selection rule below) — never leave it absent.
+  - `escalate` — audit itself cannot run (manifest unreadable, outputs dir missing). Set **`blocker_kind: audit_inconclusive`**.
+
+### `blocker_kind` selection rule (MANDATORY on blocked/escalate)
+The schema and the `verify-output-packet.py` write hook now REQUIRE a non-empty `blocker_kind` whenever `status` is `blocked` or `escalate`. A `blocked` packet without it is rejected at write time. Choose by this precedence — first match wins:
+
+1. **`bypass_detected`** — if ANY finding signals the orchestrator bypassed or forged dispatch: `role_mismatch`, `orchestrator_edited_source`, `orphan_output_packet`, `missing_expected_dispatch`, or a Check-2 `missing_output_packet` where the manifest CLAIMS the dispatch in `actual_dispatches[]` but no packet file exists (fabrication signal).
+2. **`schema_violation`** — else if the only blocking findings are Phase 4 sweep gaps on packets that EXIST but fail schema (malformed — e.g. missing `role`/`summary`, bad `ac_coverage`). This is a recoverable artifact-format defect, NOT a bypass. (This was the FEAT-011 case: a correct pipeline blocked by malformed dev/qa packets.)
+3. **`pipeline_stage_skipped`** — else if the only blocking findings are `pipeline_stage_skipped` / `ac_not_validated` (a stage genuinely did not run).
+4. **`incomplete_audit`** — fallback for any other blocking finding combination not covered above.
+
+Set `blocker_kind` to the single most-specific cause per the order above. The orchestrator branches its refusal handoff narrative on this value (bypass vs schema vs stage), so an accurate `blocker_kind` is what lets it tell the human the right story.
 - `findings[]`: one entry per failed check — `{severity: blocker|major, audit_finding_kind: <one of the kinds below>, ref: <pointer>, rationale: ≤120 chars}`; Phase 4 sweep adds one consolidated finding when gaps exist (`audit_finding_kind: missing_output_packet`)
   - Finding kinds: `missing_expected_dispatch`, `missing_output_packet`, `orphan_output_packet`, `role_mismatch`, `pipeline_stage_skipped`, `ac_not_validated`, `orchestrator_edited_source`, `warnings_file_corrupt`, `incomplete_review`, `cost_capture_incomplete`
 - `evidence[]`: pointers to manifest entries and output packet files inspected

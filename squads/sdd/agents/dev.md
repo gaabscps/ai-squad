@@ -52,6 +52,30 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 - `files_changed[]`: list of paths actually edited (must be subset of `scope_files`)
 - `notes`: optional, ≤80 chars
 
+## Output Packet write contract
+
+Write the Output Packet with the `Write` tool to **`outputs/<dispatch_id>.json`** (path relative to the session dir `.agent-session/<spec_id>/`; `dispatch_id` already encodes role + loop, e.g. `d-T-001-dev-l1`). The `verify-output-packet.py` Stop hook resolves exactly this path and refuses your stop if the packet is missing or fails schema checks.
+
+### Mandatory fields in the Output Packet
+```json
+{
+  "spec_id": "FEAT-NNN",
+  "task_id": "T-XXX",
+  "dispatch_id": "d-T-XXX-dev-lN",
+  "role": "dev",
+  "status": "done | needs_review | blocked | escalate",
+  "summary": "one-line past-tense summary (≤120 chars)",
+  "evidence": [],
+  "files_changed": [],
+  "usage": null
+}
+```
+- `role`: ALWAYS the literal string `"dev"`. Omitting it is a schema violation that the Stop hook blocks.
+- `summary`: ALWAYS a non-empty one-liner. Omitting it is a schema violation.
+- `dispatch_id`: copy verbatim from the Work Packet.
+- `blocker_kind`: REQUIRED (non-empty) whenever `status` is `blocked` or `escalate` — e.g. `contract_violation`, `missing_test_infra`. Omit it otherwise.
+- `usage`: always emit `"usage": null` (the hook fills it post-write). Never add `cost_usd`/`cost_source` — the schema is `additionalProperties: false`.
+
 ## Hard rules
 - Never: prose preamble, restating Work Packet, narrating progress, inline file content in evidence.
 - Never: edit files outside `scope_files`.

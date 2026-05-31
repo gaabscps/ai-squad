@@ -14,6 +14,27 @@
     "usage"
   ],
   "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "A blocked/escalate packet MUST name its cause via a non-empty blocker_kind, so the orchestrator can branch its handoff deterministically.",
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["blocked", "escalate"]
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["blocker_kind"],
+        "properties": {
+          "blocker_kind": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "spec_id": {
       "type": "string",
@@ -55,7 +76,7 @@
     },
     "blocker_kind": {
       "type": "string",
-      "description": "Required when status is blocked or escalate; enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, opaque_repo, insufficient_data, timeout, bypass_detected, etc.)"
+      "description": "Required (non-empty) when status is blocked or escalate — enforced by the allOf/if-then above and by verify-output-packet.py at write time. Enum maintained loosely (contract_violation, missing_test_infra, missing_test_for_ac, opaque_repo, insufficient_data, timeout, bypass_detected, schema_violation, missing_output_packet, pipeline_stage_skipped, incomplete_audit, audit_inconclusive, etc.)"
     },
     "missing_for": {
       "type": "array",
