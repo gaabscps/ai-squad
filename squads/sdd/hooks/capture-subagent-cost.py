@@ -20,6 +20,32 @@ import transcript_cost  # noqa: E402
 from hook_runtime import resolve_project_root  # noqa: E402
 
 
+def _slugify_project(repo_root) -> str:
+    """Claude Code's project-dir slug: absolute path with '/' and '.' -> '-'.
+
+    e.g. /Users/x/repo/.claude/wt -> -Users-x-repo--claude-wt. Both separators
+    must be replaced — a worktree path (.claude) or a dotted repo name would
+    otherwise produce a slug that never matches the real transcript dir.
+    """
+    return str(repo_root).replace("/", "-").replace(".", "-")
+
+
+def _glob_subagent_transcript(repo_root, agent_id):
+    """Fallback locator, scoped to THIS project's Claude transcript dir.
+
+    Claude Code stores subagent transcripts at
+    ~/.claude/projects/<project-slug>/<sessionId>/subagents/agent-<id>.jsonl.
+    Scoping the glob to <project-slug> (was a machine-wide projects/*/*) keeps a
+    homonym agent id under another project from being mistaken for this one —
+    the same bug class as the $821/2804-agent backfill contamination.
+    """
+    slug = _slugify_project(repo_root)
+    pattern = os.path.expanduser(
+        f"~/.claude/projects/{slug}/*/subagents/agent-{agent_id}.jsonl")
+    hits = glob.glob(pattern)
+    return max(hits, key=os.path.getmtime) if hits else None
+
+
 def _find_active_session_dir(repo_root: Path):
     """Newest .agent-session/<ID>/ that has a session.yml. Best-effort."""
     base = repo_root / ".agent-session"
@@ -66,10 +92,10 @@ def main():
     session_dir = _find_active_session_dir(Path(repo_root))
     if session_dir is None:
         return 0
-    # Fallback: if payload lacks the path, glob the newest subagent transcript.
+    # Fallback: if payload lacks the path, glob the newest subagent transcript
+    # for this agent id — scoped to THIS project's slug (not a machine-wide glob).
     if not transcript_path:
-        hits = glob.glob(os.path.expanduser(f"~/.claude/projects/*/*/subagents/agent-{agent_id}.jsonl"))
-        transcript_path = max(hits, key=os.path.getmtime) if hits else None
+        transcript_path = _glob_subagent_transcript(repo_root, agent_id)
     if not transcript_path:
         return 0
     # Decoupling: token capture must NEVER depend on the price table being
