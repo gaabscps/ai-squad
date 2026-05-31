@@ -77,11 +77,22 @@ Skip this check on `--resume` after the first turn of the same Session has confi
 - `/orchestrator FEAT-NNN --restart` — wipes `.agent-session/<spec_id>/inputs/` and `outputs/` (preserves spec/plan/tasks). Used when human edits invalidated prior work.
 
 ## Refuse when
-- `implementation` not in `planned_phases` → message: `"Implementation was not planned for this Session. Edit planned_phases in session.yml or restart with /spec-writer."`
+- `implementation` not in `planned_phases` — branch on who is steering (the `auto_approved_by` field in `session.yml`):
+  - **`auto_approved_by` is non-null** (an autonomous driver such as `pm` is steering) → hard refuse → message: `"Implementation was not planned for this Session and an autonomous driver (auto_approved_by=<value>) is steering. The PM/supervisor must declare implementation in planned_phases before Phase 4."` An autonomous driver reaching here without having planned implementation is a real misconfiguration — never self-authorize on its behalf.
+  - **`auto_approved_by` is null** (a human invoked `/orchestrator` directly) → do NOT refuse and do NOT make the human edit `session.yml`. The explicit human invocation is the authorization; confirm once and self-enable the phase (see "Human authorization of an unplanned implementation" below).
 - Spec not `status: approved` → message: `"Spec must be approved before /orchestrator."`
 - Plan in `planned_phases` but not `status: approved` → message: `"Plan must be approved before /orchestrator."`
 - Tasks in `planned_phases` but not `status: approved` → message: `"Tasks must be approved before /orchestrator. Run /task-builder FEAT-NNN to finish them."`
 - `session.yml.schema_version` higher than this Skill knows → message: `"Session schema_version <N> newer than this Skill's <M>. Upgrade ai-squad."`
+
+### Human authorization of an unplanned implementation
+Reached only when `implementation` is absent from `planned_phases` **and** `auto_approved_by` is null (interactive, human-driven). The recommended SDD flow scopes a Session at `/spec-writer` time and frequently defers implementation to a later session, so a human returning to run `/orchestrator` on a plan/tasks-only Session is the normal path — not an error. Forcing a manual `session.yml` edit to "prove" intent the human just expressed by typing the command is pure friction.
+
+1. Ask the human **once**, via `AskUserQuestion`: `"Implementation wasn't in this Session's planned_phases. Start Phase 4 now? [Yes — add implementation and run | No — abort]"`. This runs at the entry point, before any dispatch — the human is present, so the HOTL guarantee (no human interrupted mid-pipeline) is preserved.
+2. **Yes** → append `implementation` to `planned_phases` and record the authorization under `phase_history.implementation` (`authorized_by: <human>`, `authorized_at: <date>`, `note: "Implementation added via explicit /orchestrator invocation; was outside the original planned_phases."`). Continue preflight normally.
+3. **No** → abort with zero changes to `session.yml`.
+
+This is the **only** case in which the orchestrator may add a phase to `planned_phases`, and only for a human-driven Session. The remaining "Refuse when" gates (Spec/Plan/Tasks approval) still apply after authorization — self-authorization covers the `planned_phases` entry alone, never artifact approval. `--resume` semantics are unaffected: a human who uses `--resume` on a Session that never planned (or started) implementation is routed through this same confirm-once path — treat it as a fresh start of implementation, not a `"nothing to resume"` error.
 
 ## Inputs (preconditions)
 - `.agent-session/<spec_id>/spec.md` (status: approved) — always required.
