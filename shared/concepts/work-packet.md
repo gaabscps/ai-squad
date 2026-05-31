@@ -42,6 +42,7 @@ It is the **yang to the Output Packet's yin**: same FS layout (`.agent-session/<
 | `project_context` | object | no | Host project's local context: `stack`, `standards_ref` (path to project's `CLAUDE.md` or rules), `other`. |
 | `model` | string | no | `sonnet | opus | haiku`. Overrides the Role's frontmatter default for this dispatch only. |
 | `effort` | string | no | `low | medium | high | xhigh | max`. Overrides default. |
+| `output_locale` | string | no | BCP-47 tag (`pt-BR`) for the language of human-facing prose this dispatch emits (`summary`, `findings`, `blockers`, `notes`, `evidence.reason`). Absent → `en`. See [`output-locale.md`](output-locale.md). Lives in the Work Packet's **stable block** (same across all dispatches in a Session). |
 | `max_loops` | integer | no | Loop cap for this Role within the current Pipeline phase. Default 3 from Session config. |
 | `previous_findings` | array | no | Findings from the immediately prior loop iteration. Populated by the orchestrator on re-runs. |
 
