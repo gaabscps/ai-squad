@@ -86,6 +86,23 @@ def _task_verdict(packets):
     return min(finals, key=lambda s: _STATUS_RANK.get(s, 2)) if finals else "done"
 
 
+def _finding_list(packet):
+    """Normalize a packet's `findings` to a list of dicts.
+
+    Canonical shape is a list, but some packets emit a name-keyed DICT (a
+    fact-finding dev did `findings: {discrepancy: {...}, raw_data: {...}}`).
+    `for fd in <dict>` would iterate the string keys and crash `fd.get`, taking
+    down the whole report (and, via the fail-open Stop hook, leaving report.html
+    stale). Coerce dict -> its values, then keep only dict entries.
+    """
+    fnd = packet.get("findings")
+    if isinstance(fnd, dict):
+        fnd = list(fnd.values())
+    if not isinstance(fnd, list):
+        return []
+    return [fd for fd in fnd if isinstance(fd, dict)]
+
+
 def _split_findings(packets):
     """(resolved, open). A finding is open only if it sits in the last loop of its
     role AND the task did not converge (verdict != done); everything a later loop
@@ -97,7 +114,7 @@ def _split_findings(packets):
         last = _loop_of(lst[-1].get("dispatch_id"))
         for p in lst:
             is_last = _loop_of(p.get("dispatch_id")) == last
-            for fd in (p.get("findings") or []):
+            for fd in _finding_list(p):
                 (open_ if (is_last and not task_done) else resolved).append((p, fd))
     return resolved, open_
 
@@ -185,7 +202,7 @@ def _finding_li(packet, fd, resolved):
     # `rationale` is the canonical finding field (all reviewers + audit emit it);
     # `message`/`concern` kept as defensive fallback for any legacy packet.
     text = _esc(fd.get("rationale") or fd.get("message") or fd.get("concern")
-                or packet.get("summary", ""))
+                or fd.get("issue") or packet.get("summary", ""))
     ref = _finding_ref(fd)
     cls = "find resolved" if resolved else "find open"
     tag = "✓ resolved" if resolved else "open"
