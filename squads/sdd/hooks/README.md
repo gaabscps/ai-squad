@@ -24,6 +24,7 @@ in the markdown components, exactly where the rules are.
 | [`guard-session-scope.py`](guard-session-scope.py) | `skills/orchestrator` | `PreToolUse` (Edit\|Write\|MultiEdit) | Orchestrator can edit only inside `.agent-session/<spec_id>/`. Any source-tree edit is denied. |
 | [`block-git-write.py`](block-git-write.py) | `skills/orchestrator` | `PreToolUse` (Bash) | Orchestrator cannot run git write commands (commit, add, reset, push, branch -d, etc.). Read-only commands (status, diff, log) are allowed. |
 | [`verify-audit-dispatch.py`](verify-audit-dispatch.py) | `skills/orchestrator` | `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json`'s `actual_dispatches[]` with `status: done`. |
+| [`register-impl-session.py`](register-impl-session.py) | `skills/orchestrator` | `Stop` | Bookkeeping (fail-open, never blocks). Records the orchestrator's own session id into `implementation_sessions:` in `session.yml` — the authoritative anchor `cost_report.build_cost_report` uses to scope which subagent cost files belong to this feature (ignoring foreign-session/project contamination on read). |
 | [`verify-output-packet.py`](verify-output-packet.py) | every Phase 4 Subagent (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) | `Stop` (auto-becomes `SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json` (parsed dispatch_id from its prompt). Validates required fields + status enum. |
 
 ## Cursor / Cursor CLI (same scripts, native `hooks.json`)
@@ -36,6 +37,7 @@ Shared logic lives in **[`hook_runtime.py`](hook_runtime.py)** (`resolve_project
 |--------|------------------------|--------|
 | `block-git-write.py` | yes (`preToolUse` / Shell) | Safe globally — blocks git writes for orchestrator **and** dev (human commits after handoff). |
 | `verify-audit-dispatch.py` | yes (`stop`) | Skips verification unless `dispatch-manifest.json` exists **and** `session.yml` shows Phase 4–style state (avoids blocking unrelated chats). |
+| `register-impl-session.py` | yes (`stop`) | Gated to the orchestrator Skill via the transcript marker. No-ops (cost read-scoping falls back to disk cross-validation) when the active skill can't be confirmed. |
 | `verify-output-packet.py` | yes (`subagentStop`) | Same as Claude. |
 | `guard-session-scope.py` | **no** | Would deny every `Write` outside `.agent-session/`, including **`dev`** editing source. Keep this hook on **Claude Code** only (orchestrator Skill frontmatter / Third-party Claude config). |
 

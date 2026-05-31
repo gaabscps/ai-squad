@@ -23,6 +23,9 @@ hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-audit-dispatch.py"'
           timeout: 5
+        - type: command
+          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py"'
+          timeout: 5
 ---
 
 # Orchestrator — Phase 4 (Implementation)

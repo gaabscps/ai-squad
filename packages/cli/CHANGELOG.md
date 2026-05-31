@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0 — 2026-05-31
+
+Cost-report read-scoping (Gap A). The 0.8.1 fixes hardened the **write** side (backfill + capture no longer scoop other projects), but `build_cost_report` still trusted everything already on disk — so historical contamination in `costs/` (from old wide globs, or `capture-session-cost`'s mtime-based feature attribution) kept inflating the report until the files were deleted by hand. This release makes the **read** side scope provenance, so contamination is inert without manual cleanup.
+
+### Added
+
+- **Authoritative implementation-session registry.** New `register-impl-session.py` Stop hook, wired to the orchestrator Skill. It records the orchestrator's own session id (from the hook payload — trustworthy, never an mtime guess, since the hook only fires from an orchestrator session) into a new `implementation_sessions:` list in `session.yml`. Subagents dispatched by the orchestrator live under exactly this session id, so it is the precise anchor for "which subagent cost files are this feature's". Idempotent and fail-open; multiple ids accumulate across `--resume` / multi-instance runs.
+- **`excluded_subagents` in the cost report.** `build_cost_report` now reports how many out-of-scope agent cost files it ignored, and `render_markdown` adds a `NOTE` line when any were dropped — contamination is surfaced, never silently truncated.
+
+### Bug fixes
+
+- **Cost report counted subagents from other features/projects on read.** `build_cost_report` iterated every `agent-*.json` in `costs/` regardless of provenance; a contaminated dir (e.g. FEAT-005's 2804 agents, of which only 60 were real) inflated `subagent_count` and `implementation_cost_usd` until the strays were deleted by hand. The reader now scopes each agent file by its transcript's parent session: when `implementation_sessions:` is present it is the authoritative allow-list (also closing the wholesale-session-leak case the write-side fixes can't); otherwise it falls back to disk cross-validation — an agent is in-scope only if its parent session also wrote a `session-*.json` here. Both legs leave provenance-unknown legacy files (no transcript path) untouched. Verified: clean FEAT-005 reads unchanged (60 agents / $29.13, `excluded_subagents: 0`).
+
 ## 0.8.2 — 2026-05-31
 
 ### Bug fixes

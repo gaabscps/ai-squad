@@ -8,6 +8,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 _AGENT_FILE_RE = re.compile(r"agent-(.+)\.jsonl$")
+_SESSION_FILE_RE = re.compile(r"session-(.+)\.json$")
+# Subagent transcripts live at .../projects/<slug>/<sessionId>/subagents/...
+# The <sessionId> segment is the orchestrator session that dispatched them.
+_PARENT_SESSION_RE = re.compile(r"/projects/[^/]+/([^/]+)/subagents/")
 
 _TOKEN_TYPES = ("input", "output", "cache_read", "cache_creation")
 _BUCKET_FOR_TYPE = {
@@ -76,6 +80,66 @@ def session_transcripts(session_dir):
     return [str(p) for p in sorted(d.glob("agent-*.jsonl"))]
 
 
+def _parent_session(transcript_path):
+    """Parent Claude session id from a subagent transcript path, or None.
+
+    None when the path is absent or not in the `.../<sessionId>/subagents/`
+    shape — callers treat None as "provenance unknown", never as "foreign".
+    """
+    if not transcript_path:
+        return None
+    m = _PARENT_SESSION_RE.search(str(transcript_path))
+    return m.group(1) if m else None
+
+
+def _read_implementation_sessions(session_dir):
+    """Authoritative allow-list of this feature's implementation session id(s).
+
+    The orchestrator Stop hook (register-impl-session) records its own — and
+    therefore trustworthy — session id under `implementation_sessions:` in
+    session.yml. Returns the set, or None when the field is absent/empty. None
+    means "no authoritative anchor; fall back to disk cross-validation". Cheap
+    line parse, no PyYAML (consistent with the hooks).
+    """
+    sy = Path(session_dir) / "session.yml"
+    if not sy.exists():
+        return None
+    ids = set()
+    in_block = False
+    for line in sy.read_text(encoding="utf-8", errors="replace").splitlines():
+        if re.match(r"^\s*implementation_sessions\s*:", line):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        m = re.match(r"^\s+-\s*[\"']?([^\"'\s]+)[\"']?\s*$", line)
+        if m:
+            ids.add(m.group(1))
+        elif line.strip() == "":
+            continue
+        elif not line.startswith((" ", "\t")):
+            break  # a new top-level key ends the list block
+    return ids or None
+
+
+def _agent_in_scope(parent, allowed, present):
+    """Does an agent cost file belong to THIS feature?
+
+    - allowed (registry present): authoritative — keep iff the parent session
+      is listed. An unparseable parent is dropped (the registry world always
+      records a transcript path, so this only sheds contamination).
+    - else (fallback): keep when provenance is unknown (parent is None) or when
+      there are no session files to validate against; otherwise keep iff the
+      parent session also wrote a session-*.json here. This self-heals the
+      2804->60 contamination on READ without touching disk.
+    """
+    if allowed is not None:
+        return parent is not None and parent in allowed
+    if parent is None or not present:
+        return True
+    return parent in present
+
+
 def backfill_missing(session_dir, transcript_paths, prices):
     """Write costs/agent-<id>.json for any subagent transcript lacking one.
 
@@ -116,7 +180,18 @@ def build_cost_report(session_dir):
     costs = session_dir / "costs"
     planning = orchestration = implementation = 0.0
     subagents = 0
+    excluded = 0
     unpriced = set()
+    # Read-scoping anchors (Gap A): an authoritative allow-list from session.yml
+    # if present, else the set of session ids that actually wrote a session-*.json
+    # here (disk cross-validation fallback). See _agent_in_scope.
+    allowed_sessions = _read_implementation_sessions(session_dir)
+    present_sessions = set()
+    if costs.is_dir():
+        for f in costs.glob("session-*.json"):
+            m = _SESSION_FILE_RE.search(f.name)
+            if m:
+                present_sessions.add(m.group(1))
     tok_phase = {p: _empty_typemap() for p in ("planning", "orchestration", "implementation")}
     cost_phase = {p: {t: 0.0 for t in _TOKEN_TYPES} for p in ("planning", "orchestration", "implementation")}
     _prices = {"v": None, "loaded": False}  # lazy holder for the reprice fallback
@@ -194,6 +269,10 @@ def build_cost_report(session_dir):
                 _absorb((d.get("planning") or {}).get("by_model"), "planning")
                 _absorb((d.get("orchestration") or {}).get("by_model"), "orchestration")
             elif scope == "implementation":
+                if not _agent_in_scope(_parent_session(d.get("transcript_path")),
+                                       allowed_sessions, present_sessions):
+                    excluded += 1
+                    continue
                 ic, iu = _phase_cost(d)
                 implementation += ic
                 unpriced |= iu
@@ -214,6 +293,10 @@ def build_cost_report(session_dir):
         "implementation_cost_usd": round(implementation, 6),
         "total_cost_usd": total,
         "subagent_count": subagents,
+        # Agent cost files in costs/ whose provenance did not match this feature
+        # (foreign session/project contamination), ignored on read. Surfaced —
+        # never silently dropped.
+        "excluded_subagents": excluded,
         "unpriced_models": sorted(unpriced),
         # `complete` means "we actually measured something AND everything we
         # measured was priced". Zero captures (empty costs/) is NOT complete —
@@ -242,4 +325,7 @@ def render_markdown(rep, task_id):
     ]
     if not rep["complete"]:
         lines += ["", f"> WARNING: Unpriced models (cost incomplete): {', '.join(rep['unpriced_models'])}"]
+    if rep.get("excluded_subagents"):
+        lines += ["", f"> NOTE: Ignored {rep['excluded_subagents']} out-of-scope agent "
+                      "cost file(s) (foreign session/project contamination)."]
     return "\n".join(lines)

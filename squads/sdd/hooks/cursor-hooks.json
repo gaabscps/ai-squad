@@ -15,6 +15,11 @@
         "loop_limit": 5
       },
       {
+        "command": "python3 ./hooks/ai-squad/register-impl-session.py",
+        "timeout": 5,
+        "loop_limit": 5
+      },
+      {
         "command": "python3 ./hooks/ai-squad/capture-session-cost.py",
         "timeout": 10,
         "loop_limit": 5
