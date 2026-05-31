@@ -128,7 +128,7 @@ Subagents are stateless. In a loop (e.g. `dev` → `logic-reviewer` flags issues
   {
     "id": "FIND-001",
     "severity": "error",
-    "message": "Off-by-one at exact expiry instant — uses < instead of <=.",
+    "rationale": "Off-by-one at exact expiry instant — uses < instead of <=.",
     "ac_ref": "FEAT-042/AC-003",
     "evidence_ref": "EV-005",
     "from_dispatch": "logic-reviewer-3a8c1d"

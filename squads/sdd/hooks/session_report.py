@@ -182,7 +182,8 @@ def _finding_ref(fd):
 
 def _finding_li(packet, fd, resolved):
     sev = _esc(fd.get("severity", "?"))
-    # Bug fix: the real text lives in `rationale` (was read as `message`, absent).
+    # `rationale` is the canonical finding field (all reviewers + audit emit it);
+    # `message`/`concern` kept as defensive fallback for any legacy packet.
     text = _esc(fd.get("rationale") or fd.get("message") or fd.get("concern")
                 or packet.get("summary", ""))
     ref = _finding_ref(fd)

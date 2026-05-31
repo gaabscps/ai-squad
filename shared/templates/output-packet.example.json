@@ -20,7 +20,7 @@
     {
       "id": "FIND-001",
       "severity": "error",
-      "message": "Off-by-one at exact expiry instant — uses < instead of <=.",
+      "rationale": "Off-by-one at exact expiry instant — uses < instead of <=.",
       "evidence_ref": "EV-004",
       "ac_ref": "FEAT-XXX/AC-003",
       "suggested_fix": "Change < to <= at src/foo/bar.ts:52"
