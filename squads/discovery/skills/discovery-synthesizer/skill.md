@@ -1,17 +1,19 @@
 ---
 name: discovery-synthesizer
-description: Phase 3 (Decide) entry point. Generates Options table, recommends one (Cagan Q10), gets human Decision via approval gate, writes Decision into `memo.md`.
+description: Phase 3 (Decide) entry point for the Discovery squad. Generates a 3-5 row Options table (always with Kill), applies Cagan Four-Risks decision rules to recommend one option with confidence, captures the human Decision via an approval gate, and writes Decision + Open Questions for Delivery into `memo.md`. Use when running `/discovery-synthesizer DISC-NNN` on a Session whose Investigate (Phase 2) is approved, or `--resume` on a paused/escalated one.
 ---
 
 # Discovery Synthesizer — Phase 3 (Decide)
 
-The Skill that turns Frame + Investigate Findings into a structured Decision and a freshness-checkable handoff to Delivery. **Workflow:** generate Options → apply decision rules → mark Recommended option + confidence → human Decides via Kiro-style gate → memo finalized with Open Questions for Delivery.
+Turns Frame + Investigate Findings into a structured Decision and a freshness-checkable handoff to Delivery. Workflow: generate Options → apply decision rules → mark the Recommended option + confidence → human Decides via the approval gate → finalize the memo with Open Questions for Delivery.
+
+The human is the Decider (RAPID model); this Skill conducts the conversation, presents options, and captures the Decision — see [`shared/concepts/skill-vs-subagent.md`](../../../shared/concepts/skill-vs-subagent.md).
 
 ## Industry foundations
-- **Options table over weighted scoring:** Cagan/Torres treat Discovery options as categorical (kill/pivot/proceed/defer), not rankable. RICE/ICE are reserved for *feature prioritization on existing products* — not Discovery decisions. Sources: SVPG *Assessing Product Opportunities*, Torres *Opportunity Solution Trees*.
-- **Decision rules + override + rationale:** the literature gives no canonical decision rule for Discovery; this Skill invents one (Cagan Four Risks-derived) but keeps every recommendation auditable via cited evidence + optional override rationale.
-- **Show-all + Recommend (RAPID Recommender):** Bain RAPID — Recommender generates options, marks one with rationale; Decider keeps full authority. Amazon Working Backwards PR/FAQ requires alternatives visible in the FAQ even when PR commits to one direction.
-- **Per-assumption freshness signal:** Torres *Continuous Discovery Habits* — each assumption tracked individually with `validated_at`; literature explicitly warns that "Discovery as a phase rather than continuous discipline" causes assumption decay (Producttalk: *Discovery Hand-Offs Kill Momentum*). The time-decoupled handoff (Discovery → Delivery months later) requires machine-checkable freshness, not LLM judgment.
+- **Options table over weighted scoring:** Cagan/Torres treat Discovery options as categorical (kill/pivot/proceed/defer), not rankable. RICE/ICE are reserved for feature prioritization on existing products — not Discovery decisions. Sources: SVPG *Assessing Product Opportunities*, Torres *Opportunity Solution Trees*.
+- **Decision rules + override + rationale:** the literature gives no canonical decision rule for Discovery; this Skill defines one (Cagan Four Risks-derived) and keeps every recommendation auditable via cited evidence + optional override rationale.
+- **Show-all + Recommend (RAPID Recommender):** Bain RAPID — the Recommender generates options and marks one with rationale; the Decider keeps full authority. Amazon Working Backwards PR/FAQ requires alternatives visible even when the PR commits to one direction.
+- **Per-assumption freshness signal:** Torres *Continuous Discovery Habits* tracks each assumption individually with `validated_at`; treating "Discovery as a phase rather than a continuous discipline" causes assumption decay (Producttalk: *Discovery Hand-Offs Kill Momentum*). A time-decoupled handoff (Discovery → Delivery months later) requires machine-checkable freshness, not LLM judgment.
 
 ## When to invoke
 - `/discovery-synthesizer DISC-NNN` — start Phase 3 for a Discovery Session whose Investigate is approved (or auto-advanced).
@@ -33,24 +35,24 @@ The Skill that turns Frame + Investigate Findings into a structured Decision and
 ## Steps
 
 ### 1. Validate Session and inputs
-Verify all preconditions in the refusal matrix. On any failure, refuse and exit cleanly.
+Verify every precondition in "Refuse when". On any failure, refuse and exit cleanly.
 
 ### 2. Read everything
 - `memo.md`: Frame Q1-Q9 + Investigate Findings (codebase map + 4 risk analyses).
 - `outputs/risk-analyst-<value|usability|feasibility|viability>-<dispatch_id>.json`: full structured outputs (verdict, severity, rationale, evidence[], assumptions[]).
 - `outputs/codebase-mapper-<dispatch_id>.json`: containers[] for any feasibility-relevant option.
 
-### 3. Generate Options table (3-5 alternatives + kill as row 1)
+### 3. Generate the Options table (Kill + 2-4 alternatives)
 Render a Markdown table with columns: `# | Option | Description | Pros | Cons | Effort | Risk-coverage`.
 
-- **Row 1 is always `Kill`** — non-negotiable (Working Backwards canonizes "do not build" as a normal outcome).
-- Rows 2-5: alternatives derived from Frame + risk findings. Examples by pattern:
+- **Row 1 is ALWAYS `Kill`** — non-negotiable (Working Backwards canonizes "do not build" as a normal outcome).
+- Rows 2-5: alternatives derived from Frame + risk findings, by pattern:
   - **Pivot** — same Problem (Q1), different Solution (addresses a refuted risk).
   - **Proceed as scoped** — Frame as-is.
   - **Proceed with reduced scope** — drop the highest-severity risk's surface area.
   - **Defer + experiment** — ship a small assumption-testing artifact instead (Torres).
-- `Risk-coverage` column: lists which Cagan risks (value/usability/feasibility/viability) each option mitigates or leaves open.
-- Cap: 5 rows total (kill + 4 alternatives). More than 5 = decision fatigue (research: present ≤5 options to decision-maker).
+- `Risk-coverage` column: name which Cagan risks (value/usability/feasibility/viability) each option mitigates or leaves open.
+- Cap at 5 rows total (Kill + 4 alternatives). More than 5 causes decision fatigue (present ≤5 options to a decision-maker).
 
 ### 4. Apply decision rules (first-pass recommendation)
 Apply in order; first match wins:
@@ -63,22 +65,22 @@ Apply in order; first match wins:
 | **R4** | ALL risks verdict ∈ {`validated`, `N/A`} AND ALL severities ∈ {`low`, `medium`} | **Proceed** | high |
 | **R5** | catch-all (mixed validated/inconclusive low-medium) | **Proceed-with-monitoring** (surface assumptions to monitor) | medium |
 
-**Override:** synthesizer MAY override a rule's recommendation (e.g. R1 fires but synthesizer judges the refuted risk is acceptable in context). Override REQUIRES `override_rationale` (1-2 sentences citing specific evidence). Confidence drops to `medium` on override.
+**Override:** you MAY override a rule's recommendation (e.g. R1 fires but the refuted risk is acceptable in context). An override REQUIRES `override_rationale` (1-2 sentences citing specific evidence); confidence drops to `medium`.
 
-**Cite specific evidence:** for every rule fired, the recommendation must reference the exact risk-analyst Output Packet row that triggered it (e.g. `"R1 triggered by outputs/risk-analyst-feasibility-<id>.json#risk_severity"`). No hand-wavy citations.
+**Cite specific evidence:** for every rule fired, reference the exact risk-analyst Output Packet row that triggered it (e.g. `"R1 triggered by outputs/risk-analyst-feasibility-<id>.json#risk_severity"`). NEVER cite hand-wavily.
 
-### 5. Write Recommendation block in memo (draft state)
-Atomic write `memo.md.### Recommendation` with:
-- Recommended option: `#N` (from Options table)
+### 5. Write the Recommendation block into memo (draft state)
+Atomically write `memo.md` `### Recommendation` with:
+- Recommended option: `#N` (from the Options table)
 - Rule matched: `R1 | R2 | R3 | R4 | R5`
 - Confidence: `high | medium | low`
 - Cited evidence: pointer list
 - Override rationale (if applicable)
 
-Do NOT mark `phase_completed: decide` yet — that happens after human Decision (step 7).
+Do NOT mark `phase_completed: decide` yet — that happens only after the human Decision (step 7).
 
-### 6. Approval gate (Show-all + Recommend, RAPID-style)
-Print the Options table + Recommendation block as Markdown to chat (visible to human). Then use `AskUserQuestion` with the options as enumerable choices (one per row in the Options table). The recommended option is marked `[RECOMMENDED · confidence: high|medium|low]`:
+### 6. Approval gate (Show-all + Recommend, RAPID-style) — HUMAN DECIDES
+Print the Options table + Recommendation block as Markdown to chat (visible to the human). Then call `AskUserQuestion` with one enumerable choice per Options-table row. Mark the recommended option `[RECOMMENDED · confidence: high|medium|low]`:
 
 ```
 Discovery Decision — DISC-NNN
@@ -96,26 +98,26 @@ Choose your Decision:
 [ ] Option #5 — <label>
 ```
 
-The human's choice may differ from `[RECOMMENDED]` — that is the Decider's authority (RAPID).
+The human's choice MAY differ from `[RECOMMENDED]` — that is the Decider's authority (RAPID). NEVER write the Decision (step 7) before the human selects.
 
-### 7. Write Decision and Open Questions for Delivery into memo
-On any selection (including kill):
+### 7. Write Decision + Open Questions for Delivery into memo
+On any selection (including Kill):
 1. Update `### Decision` with the chosen option + ISO timestamp.
 2. Auto-generate `### Open Questions for Delivery`:
    - Aggregate `assumptions[]` from all 4 risk-analyst outputs.
-   - Filter to those whose `validation_path` indicates required-before-delivery (heuristic: any assumption from an `inconclusive` verdict, plus high-severity validated/refuted with `validation_path` set).
-   - Render each as bullet: `<id> · <summary> · validated_at: <ISO> · validation_path: <path>`.
+   - Keep those whose `validation_path` marks them required-before-delivery (heuristic: any assumption from an `inconclusive` verdict, plus high-severity validated/refuted with `validation_path` set).
+   - Render each as a bullet: `<id> · <summary> · validated_at: <ISO> · validation_path: <path>`.
    - Empty section = "ready to hand off as-is" (rare — only when all assumptions are low-stakes).
-3. Set `memo.md.status: approved` and `phase_completed: decide`.
-4. Atomic write.
+3. Set `memo.md` `status: approved` and `phase_completed: decide`.
+4. Atomically write.
 
 ### 8. Update Session
 - `session.yml.current_phase`: `done` (Discovery has 3 phases; Decide is terminal for the squad).
 - `session.yml.completed_at`: ISO timestamp.
-- `session.yml.phase_history.decide`: populated with `decision_option`, `confidence`, `rule_matched`.
+- `session.yml.phase_history.decide`: populate `decision_option`, `confidence`, `rule_matched`.
 
-### 9. Final handoff message (dynamic, based on Decision)
-See Handoff section.
+### 9. Final handoff message
+Emit the handoff for the Decision outcome (see Handoff below), and print it to chat.
 
 ## Output
 - `memo.md` finalized: `## Decide` block fully populated (Options · Recommendation · Decision · Open Questions for Delivery); `phase_completed: decide`; `status: approved`.
@@ -130,17 +132,14 @@ See Handoff section.
 
 ## Failure modes
 - **Human abandons mid-gate:** state on disk reflects last atomic write (Recommendation drafted but Decision not set). `--resume` re-prints the gate.
-- **Override rationale missing when synthesizer overrides rule:** refuse to draft Recommendation; synthesizer must supply `override_rationale` first (self-check before step 5).
-- **All 5 options identical (degenerate Options table):** indicates synthesizer failed to differentiate; emit `status: blocked, blocker_kind: degenerate_options` — escalate to human, do NOT proceed to gate.
+- **Override rationale missing on an override:** refuse to draft the Recommendation; supply `override_rationale` first (self-check before step 5).
+- **All options identical (degenerate Options table):** options were not differentiated; emit `status: blocked, blocker_kind: degenerate_options` — escalate to the human, do NOT proceed to the gate.
 - **AskUserQuestion timeout:** Session paused; no state change. `--resume` re-prompts.
-
-## Why a Skill (not a Subagent)
-Phase 3 has the human as Decider in the RAPID model — the Skill conducts the conversation, presents options, captures the Decision. Skills satisfy the criterion "human in-the-loop" (see `shared/concepts/skill-vs-subagent.md`).
 
 ## Communication style
 This Skill talks to the **human** as Decider — friendly, structured, RAPID-style:
 - Friendly, direct tone — no marketing speak.
-- Markdown table for Options (decision-fatigue mitigation: cap at 5 rows).
-- `AskUserQuestion` for the binary Decision (one option per row, recommended marked).
-- Always cite specific evidence row in Recommendation — no hand-waving.
+- Markdown table for Options (cap at 5 rows to mitigate decision fatigue).
+- `AskUserQuestion` for the Decision (one option per row, recommended marked).
+- Always cite a specific evidence row in the Recommendation — never hand-wave.
 - Always end with a guided next-step message — even on Kill (point to `/ship`); on Proceed, name the SDD entry command and remind about freshness re-validation.

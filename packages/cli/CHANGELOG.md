@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0 — 2026-05-31
+
+All 8 skills + 9 agents migrated to Anthropic's official Agent Skills authoring standard (progressive disclosure). Structure/quality level-up — no behavior change.
+
+### Changed
+
+- **Skills adopt progressive disclosure.** Each `skill.md` is now a lean "spine" (workflow + critical invariants); heavy detail (schemas, big tables, templates, edge-case catalogs) moved to flat reference `.md` files in the same skill directory, linked one level deep and read on demand. The orchestrator skill went 520 → 215 lines with 5 references (`dispatch-manifest.md`, `dispatch-contract.md`, `model-effort-calibration.md`, `handoff.md`, `failure-modes.md`); `spec-writer` 295 → 144 (+3 refs); `pm` 184 → 152 (+1); `discovery-orchestrator` 173 → 103 (+1). The rest were polished in place (already under cap). All skills are now well under the 300-line cap (Anthropic's own limit is 500). Following Anthropic's guidance, files already comfortably under cap were not force-split.
+- **Agents tightened to the standard.** Agents are flat files (Claude Code resolves `subagent_type` from `agents/<name>.md`, and the deploy copies them individually — so they can't carry reference files). Each was prose-tightened in place to the Anthropic style and brought under the 150-line agent cap without dropping any rule: `audit-agent` 216 → 125, `code-reviewer` 194 → 119, `logic-reviewer` 189 → 106, `committer` 183 → 105 (+ description normalized to English), `dev` 134 → 121; the rest were already under cap and got a style/description polish.
+- **Descriptions follow the Anthropic pattern** — third person, stating WHAT the component does plus a "Use when …" clause, for clearer discovery. Frontmatter `name`, `tools`, `model`, and `hooks:` blocks were preserved verbatim (functional wiring / invocation keys). All gates, refusal rules, Output Packet schemas, status enums, and MUST/NEVER invariants are preserved (the "narrow-bridge" rules stay strong per Anthropic's degrees-of-freedom guidance).
+
 ## 0.10.0 — 2026-05-31
 
 Orchestrator no longer forces a manual `session.yml` edit when a human starts an unplanned implementation (Gap B).

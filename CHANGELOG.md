@@ -18,6 +18,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- All skills + agents migrated to Anthropic's Agent Skills authoring standard (cli 0.11.0). Skills adopt progressive disclosure — a lean `skill.md` spine plus flat reference `.md` files read on demand (orchestrator 520 → 215 lines + 5 refs; spec-writer, pm, discovery-orchestrator also split); agents (flat files, no refs possible) were prose-tightened under the 150-line cap. Descriptions follow the third-person "what + use when" pattern. Behavior preserved — frontmatter wiring, gates, schemas, and MUST/NEVER invariants all intact.
 - Orchestrator recognizes explicit human `/orchestrator` invocation as authorization to run an unplanned implementation (cli 0.10.0). When `implementation` is absent from `planned_phases`, the refusal now branches on `auto_approved_by`: autonomous drivers (`pm`) still hard-refuse, but a human-driven Session (`auto_approved_by: null`) is confirmed once via `AskUserQuestion` and the orchestrator self-appends `implementation` + an audit note — no manual `session.yml` edit. Removes the friction every plan/tasks-only feature hit (FEAT-005, FEAT-006).
 
 ### Fixed

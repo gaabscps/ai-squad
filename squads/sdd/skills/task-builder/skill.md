@@ -1,11 +1,11 @@
 ---
 name: task-builder
-description: Phase 3 entry point. Interactive task decomposition — reads approved Spec + Plan, writes approved `tasks.md` with AC coverage and parallelization markers.
+description: Phase 3 (Tasks) entry point for the SDD pipeline. Interactive task decomposition — reads an approved Spec + Plan and writes an approved `tasks.md` of granular `T-XXX` units with exact file scope, AC coverage, and `[P]` parallelization markers. Use when running `/task-builder FEAT-NNN` after Spec+Plan are approved, or `--rewrite` to discard approved Tasks and start over.
 ---
 
 # Task Builder — Phase 3 (Tasks)
 
-The Skill that turns an approved Spec + Plan into an approved Tasks list: granular `T-XXX` units with exact file scope, AC coverage, and `[P]` parallelization markers. Interactive with the human. Style inspired by GitHub Spec Kit's tasks template.
+Turn an approved Spec + Plan into an approved Tasks list: granular `T-XXX` units with exact file scope, AC coverage, and `[P]` parallelization markers. Interactive with the human. Decomposition style follows GitHub Spec Kit's tasks template.
 
 ## When to invoke
 - `/task-builder` — after Spec+Plan approved and `tasks` is in `planned_phases` (auto-detects `spec_id` from Session).
@@ -34,65 +34,64 @@ The Skill that turns an approved Spec + Plan into an approved Tasks list: granul
 
 ### 2. Generate first draft (vertical-slice decomposition — Spec Kit pattern)
 
-**Read `session.yml.pipeline_mode` first.** It changes the targets below.
+**Read `session.yml.pipeline_mode` first** (default `standard`; valid `lite` | `standard`) — it sets the task targets below.
 
-Decompose using the per-User-Story phase model:
-- One section of tasks per User Story, sequenced by priority (P1 → P2 → P3).
+Decompose per the per-User-Story phase model:
+- One task section per User Story, sequenced by priority (P1 → P2 → P3).
 - Inside each story: layered tasks (model → service → API → UX → tests) following INVEST sizing (Independent, Negotiable, Valuable, Estimable, Small, Testable).
-- **Target by mode:**
-  - `standard` mode: **5-8 tasks per story, ~15-30 tasks total per feature**. Outliers OK with rationale; if over 40, flag possible feature-scope explosion.
-  - `lite` mode: **HARD CAP of 2 tasks total** across the entire feature. If decomposition naturally exceeds 2, the spec was too big for `lite` — surface this via chat: `"Lite mode caps tasks at 2; decomposition produced N. Either merge tasks (preferred — lite implies single-purpose change), or re-run /spec-writer --mode=standard."` Do not silently break the cap.
-- **Task size = smallest independently testable slice that touches a coherent file set** (not 1 file, not 1 module).
-- Each task gets: monotonic `T-XXX` ID, `[US-XXX]` reference (or none for Setup/Foundational), `Files:` (exact paths — see step 4), `AC covered:` tags, optional `Depends on:`, `Estimated complexity:`.
-- **Auto skip-reviewers (lite mode only):** for any lite-mode task whose `Files:` set is exactly **one file** AND whose `Estimated complexity:` is `trivial` or `small`, automatically append `Skip reviewers: lite mode — single-file <category>` to the task (category = `fix` | `doc` | `copy` | `single-fn`). This grants the orchestrator's reviewer-skip exception (per `orchestrator/skill.md`) without manual annotation. Multi-file lite tasks still get full reviewers.
-- Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding before any story tasks; optional **Foundational** phase for cross-story prereqs. **Lite mode disallows Setup/Foundational phases** — if scaffolding is needed, lite is the wrong mode.
-- Write to `.agent-session/<spec_id>/tasks.md` (atomic; `status: draft`).
+- **Task size = smallest independently testable slice that touches a coherent file set** (not one file, not one whole module).
+- **Targets by mode:**
+  - `standard`: **5-8 tasks/story, ~15-30 total/feature**. Outliers OK with rationale; over 40 → flag possible feature-scope explosion.
+  - `lite`: **HARD CAP of 2 tasks total** for the whole feature. NEVER silently break it. If decomposition needs more, the spec was too big for `lite` — surface via chat: `"Lite mode caps tasks at 2; decomposition produced N. Either merge tasks (preferred — lite implies single-purpose change), or re-run /spec-writer --mode=standard."`
+- Each task carries: monotonic `T-XXX` ID, `[US-XXX]` reference (none for Setup/Foundational), `Files:` (exact paths — step 4), `AC covered:` tags, optional `Depends on:`, `Estimated complexity:`.
+- **Auto skip-reviewers (lite mode only):** for any lite task whose `Files:` is exactly **one file** AND whose `Estimated complexity:` is `trivial` or `small`, append `Skip reviewers: lite mode — single-file <category>` (category = `fix` | `doc` | `copy` | `single-fn`). This grants the orchestrator's reviewer-skip exception (`orchestrator/skill.md`) without manual annotation. Multi-file lite tasks keep full reviewers.
+- Optional **Setup** phase (`T-001..T-00N`) for shared scaffolding; optional **Foundational** phase for cross-story prereqs. **Lite mode disallows both** — if scaffolding is needed, lite is the wrong mode.
+- Write `.agent-session/<spec_id>/tasks.md` atomically (`status: draft`).
 
 ### 3. Mark `[P]` (parallelization — Spec Kit dual-rule)
 A task is `[P]`-safe IFF **both**:
 - (a) Its `Files:` set is **disjoint** from every other `[P]` task in its phase (mechanical exact-path set intersection), AND
 - (b) It has **no `Depends on:`** pointing to an incomplete predecessor.
 
-Reject `[P]` markers that fail either rule:
-- **Interactive mode** (`auto_approved_by != "pm"`): emit a chat warning; remove the `[P]` (default) OR ask the human to refactor `Files:` into disjoint sets via `AskUserQuestion`.
-- **PM-mode** (`auto_approved_by == "pm"`): do NOT silently remove the `[P]`. Instead INSERT a `[NEEDS CLARIFICATION] [P]-violation: <task-id> shares write scope with <conflicting-task-id>` marker into `tasks.md` (atomic write). The bypass step (Step 9) will detect the marker and refuse approval — the violation is never silently masked.
+Any `[P]` that fails either rule MUST be rejected:
+- **Interactive** (`auto_approved_by != "pm"`): chat warning; remove the `[P]` (default) OR ask the human via `AskUserQuestion` to refactor `Files:` into disjoint sets.
+- **PM-mode** (`auto_approved_by == "pm"`): NEVER silently remove the `[P]`. Insert a `[NEEDS CLARIFICATION] [P]-violation: <task-id> shares write scope with <conflicting-task-id>` marker (atomic write). Step 9 detects it and refuses approval — the violation is never masked.
 
 ### 4. Specify `Files:` (exact paths — Spec Kit pattern)
-- Use **exact file paths** (e.g. `src/auth/login.ts`), never globs (e.g. `src/auth/**`).
-- Exception: a directory path is allowed only when the task creates new files within it (e.g. `src/auth/` for "scaffold auth module").
-- Exact paths enable mechanical `[P]`-conflict detection in step 3.
+- Use **exact file paths** (`src/auth/login.ts`), NEVER globs (`src/auth/**`). Exact paths enable the mechanical `[P]`-conflict detection in step 3.
+- Exception: a directory path is allowed only when the task creates new files within it (`src/auth/` for "scaffold auth module").
 
 ### 5. Tag `AC covered:` per task (Kiro forward-traceability)
-Every AC in the Spec must appear in at least one task's `AC covered:` field. Re-tagging at the task layer (in addition to the Plan's AC Coverage Map) lets the `qa` Subagent verify AC closure mechanically per dispatch.
+Every Spec AC MUST appear in at least one task's `AC covered:` field. Re-tagging at the task layer (on top of the Plan's AC Coverage Map) lets the `qa` Subagent verify AC closure mechanically per dispatch.
 
 ### 6. Clarification pass (one ambiguity at a time)
-For uncertain decomposition decisions: insert `[NEEDS CLARIFICATION] <question>` markers. Resolve via `AskUserQuestion` with 2-3 enumerable options + "Other" fallback. Atomic write after each resolution.
-- **Interactive mode** (`auto_approved_by != "pm"`): cap at 3 markers; ask the human to pick the 3 most important and move the rest to a `## Decisions deferred to Implementation` section.
-- **PM-mode** (`auto_approved_by == "pm"`): NO cap — every unresolved ambiguity MUST get its own `[NEEDS CLARIFICATION]` marker so Step 9's bypass scan catches all of them. Silently demoting violations to a deferred section would hide them from the bypass audit check.
+For uncertain decomposition decisions, insert `[NEEDS CLARIFICATION] <question>` markers; resolve via `AskUserQuestion` (2-3 enumerable options + "Other"). Atomic write after each resolution.
+- **Interactive** (`auto_approved_by != "pm"`): cap at 3 markers; ask the human to pick the 3 most important and move the rest to a `## Decisions deferred to Implementation` section.
+- **PM-mode** (`auto_approved_by == "pm"`): NO cap — every unresolved ambiguity MUST get its own marker so Step 9's bypass scan catches all of them. Demoting to a deferred section would hide violations from the audit.
 
-### 7. Section-by-section refinement (only when human asks)
+### 7. Section-by-section refinement (only when the human asks)
 - Enumerable decision (split T-005? promote T-007 to `[P]`? change `Estimated complexity`?) → `AskUserQuestion`.
 - Generative refinement (rewrite a task title, restructure a `Depends on:` chain) → free-form chat.
-- After every accepted change: atomic write of full `tasks.md` AND re-run `[P]` validation (step 3) AND re-check AC coverage (step 8).
+- After every accepted change: atomic write of full `tasks.md`, then re-run `[P]` validation (step 3) AND re-check AC coverage (step 8).
 
 ### 8. AC coverage gate (designer-symmetric hard gate)
-Before approval: every AC from the Spec MUST be covered by at least one task's `AC covered:` field.
-- **Interactive mode** (`auto_approved_by != "pm"`): gaps → list them, refuse approval, return to step 7.
-- **PM-mode** (`auto_approved_by == "pm"`): do NOT loop to step 7 (step 7 is interactive). Instead INSERT a `[NEEDS CLARIFICATION] AC-coverage gap: <AC-XXX> uncovered` marker into `tasks.md` for each uncovered AC (atomic write). The bypass step (Step 9) will detect the markers and refuse approval. This mirrors the designer pattern (T-013).
+Before approval, every Spec AC MUST be covered by at least one task's `AC covered:` field.
+- **Interactive** (`auto_approved_by != "pm"`): gaps → list them, refuse approval, return to step 7.
+- **PM-mode** (`auto_approved_by == "pm"`): do NOT loop to step 7 (it is interactive). Insert a `[NEEDS CLARIFICATION] AC-coverage gap: <AC-XXX> uncovered` marker per uncovered AC (atomic write); Step 9 detects them and refuses approval. Mirrors the designer pattern (T-013).
 
 ### 9. PM-mode approval gate check (bypass — runs before Step 10)
 
 > Reference: `shared/concepts/pm-bypass.md` — reproduced here for in-context visibility.
 
 1. Read `session.yml.auto_approved_by`.
-2. IF `auto_approved_by != "pm"` (strict equality, case-sensitive, must be string)
+2. IF `auto_approved_by != "pm"` (strict equality, case-sensitive, must be a string)
    → Proceed to Step 10 (interactive gate). Stop here.
 
-3. Scan `tasks.md` for any `[NEEDS CLARIFICATION]` markers.
-   In the task-builder context, ALSO treat the following as escalation triggers (insert a `[NEEDS CLARIFICATION]` marker BEFORE reaching this step when either is detected):
-   - **`[P]`-violation:** a proposed parallel-safe (`[P]`) task would share write scope with another `[P]` task in the same wave.
+3. Scan `tasks.md` for `[NEEDS CLARIFICATION]` markers. In the task-builder context, ALSO treat these as escalation triggers — insert a marker BEFORE reaching this step when either is detected:
+   - **`[P]`-violation:** a proposed `[P]` task shares write scope with another `[P]` task in the same wave.
    - **AC-coverage gap:** any Spec AC is uncovered by the task list.
-   IF one or more `[NEEDS CLARIFICATION]` markers remain:
+
+   IF one or more markers remain:
    → REFUSE bypass. Do NOT approve.
    → Attempt to append to `session.yml.notes` (atomic tmp + rename):
      ```yaml
@@ -106,18 +105,12 @@ Before approval: every AC from the Spec MUST be covered by at least one task's `
    → Surface to PM persona: `"Approval blocked — open questions must be resolved before autonomous approval."`
    → Exit this step; leave `tasks.md` status unchanged.
 
-4. No markers remain. Approve in this exact order (ordering invariant: evidence lands in `session.yml` BEFORE artifact is marked approved):
+4. No markers remain. Approve in this exact order (ordering invariant: evidence lands in `session.yml` BEFORE the artifact is marked approved):
 
-   a. Check for re-entry / partial-write repair:
-      - IF session.yml already has `phase_history.tasks.approved_by == "pm"`
-        AND `tasks.md` frontmatter `status == "approved"`:
-          REFUSE (raise). Phase already approved by PM must not be re-approved.
-      - IF session.yml already has `phase_history.tasks.approved_by == "pm"`
-        AND `tasks.md` frontmatter `status != "approved"`:
-          Partial-write repair. Write occurred in session.yml (step 4.b) but not in tasks.md (step 4.c).
-          DO NOT raise. Skip step 4.b (session.yml write and current_phase advancement already done). Go directly to step 4.c.
-      - IF session.yml does NOT have `phase_history.tasks.approved_by`:
-          Normal path. Continue to step 4.b.
+   a. Check for re-entry / partial-write repair via `phase_history.tasks.approved_by`:
+      - Set to `"pm"` AND `tasks.md` `status == "approved"` → REFUSE (raise). A PM-approved phase must not be re-approved.
+      - Set to `"pm"` AND `tasks.md` `status != "approved"` → partial-write repair (session.yml write in 4.b happened, tasks.md write in 4.c did not). DO NOT raise; skip 4.b (session.yml + current_phase already done), go directly to 4.c.
+      - Absent → normal path. Continue to 4.b.
 
    b. Perform a single atomic read-modify-write on `session.yml` (one tmp + rename) writing ALL of:
       - `phase_history.tasks.approved_by: "pm"`
@@ -175,16 +168,15 @@ After approval, check `planned_phases` and **auto-invoke the next Skill** — th
 - If `implementation` not planned (recommended path): `"Tasks approved. Implementation runs in a separate session for a clean per-phase cost split + structural prevention of PM-mode inference from planning history. Session is now paused. ▶ Next step: /orchestrator FEAT-NNN --resume (autonomous Phase 4; generates .agent-session/FEAT-NNN/report.html at session end with cost + code review). To clean up without executing: /ship FEAT-NNN."`
 
 ## Failure modes
-- **Human abandons mid-Session:** state on disk reflects last atomic write. Next `/task-builder FEAT-NNN` resumes.
+- **Human abandons mid-Session:** disk reflects the last atomic write. Next `/task-builder FEAT-NNN` resumes.
 - **AskUserQuestion timeout / no answer:** Session paused; no state change.
 - **Partial `tasks.md` write:** atomic write (tmp + rename) makes this impossible.
-- **Spec or Plan edited externally during decomposition:** task-builder is read-only on Spec/Plan. mtime check on next refinement turn; if changed, warn: `"Spec/Plan changed since draft. Re-read and regenerate?"`.
-- **More than 3 `[NEEDS CLARIFICATION]` would emerge (interactive mode only):** ask the human to pick the 3 most important; the rest go to a `## Decisions deferred to Implementation` section in tasks.md. In PM-mode there is NO cap — every unresolved ambiguity keeps its marker so Step 9 catches all violations (see Step 6).
-- **`[P]` marker on tasks with overlapping `Files:` (interactive mode):** auto-detected in step 3; chat warning + remove the `[P]` marker (default) OR ask the human to refactor `Files:` into disjoint sets via `AskUserQuestion`. In PM-mode, task-builder MUST insert a `[NEEDS CLARIFICATION]` marker (atomic write) instead of silently removing `[P]` — marker ownership lies with task-builder, not with the bypass step.
-- **AC coverage gap at approval gate (interactive mode):** refuse approval; list uncovered ACs; return to step 7. In PM-mode, task-builder MUST insert a `[NEEDS CLARIFICATION]` marker per uncovered AC (atomic write) — marker ownership lies with task-builder, not with the bypass step.
-- **Task count > 40:** flag possible feature-scope explosion; ask the human to consider splitting the Spec via `AskUserQuestion` (split / proceed anyway / cancel).
-- **PM bypass re-entry guard fires:** `phase_history.tasks.approved_by` already set when Step 9 runs → raise immediately; do NOT re-approve. Indicates a session state inconsistency — surface to PM persona for manual investigation.
-- **`session.yml` write fails during PM bypass:** after one retry, raise (do NOT swallow). The PM persona must be informed; the artifact is NOT marked approved.
+- **Spec or Plan edited externally during decomposition:** task-builder is read-only on Spec/Plan. mtime check on the next refinement turn; if changed, warn: `"Spec/Plan changed since draft. Re-read and regenerate?"`.
+- **>3 `[NEEDS CLARIFICATION]` (interactive):** per step 6 — pick the 3 most important; rest to `## Decisions deferred to Implementation`. PM-mode keeps every marker (no cap).
+- **`[P]` overlap / AC-coverage gap:** handled in steps 3 and 8. **Marker ownership lies with task-builder, not the bypass step** — in PM-mode, task-builder MUST insert the `[NEEDS CLARIFICATION]` marker itself (atomic write); Step 9 only detects it.
+- **Task count > 40:** flag possible feature-scope explosion; ask the human via `AskUserQuestion` (split / proceed anyway / cancel).
+- **PM bypass re-entry guard fires:** `phase_history.tasks.approved_by` already set when Step 9 runs → raise immediately, do NOT re-approve. Indicates session-state inconsistency — surface to PM persona for manual investigation.
+- **`session.yml` write fails during PM bypass:** after one retry, raise (NEVER swallow). Inform the PM persona; the artifact is NOT marked approved.
 
 ## Why a Skill (not a Subagent)
 Phase 3 has the human in-the-loop reviewing decomposition. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents".
