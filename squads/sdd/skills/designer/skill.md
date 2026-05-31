@@ -1,16 +1,17 @@
 ---
 name: designer
-description: Phase 2 entry point. Interactive design session — reads approved Spec, proposes architecture decisions, writes approved `plan.md`.
+description: Phase 2 (Plan) entry point for the SDD pipeline. Turns an approved Spec into an approved `plan.md` — architecture, data model, API surface, UX surface, risks — interactively with the human, then auto-advances to the next planned Phase. Use when running `/designer FEAT-NNN` to plan an approved Spec, or `--rewrite` to discard an approved Plan and start over.
 ---
 
 # Designer — Phase 2 (Plan)
 
-The Skill that turns an approved Spec into an approved Plan: architecture, data model, API/contracts, UX surface, risks. Interactive with the human.
+Turns an approved Spec into an approved Plan (architecture, data model, API/contracts, UX surface, risks). Human in-the-loop throughout.
 
-## When to invoke
-- `/designer` — after Spec approved and `plan` is in `planned_phases` (auto-detects `spec_id` from current Session).
+## Invoke
+
+- `/designer` — auto-detect `spec_id` from the current Session (Spec must be approved and `plan` in `planned_phases`).
 - `/designer FEAT-NNN` — explicit `spec_id`.
-- `/designer FEAT-NNN --rewrite` — discard existing Plan and start over (only allowed if Plan is `status: approved`).
+- `/designer FEAT-NNN --rewrite` — discard existing Plan and start over (only if Plan is `status: approved`).
 
 ## Refuse when
 - `plan` not in `planned_phases` → message: `"Plan was not planned for this Session. Edit planned_phases in session.yml or restart with /spec-writer."`
@@ -26,40 +27,40 @@ The Skill that turns an approved Spec into an approved Plan: architecture, data 
 ## Steps
 
 ### 1. Resolve Session and Spec
-1. Determine `spec_id` (explicit arg or current Session from `session.yml`).
-2. Read approved Spec; extract the full set of `AC-XXX` IDs from all User Stories — this is the **AC universe** the Plan must cover.
+1. Determine `spec_id` (explicit arg, else current Session from `session.yml`).
+2. Read the approved Spec; extract every `AC-XXX` ID from all User Stories — this is the **AC universe** the Plan MUST cover.
 
 ### 2. Generate first draft (Hybrid drafting — Spec Kit/Kiro pattern)
-Produce a full draft of `plan.md` from the bundled template `plan.template.md` (in this skill's base directory — the "Base directory for this skill" path shown on activation), populated from the Spec:
-- Fill Architecture decisions, Data model, API surface (and UX surface if Spec has visual surface) with the most defensible choice given the Spec and `project_context`.
-- **Tag every decision inline with the AC IDs it covers** — `Decision X — uses REST over gRPC (covers: AC-001, AC-003).` (Kiro forward-traceability pattern.)
-- For uncertain decisions: insert `[NEEDS CLARIFICATION] <specific question>` markers (cap: 3).
-- **Auto-populate Risks** by fixed categories (STRIDE + ATAM lineage): `Security`, `Performance`, `Migration / data`, `Backwards compatibility`, `Regulatory / compliance`. Derive at least one concrete risk per category from Spec content; if none applies, write `(none — <one-line reason>)` to make the consideration explicit.
-- Generate the **AC Coverage Map** section at the end of the Plan: every AC → Plan section(s) that cover it.
-- Write to `.agent-session/<spec_id>/plan.md` (atomic write; `status: draft`).
+Draft `plan.md` from the bundled template `plan.template.md` (in this skill's base directory — the "Base directory for this skill" path shown on activation), populated from the Spec:
+- Fill Architecture decisions, Data model, and API surface (plus UX surface when the Spec has a visual surface) with the most defensible choice given the Spec and `project_context`.
+- **Tag every decision inline with the AC IDs it covers** — e.g. `Decision X — uses REST over gRPC (covers: AC-001, AC-003).` (Kiro forward-traceability pattern.)
+- Mark uncertain decisions with `[NEEDS CLARIFICATION] <specific question>` (cap: 3).
+- **Auto-populate Risks** across five fixed categories (STRIDE + ATAM lineage): `Security`, `Performance`, `Migration / data`, `Backwards compatibility`, `Regulatory / compliance`. Derive at least one concrete risk per category from the Spec; if none applies, write `(none — <one-line reason>)` so the consideration is explicit.
+- Generate the **AC Coverage Map** at the end: every AC → the Plan section(s) covering it.
+- Atomic-write to `.agent-session/<spec_id>/plan.md` with `status: draft`.
 
 ### 3. Record alternatives (MADR-style, post-hoc — not interactive)
-For any decision where alternatives were considered, append to `## Notes` using MADR format:
-- `Decision: <chosen>` — `Alternatives considered: <X (rejected because Y)>, <Z (rejected because W)>.`
-- **Do NOT prompt the human at branching points.** Spec Kit + Kiro + Nygard ADR converge on commit-then-document; interactive choice at every fork creates friction without quality gain.
+For any decision with alternatives considered, append to `## Notes` in MADR format: `Decision: <chosen>` — `Alternatives considered: <X (rejected because Y)>, <Z (rejected because W)>.`
+
+**Do NOT prompt the human at branching points.** Spec Kit + Kiro + Nygard ADR converge on commit-then-document; interactive choice at every fork is friction without quality gain.
 
 ### 4. Clarification pass (one ambiguity at a time)
 For each `[NEEDS CLARIFICATION]` (cap of 3, same convention as spec-writer):
-- Use `AskUserQuestion` with 2-3 enumerable resolution options + an "Other" free-form fallback.
-- On answer: replace marker with resolved text; atomic write `plan.md`; recompute AC Coverage Map.
-- When all resolved: proceed to step 5.
+- `AskUserQuestion` with 2-3 enumerable resolution options + an "Other" free-form fallback.
+- On answer: replace the marker with resolved text; atomic-write `plan.md`; recompute the AC Coverage Map.
+- When all resolved, proceed to step 5.
 
 ### 5. Section-by-section refinement (only when the human asks)
 - Enumerable decision ("swap REST for gRPC?", "Postgres or DynamoDB?") → `AskUserQuestion`.
 - Generative refinement (rewrite a Risk's mitigation, expand a Data model entity) → free-form chat.
-- After every accepted change to a major section: atomic write of full `plan.md` AND auto-recompute AC Coverage Map.
+- After every accepted change to a major section: atomic-write the full `plan.md` AND auto-recompute the AC Coverage Map.
 
 ### 6. AC coverage gate (designer-specific hard gate)
-Before approval: every AC in the Spec MUST be covered by at least one Plan section (per inline tags + final matrix). If gaps exist:
+Before approval, every AC in the Spec MUST be covered by at least one Plan section (per inline tags + final matrix). If gaps exist:
 
-**PM-mode branch (when `session.yml.auto_approved_by == "pm"`):** insert a `[NEEDS CLARIFICATION]` marker into `plan.md` (atomic tmp + rename) naming every uncovered AC before exiting this step. Example marker: `[NEEDS CLARIFICATION] AC coverage gap: AC-007, AC-012 not covered by any Plan decision. Add a decision or move to Decisions deferred to Implementation with a one-line reason.` Then proceed to Step 6.5 — the bypass step will detect the marker and refuse autonomous approval.
+**PM-mode branch (`session.yml.auto_approved_by == "pm"`):** atomic-write a `[NEEDS CLARIFICATION]` marker into `plan.md` naming every uncovered AC, then proceed to Step 6.5 — the bypass step will detect the marker and refuse autonomous approval. Example marker: `[NEEDS CLARIFICATION] AC coverage gap: AC-007, AC-012 not covered by any Plan decision. Add a decision or move to Decisions deferred to Implementation with a one-line reason.`
 
-**Interactive branch (normal run):** print the uncovered ACs. Refuse to proceed to approval until the human either (a) adds a Plan decision that covers them, or (b) explicitly moves them to `## Decisions deferred to Implementation` with a one-line reason.
+**Interactive branch (normal run):** print the uncovered ACs. Refuse to proceed to approval until the human either (a) adds a Plan decision covering them, or (b) explicitly moves them to `## Decisions deferred to Implementation` with a one-line reason.
 
 ### 6.5. PM-mode approval gate check (bypass — runs before Step 7)
 
@@ -142,7 +143,7 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 - `artifact_path`: `.agent-session/<spec_id>/plan.md`.
 
 ### 7. Final approval gate (Hybrid: checklist + AskUserQuestion — Kiro/Spec Kit pattern)
-1. Print visual checklist summary:
+1. Print the visual checklist summary:
    ```
    Plan ready for approval:
    [x] Architecture decisions: N
@@ -165,24 +166,24 @@ Before approval: every AC in the Spec MUST be covered by at least one Plan secti
 
 ## Output
 - Path: `.agent-session/<spec_id>/plan.md` (template: `plan.template.md` in this skill's base directory).
-- Status field: `draft` → `approved` (no `in-progress` mid-state).
-- Atomic write: tmp + rename, on every accepted section change AND on final approval.
-- Required sections at approval: Architecture, Data model, API surface, UX (if applicable), Risks (5 categories), AC Coverage Map. Notes optional but holds MADR alternatives.
+- Status: `draft` → `approved` (no `in-progress` mid-state).
+- Atomic write (tmp + rename) on every accepted section change AND on final approval.
+- Required sections at approval: Architecture, Data model, API surface, UX (if applicable), Risks (5 categories), AC Coverage Map. Notes is optional but holds the MADR alternatives.
 
 ## Handoff (auto-advance when next Phase is planned)
-After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step needed.
-- If `tasks` planned next: print `"Plan approved. Advancing to Phase 3 (Tasks)..."` → invoke `/task-builder`.
-- If `tasks` skipped but `implementation` planned: print `"Plan approved. Tasks was not planned. Advancing to Phase 4 (Implementation)..."` → invoke `/orchestrator`.
-- If neither planned: `"Plan approved. No further Phases were planned for this Session — Session is now paused. To extend later, edit planned_phases in session.yml. To clean up: /ship FEAT-NNN."`
+After approval, check `planned_phases` and **auto-invoke the next Skill** — the human's approval IS the gate; no second manual step.
+- `tasks` planned next → print `"Plan approved. Advancing to Phase 3 (Tasks)..."`, invoke `/task-builder`.
+- `tasks` skipped but `implementation` planned → print `"Plan approved. Tasks was not planned. Advancing to Phase 4 (Implementation)..."`, invoke `/orchestrator`.
+- Neither planned → print `"Plan approved. No further Phases were planned for this Session — Session is now paused. To extend later, edit planned_phases in session.yml. To clean up: /ship FEAT-NNN."`
 
 ## Failure modes
-- **Human abandons mid-Session:** state on disk reflects last atomic write (per-section). Next `/designer FEAT-NNN` resumes from there.
-- **AskUserQuestion timeout / no answer:** Session paused; no state change. Next `/designer FEAT-NNN` re-prompts the same question.
+- **Human abandons mid-Session:** disk reflects the last per-section atomic write. Next `/designer FEAT-NNN` resumes from there.
+- **AskUserQuestion timeout / no answer:** Session paused, no state change. Next `/designer FEAT-NNN` re-prompts the same question.
 - **Partial `plan.md` write:** atomic write (tmp + rename) makes this impossible.
-- **Spec edited externally during design:** designer is read-only on Spec. On next refinement turn, mtime check; if Spec changed, warn: `"Spec changed since draft. Re-read and regenerate AC Coverage Map?"`.
+- **Spec edited externally during design:** designer is read-only on the Spec. On the next refinement turn, mtime-check; if the Spec changed, warn `"Spec changed since draft. Re-read and regenerate AC Coverage Map?"`.
 - **More than 3 `[NEEDS CLARIFICATION]` would emerge:** spec-writer convention applies — ask the human to pick the 3 most important; the rest go to `## Decisions deferred to Implementation`.
 - **AC coverage gap at approval gate:** refuse approval, list gaps, return to step 5 or 6.
-- **Architecture decisions conflict during refinement** (e.g., two decisions cover the same AC differently): chat-flag the conflict; let human resolve; re-tag affected ACs in both decisions.
+- **Architecture decisions conflict during refinement** (two decisions cover the same AC differently): chat-flag the conflict, let the human resolve, re-tag the affected ACs in both decisions.
 
 ## Why a Skill (not a Subagent)
-Phase 2 has the human in-the-loop refining design decisions. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `shared/concepts/skill-vs-subagent.md`).
+Phase 2 keeps the human in-the-loop refining design decisions. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `shared/concepts/skill-vs-subagent.md`).

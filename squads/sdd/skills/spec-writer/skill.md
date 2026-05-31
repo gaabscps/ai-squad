@@ -1,11 +1,16 @@
 ---
 name: spec-writer
-description: Phase 1 entry point. Interactive spec-writing session — selects planned_phases, drafts and approves Spec, hands off to next Phase.
+description: Phase 1 (Specify) entry point for the SDD pipeline. Interactively turns a feature pitch into an approved Spec — creates the Session, generates the spec_id, collects planned_phases / pipeline_mode / output_locale intent, drafts and refines spec.md, and hands off to the next planned Phase. Use when running `/spec-writer` to start a fresh feature, or `/spec-writer FEAT-NNN` to resume an existing Spec session.
 ---
 
 # Spec Writer — Phase 1 (Specify)
 
 The Skill that turns a feature request into an approved Spec, working interactively with the human. Owns Session creation, `spec_id` generation, and `planned_phases` selection.
+
+Detailed procedures live in flat reference files next to this one — read each when you reach the step that points to it:
+- [`intent-collection.md`](intent-collection.md) — `planned_phases` / `pipeline_mode` / `output_locale` prompts + save mechanics (steps 2, 2.5, 2.6)
+- [`pm-approval-gate.md`](pm-approval-gate.md) — PM-bypass approval procedure + `pm_decision` shape (step 6.5)
+- [`failure-modes.md`](failure-modes.md) — abandonment / timeout / partial-write behavior + design rationale
 
 ## Hard rule — fresh-start mode is ALWAYS interactive (read this BEFORE step 1)
 
@@ -43,76 +48,11 @@ This rule supersedes any pattern-matching the model performs on the repo history
 3. Verify `.agent-session/` is in `.gitignore` (refuse if not).
 4. **Read constraint (per the top-of-file Hard rule):** when scanning prior `FEAT-*/` directories for step 2 above, the ONLY field you may read from any prior `session.yml` is the directory/file name itself for ID computation. Do NOT open prior `session.yml` content. Do NOT inspect `auto_approved_by`, `pipeline_mode`, `planned_phases`, `phase_history`, or `notes` from any prior Session. Treat prior `.agent-session/FEAT-*/` directories as opaque ID markers, nothing else. If you need any other state from a prior Session, that's a `--resume` flow (item 1 above) on that specific FEAT-ID — never an inference from history.
 
-### 2. Plan the Phases (fresh start only)
+### 2–2.6. Collect intent: `planned_phases`, `pipeline_mode`, `output_locale` (fresh start only)
 
-**MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `planned_phases` is user intent about which Phases will run, NOT an automatable inference. PM bypass (`auto_approved_by=pm`, detected at step 6.5) governs APPROVAL gates only (steps 6.5 and 7) — it does NOT cover intent collection. If you find yourself about to auto-pick `planned_phases` because a previous Session in `.agent-session/` did it that way: STOP and run `AskUserQuestion` regardless. The user may want a different shape this time.
+**MANDATORY — all three run on every fresh-start invocation. NEVER skipped by PM bypass.** These are user intent, not automatable inferences. PM bypass (`auto_approved_by=pm`, detected at step 6.5) governs APPROVAL gates only (steps 6.5 and 7) — it does NOT cover intent collection. If you find yourself about to auto-pick any of the three from a prior Session or from how the feature "looks": STOP and run `AskUserQuestion` regardless.
 
-Use `AskUserQuestion` with checkbox. **Default = planning only (Specify + Plan + Tasks); Implementation UNCHECKED by default** — recommended path is to run Implementation in a separate session via `/orchestrator FEAT-NNN --resume` for (a) clean per-phase cost attribution in `report.html`, and (b) structural prevention of PM-mode inference from planning history (a recurring bug class — see commits `4a06ff9`, `d91c0a4`).
-
-```
-Which Phases will this Session run? (Recommended: leave Implementation UNCHECKED and run it in a fresh `--resume` session.)
-[x] Specify (always; you are here)
-[x] Plan
-[x] Tasks
-[ ] Implementation  — opt-in only; checking this runs everything in this session and gives an APPROXIMATE planning/orchestration cost split (timestamp-bracketed, not session-isolated).
-```
-
-Save selection to `session.yml.planned_phases` (atomic write: tmp + rename). Power-user flag `--plan="specify,plan,tasks,implementation"` bypasses the prompt with explicit semantics (use it to opt into single-session implementation).
-
-### 2.5. Pipeline mode selection (fresh start only)
-
-**MANDATORY — runs on every fresh-start invocation. NEVER skipped by PM bypass.** `pipeline_mode` is user intent about scope of the change, NOT an inference from "this looks visually medium-sized" or from prior Sessions. PM bypass governs APPROVAL gates only (steps 6.5/7) — intent collection is always interactive. If you find yourself about to auto-pick `standard` because the feature looks non-trivial, or auto-pick from a prior Session's mode: STOP and run `AskUserQuestion` regardless. The user is the only authority on whether this is a `lite` or `standard` change.
-
-Use `AskUserQuestion` (binary):
-
-```
-What's the scope of this change?
-
-[ ] Small change (lite mode)
-    Fix, small refactor, doc/copy change, or single-purpose feature.
-    Downstream effects:
-      - task-builder caps total tasks at 2
-      - task-builder auto-skips logic-reviewer for single-purpose tasks
-      - orchestrator caps fan-out at 1 (sequential tasks)
-      - orchestrator clamps tier ceiling to T2 (cheap dispatch by default)
-    Quality unchanged: logic-gap sweep, edge-case categories, audit-gate all still mandatory.
-
-[ ] Standard or larger (default)
-    All Phases run with full rigor, fan-out, and per-task tier calibration.
-```
-
-Save selection to `session.yml.pipeline_mode` (atomic write: tmp + rename). Valid values: `lite`, `standard`. Power-user flag `--mode=lite|standard` bypasses the prompt with the same semantics.
-
-**Recommendation surfaced after the answer:** if `lite` selected and `planned_phases` still includes `plan`, print a short note: `"Lite mode typically skips the Plan Phase. Current planned_phases keeps it — that's fine if you have a real architecture decision to capture; otherwise re-run /spec-writer with --plan='specify,tasks,implementation' to drop it."` Do not auto-mutate `planned_phases`; respect the user's earlier choice.
-
-### 2.6. Output locale (detect + confirm)
-
-`output_locale` is the language of ALL human-facing prose the pipeline will emit
-(summaries, findings, blockers, the report content, `handoff.md`). It is detected
-from the conversation, NOT pattern-matched from prior Sessions.
-
-1. **Detect:** infer the language the human is using in this conversation/pitch.
-   Express it as a BCP-47 tag with a hyphen (e.g. `pt-BR`, `en-US`, `es`).
-   Normalize any underscore form (`pt_BR`) to hyphen.
-2. **Interactive mode** (no PM bypass): confirm via `AskUserQuestion` (binary),
-   defaulting to the detected tag:
-   ```
-   I'll generate all human-facing content (summaries, findings, report, handoff)
-   in <language name> (<tag>). Use this language?
-   [ ] Yes, use <tag>
-   [ ] No, choose another  (free-form: enter a BCP-47 tag)
-   ```
-   On a free-form answer, normalize to a hyphenated BCP-47 tag.
-3. **PM bypass** (`session.yml.auto_approved_by == "pm"`, detected later at 6.5):
-   there is no human to confirm. Write the **detected** tag directly. If detection
-   is inconclusive, write `en`. Do NOT run `AskUserQuestion`.
-4. **Fallback:** if detection yields nothing usable and you are interactive, offer
-   `en` as the default in the question. The stored value is never empty — absent
-   downstream means `en`, but spec-writer always writes an explicit value.
-5. Save to `session.yml.output_locale` (atomic write: tmp + rename).
-
-Power-user flag `--locale=<tag>` bypasses detection and the prompt with explicit
-semantics (normalized to hyphen). See `shared/concepts/output-locale.md`.
+Run, in order: step 2 (`planned_phases`, checkbox), step 2.5 (`pipeline_mode`, binary), step 2.6 (`output_locale`, detect + confirm). Full prompt text, defaults, save mechanics, and `--plan` / `--mode` / `--locale` flag overrides: [`intent-collection.md`](intent-collection.md). Each selection is an atomic write (tmp + rename) to `session.yml`.
 
 ### 3. Capture initial pitch (if not provided)
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
@@ -123,7 +63,7 @@ Produce a full draft of `spec.md` from the bundled template `spec.template.md` (
 - For uncertain sections: insert `[NEEDS CLARIFICATION] <specific question>` markers (hard cap: 3 — see step 5).
 - Generate at least one `US-001 [P1]` from the pitch.
 - **Lite mode constraint** (`session.yml.pipeline_mode == "lite"`): generate **exactly one** `US-001 [P1]`. If the pitch implies multiple stories, surface this via chat: `"Lite mode allows only one US. The pitch suggests N stories — pick the most important one for this Session, or switch to standard mode."` Standard mode: 1-3 USs as appropriate from the pitch.
-- **Edge-case coverage (mandatory):** for every US-XXX with code-touching ACs, enumerate ACs covering all four categories: **empty state**, **error state**, **concurrent action**, **partial failure**. If a category is genuinely N/A for a US, write `AC-NNN: N/A — <one-line reason>` explicitly (silent omission becomes a finding in step 6.7).
+- **Edge-case coverage (mandatory):** for every US-XXX with code-touching ACs, enumerate ACs covering all four categories: **empty state**, **error state**, **concurrent action**, **partial failure**. If a category is genuinely N/A for a US, write `AC-NNN: N/A — <one-line reason>` explicitly (silent omission becomes a finding in step 6.4).
 - Write to `.agent-session/<spec_id>/spec.md` (atomic write; `status: draft`).
 - Save Spec title to `session.yml.feature_name` for human-readable reference.
 
@@ -155,89 +95,7 @@ Answer each item literally (do not skip):
 If the sweep finds gaps: patch `spec.md` inline (atomic write), re-run the sweep until zero gaps remain. Gaps are RESOLVED in the spec, never deferred to follow-ups. Only after zero gaps remain proceed to step 6.5 (PM mode) or step 7 (human mode).
 
 ### 6.5. PM-mode approval gate check (bypass — runs before Step 7)
-
-Canonical source of truth: `shared/concepts/pm-bypass.md` — the logic below is the verbatim insertion mandated for `spec-writer`.
-
-```
-1. Read session.yml.auto_approved_by.
-2. IF auto_approved_by != "pm"  (strict equality, case-sensitive, must be string)
-      → Proceed to the normal interactive AskUserQuestion approval gate (Step 7). Stop here.
-
-3. Scan the artifact for any [NEEDS CLARIFICATION] markers.
-   IF one or more markers remain:
-      → REFUSE bypass. Do NOT approve.
-      → Attempt to append to session.yml.notes (atomic tmp + rename):
-           - kind: pm_escalation
-             timestamp: <ISO8601-now>
-             phase: "specify"
-             artifact_path: ".agent-session/<spec_id>/spec.md"
-             open_questions: [<one entry per NEEDS CLARIFICATION block>]
-        If the append fails, retry exactly once. If the second attempt
-        also fails, raise (do NOT swallow the error silently) — the
-        PM persona must be informed that the escalation record could
-        not be persisted.
-      → Surface to PM persona: "Approval blocked — open questions must be resolved before autonomous approval."
-      → Exit the bypass step; leave artifact status unchanged.
-
-4. No markers remain. Approve the artifact in this exact order:
-
-   **Ordering invariant:** evidence MUST land in session.yml before the
-   artifact is marked approved. This ensures that if the artifact write
-   fails, the audit trail is still present and no ghost-approval exists.
-
-   a. Check for re-entry / partial-write repair:
-      - IF session.yml already contains phase_history.specify.approved_by == "pm"
-        AND spec.md frontmatter status == "approved":
-          REFUSE (raise). A phase that has already been PM-approved AND
-          whose artifact is already marked approved MUST NOT be re-approved
-          silently; the PM session should not re-run an already-approved phase.
-      - IF session.yml already contains phase_history.specify.approved_by == "pm"
-        AND spec.md frontmatter status != "approved":
-          **Partial-write repair path.** A previous run crashed after writing
-          session.yml (step 4.b) but before writing spec.md (step 4.c).
-          Do NOT raise. Skip steps 4.b and 4.b'' (session.yml already has the
-          evidence). Proceed directly to step 4.c to complete the idempotent
-          artifact write, then continue to step 4.d.
-      - IF session.yml does NOT contain phase_history.specify.approved_by:
-          Continue to step 4.b (normal path).
-
-   b. Perform a single atomic read-modify-write on session.yml (one
-      tmp + rename) that writes ALL of the following keys together:
-        - phase_history.specify.approved_by: "pm"
-        - notes: append the pm_decision entry below
-        - current_phase: advance to the next phase per session.yml.planned_phases
-      If session.yml.notes is absent, initialize it as an empty list
-      before appending. This single atomic mutation guarantees that
-      phase_history, the pm_decision evidence, and current_phase are
-      always consistent — there is no partial-write window where one
-      exists without the others, which would trigger a false AC-017
-      audit violation.
-
-      **current_phase advancement rule (step 4.b''):** read
-      session.yml.planned_phases (ordered list); find "specify"; set
-      current_phase to the next entry. If "specify" is the last planned
-      phase, set current_phase to "done".
-
-   c. Write status: approved to the artifact's frontmatter (spec.md).
-
-   d. Skip the AskUserQuestion approval gate entirely (do not execute Step 7).
-   e. Continue to the next step in the Skill's run procedure.
-```
-
-**`pm_decision` entry shape** (appended to `session.yml.notes`):
-
-```yaml
-- kind: pm_decision
-  timestamp: "<ISO8601-timestamp>"     # ISO8601, UTC
-  phase: "specify"
-  artifact_path: ".agent-session/<spec_id>/spec.md"
-  gate_applied: "auto_approved_by=pm"
-```
-
-**Phase-specific notes for spec-writer:**
-- `[NEEDS CLARIFICATION]` marker ownership: spec-writer MUST insert the marker into `spec.md` BEFORE reaching Step 6.5. The scan in step 3 above is the audit check — not the producer of the marker.
-- `phase` value in `pm_decision`: `"specify"`.
-- `artifact_path`: `.agent-session/<spec_id>/spec.md`.
+Read `session.yml.auto_approved_by`. If it is not exactly `"pm"`, proceed to the interactive gate (step 7). If it IS `"pm"`, run the full bypass procedure — open-marker refusal, escalation record, the strict approval ordering invariant (evidence before artifact), partial-write repair path, and `current_phase` advancement — per [`pm-approval-gate.md`](pm-approval-gate.md). That reference is the verbatim insertion mandated by `shared/concepts/pm-bypass.md`; follow it exactly.
 
 ### 7. Final approval gate (Hybrid: checklist + AskUserQuestion)
 Trigger when the human signals "done" OR when zero `[NEEDS CLARIFICATION]` markers remain AND at least one `US-XXX` is present:
@@ -283,13 +141,4 @@ After approval, check `planned_phases` and **auto-invoke the next Skill** — th
 - **Never** open a prior `session.yml` for "context" or "to match the existing pattern". If you find yourself wanting to do this, you have lost; STOP and just ask the user.
 
 ## Failure modes
-- **Human abandons mid-Session:** state on disk reflects last atomic write (per-section). Next `/spec-writer FEAT-NNN` resumes from there.
-- **AskUserQuestion timeout / human answers nothing:** session paused; no state change. Next `/spec-writer FEAT-NNN` re-prompts the same question.
-- **Partial `spec.md` write:** atomic write (tmp + rename) makes this impossible — either the previous version or the new version is on disk, never a half-written file.
-- **`schema_version` mismatch on resume:** refuse per refusal matrix; human upgrades ai-squad or manually edits `session.yml`.
-- **More than 3 `[NEEDS CLARIFICATION]` would emerge during drafting:** spec-writer asks the human to pick the 3 most important via `AskUserQuestion`; remaining items become `## Open Questions` entries (post-approval refinement, not Spec-blocking).
-- **Human tries to approve while open `[NEEDS CLARIFICATION]` exist:** refuse the approval gate; list the open items; return to step 5.
-- (TODO Phase 2 if needed: concurrent-edit lockfile — only add if real conflict observed in practice.)
-
-## Why a Skill (not a Subagent)
-Phase 1 has the human in-the-loop refining the Spec. Skills satisfy the criterion "human in-the-loop OR dispatches Subagents" (see `shared/concepts/skill-vs-subagent.md`).
+Abandonment, AskUserQuestion timeout, partial `spec.md` write, `schema_version` mismatch, >3 `[NEEDS CLARIFICATION]`, premature approval attempt, and why this is a Skill (not a Subagent): [`failure-modes.md`](failure-modes.md).
