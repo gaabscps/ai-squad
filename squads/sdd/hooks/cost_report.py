@@ -121,6 +121,12 @@ def build_cost_report(session_dir):
     cost_phase = {p: {t: 0.0 for t in _TOKEN_TYPES} for p in ("planning", "orchestration", "implementation")}
     _prices = {"v": None, "loaded": False}  # lazy holder for the reprice fallback
 
+    def _get_prices():
+        if not _prices["loaded"]:
+            _prices["v"] = _load_prices_safe()
+            _prices["loaded"] = True
+        return _prices["v"]
+
     def _absorb(by_model, phase):
         if not isinstance(by_model, dict):
             return
@@ -130,16 +136,47 @@ def build_cost_report(session_dir):
             for t, bkey in _BUCKET_FOR_TYPE.items():
                 tok_phase[phase][t] += entry.get(bkey, 0) or 0
             cbt = entry.get("cost_by_type")
-            if cbt is None:
-                if not _prices["loaded"]:
-                    _prices["v"] = _load_prices_safe()
-                    _prices["loaded"] = True
-                if _prices["v"] is not None:
-                    from pricing import cost_for_usage
-                    cbt = cost_for_usage(entry, model, _prices["v"]).get("cost_by_type")
+            if cbt is None and _get_prices() is not None:
+                from pricing import cost_for_usage
+                cbt = cost_for_usage(entry, model, _get_prices()).get("cost_by_type")
             if cbt:
                 for t in _TOKEN_TYPES:
                     cost_phase[phase][t] += cbt.get(t, 0) or 0
+
+    def _phase_cost(obj):
+        """(cost_usd, unpriced_set) for one captured phase/agent object.
+
+        A cost file is the immutable record of TOKENS; the price is applied
+        here, at report time, with the current table. So when an entry's
+        `cost_usd` is null (the model was unpriced WHEN captured — e.g. a
+        spec/plan session that ran before the model hit the table), we re-price
+        it from its tokens instead of trusting the frozen `total_cost_usd: 0.0`.
+        A present `cost_usd` is trusted verbatim (no drift if the table moved).
+        Falls back to the stored total when `by_model` is absent (legacy files).
+        """
+        obj = obj or {}
+        bm = obj.get("by_model")
+        if not isinstance(bm, dict) or not bm:
+            return (obj.get("total_cost_usd") or 0.0), set(obj.get("unpriced_models") or [])
+        total = 0.0
+        unp = set()
+        for model, entry in bm.items():
+            if not isinstance(entry, dict):
+                continue
+            cu = entry.get("cost_usd")
+            if cu is not None:
+                total += cu
+                continue
+            prices = _get_prices()
+            priced = None
+            if prices is not None:
+                from pricing import cost_for_usage
+                priced = cost_for_usage(entry, model, prices)
+            if priced and priced.get("priced"):
+                total += priced["cost_usd"]
+            else:
+                unp.add(model)
+        return total, unp
 
     if costs.is_dir():
         for f in sorted(costs.glob("*.json")):
@@ -149,16 +186,18 @@ def build_cost_report(session_dir):
                 continue
             scope = d.get("scope")
             if scope == "session":
-                planning += (d.get("planning") or {}).get("total_cost_usd") or 0.0
-                orchestration += (d.get("orchestration") or {}).get("total_cost_usd") or 0.0
-                for sub in ("planning", "orchestration"):
-                    unpriced.update((d.get(sub) or {}).get("unpriced_models") or [])
+                pc, pu = _phase_cost(d.get("planning"))
+                oc, ou = _phase_cost(d.get("orchestration"))
+                planning += pc
+                orchestration += oc
+                unpriced |= pu | ou
                 _absorb((d.get("planning") or {}).get("by_model"), "planning")
                 _absorb((d.get("orchestration") or {}).get("by_model"), "orchestration")
             elif scope == "implementation":
-                implementation += d.get("total_cost_usd") or 0.0
+                ic, iu = _phase_cost(d)
+                implementation += ic
+                unpriced |= iu
                 subagents += 1
-                unpriced.update(d.get("unpriced_models") or [])
                 _absorb(d.get("by_model"), "implementation")
     total = round(planning + orchestration + implementation, 6)
     tokens_by_type = _empty_typemap()

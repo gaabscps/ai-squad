@@ -196,6 +196,66 @@ def test_tokens_aggregated_by_phase_and_type(tmp_path):
     assert round(sum(tc["by_type"].values()), 6) == rep["total_cost_usd"]
 
 
+def test_reprices_historical_unpriced_from_tokens(tmp_path, monkeypatch):
+    # A cost file captured when the model had no price freezes
+    # total_cost_usd:0.0 with cost_usd:null per model (the "planning $0" bug:
+    # the spec/plan session ran before claude-opus-4-8 was in the table). The
+    # report must RE-PRICE from the captured tokens using today's table, not
+    # trust the frozen zero, and drop the now-priced model from `unpriced`.
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "session-s1.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {
+            "total_cost_usd": 0.0,
+            "by_model": {"opus-x": {
+                "input_tokens": 10, "output_tokens": 5,
+                "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+                "messages": 1, "cost_usd": None}},
+            "unpriced_models": ["opus-x"]},
+        "orchestration": {"total_cost_usd": 0.0, "by_model": {}, "unpriced_models": []},
+    }))
+    monkeypatch.setattr(cr, "_load_prices_safe",
+                        lambda: {"opus-x": {"input_per_mtok": 1_000_000.0, "output_per_mtok": 2_000_000.0}})
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["planning_cost_usd"] == 20.0        # 10*$1 + 5*$2, re-priced
+    assert "opus-x" not in rep["unpriced_models"]   # no longer unpriced today
+    assert rep["total_cost_usd"] == 20.0
+
+
+def test_keeps_unpriced_when_model_still_absent(tmp_path, monkeypatch):
+    # Re-price attempt with a model STILL missing from the table → stays
+    # unpriced and contributes 0 (honest incompleteness, never a guessed cost).
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 0.0, "agent_id": "a",
+        "by_model": {"ghost": {"input_tokens": 10, "output_tokens": 5,
+                               "messages": 1, "cost_usd": None}},
+        "unpriced_models": ["ghost"]}))
+    monkeypatch.setattr(cr, "_load_prices_safe", lambda: {"other": {"input_per_mtok": 1.0, "output_per_mtok": 1.0}})
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["implementation_cost_usd"] == 0.0
+    assert "ghost" in rep["unpriced_models"]
+    assert rep["complete"] is False
+
+
+def test_trusts_present_cost_usd_without_repricing(tmp_path, monkeypatch):
+    # When cost_usd is already populated, use it verbatim — don't re-price
+    # (would drift if the table changed since capture).
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 7.0, "agent_id": "a",
+        "by_model": {"m": {"input_tokens": 10, "output_tokens": 5,
+                           "messages": 1, "cost_usd": 7.0}},
+        "unpriced_models": []}))
+    # table would price it differently if consulted — prove it is NOT consulted
+    monkeypatch.setattr(cr, "_load_prices_safe", lambda: {"m": {"input_per_mtok": 9e9, "output_per_mtok": 9e9}})
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["implementation_cost_usd"] == 7.0
+
+
 def test_tokens_fallback_reprice_when_cost_by_type_absent(tmp_path, monkeypatch):
     costs = tmp_path / "costs"; costs.mkdir()
     bm = {"m": {"input_tokens": 10, "output_tokens": 5,
