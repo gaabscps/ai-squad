@@ -15,16 +15,28 @@ if str(_HOOKS) not in sys.path:
 import session_report  # noqa: E402
 
 
+def _bm(i, o, r, c):
+    return {"claude-x": {
+        "input_tokens": i, "output_tokens": o, "cache_read_input_tokens": r,
+        "cache_creation_input_tokens": c,
+        "cost_by_type": {"input": i * 1e-6, "output": o * 1e-6,
+                         "cache_read": r * 1e-7, "cache_creation": c * 1.25e-6},
+        "cost_usd": 0.0, "messages": 1}}
+
+
 def _seed_costs(sd):
     (sd / "costs").mkdir(parents=True, exist_ok=True)
     (sd / "costs" / "session.json").write_text(json.dumps({
         "scope": "session",
-        "planning": {"total_cost_usd": 1.20, "unpriced_models": []},
-        "orchestration": {"total_cost_usd": 27.25, "unpriced_models": []},
+        "planning": {"total_cost_usd": 1.20, "unpriced_models": [],
+                     "by_model": _bm(100000, 40000, 1000000, 60000)},
+        "orchestration": {"total_cost_usd": 27.25, "unpriced_models": [],
+                          "by_model": _bm(300000, 120000, 4000000, 130000)},
     }))
     (sd / "costs" / "agent-a.json").write_text(json.dumps({
         "scope": "implementation", "total_cost_usd": 10.12,
-        "agent_id": "a", "unpriced_models": []}))
+        "agent_id": "a", "unpriced_models": [],
+        "by_model": _bm(800000, 500000, 4500000, 200000)}))
 
 
 def _packet(sd, dispatch_id, **fields):
@@ -172,3 +184,17 @@ def test_diff_rendered_github_style(tmp_path):
     # added content present and escaped, removed content present
     assert "int neu = 1;" in html
     assert "int old = 0;" in html
+
+
+def test_token_usage_section_rendered(tmp_path):
+    html = _build(tmp_path)
+    assert "Token usage" in html
+    for col in ("Input", "Output", "Cache read", "Cache creation"):
+        assert col in html
+    assert "M tokens" in html or "K tokens" in html   # compact total in the cost KPI
+
+
+def test_fmt_tokens_compact():
+    assert session_report.cost_report.fmt_tokens(1_350_000) == "1.4M"
+    assert session_report.cost_report.fmt_tokens(775_000) == "775K"
+    assert session_report.cost_report.fmt_tokens(500) == "500"

@@ -236,7 +236,8 @@ def _dashboard(rep, task_verdicts, open_count, ac_count):
         f"<div class='kpi'><div class='lbl'>Task status</div>"
         f"<div class='donutwrap'>{donut}<div class='legend'>🟢 {done} done<br>"
         f"🟡 {needs} needs review<br>🔴 {bad} blocked/escalated</div></div></div>"
-        f"<div class='kpi'><div class='lbl'>Cost · ${rep['total_cost_usd']:.2f}</div>"
+        f"<div class='kpi'><div class='lbl'>Cost · ${rep['total_cost_usd']:.2f} · "
+        f"{cost_report.fmt_tokens((rep.get('tokens') or {}).get('total', 0))} tokens</div>"
         f"{_cost_bar(rep)}"
         f"<div class='legend'>🔵 planning ${rep['planning_cost_usd']:.2f} · "
         f"🔷 orchestration ${rep['orchestration_cost_usd']:.2f} · "
@@ -261,6 +262,43 @@ def _integrity_section(pipeline_packets):
                     f"{_esc(status_lbl)}</span> {summary}</div>")
     return ("<section><h2>Pipeline integrity</h2>"
             f"<div class='intg'>{''.join(rows)}</div></section>")
+
+
+_TOK_COLS = [("input", "Input"), ("output", "Output"),
+             ("cache_read", "Cache read"), ("cache_creation", "Cache creation")]
+_TOK_PHASES = [("planning", "Planning"), ("orchestration", "Orchestration"),
+               ("implementation", "Implementation")]
+
+
+def _token_section(rep):
+    """Phase × type matrix: each cell carries tokens + the $ for that type/phase."""
+    tok = rep.get("tokens") or {}
+    cost = rep.get("token_cost") or {}
+    if tok.get("total", 0) <= 0:
+        return ""
+    ft = cost_report.fmt_tokens
+    types = [k for k, _ in _TOK_COLS]
+
+    def _cell(tokens, dollars):
+        return f"<td>{ft(tokens)} <span class='tc'>(${dollars:.2f})</span></td>"
+
+    head = "".join(f"<th>{lbl}</th>" for _, lbl in _TOK_COLS)
+    rows = []
+    for pk, plbl in _TOK_PHASES:
+        tph = (tok.get("by_phase") or {}).get(pk, {})
+        cph = (cost.get("by_phase") or {}).get(pk, {})
+        cells = "".join(_cell(tph.get(t, 0), cph.get(t, 0.0)) for t in types)
+        rows.append(f"<tr><th>{plbl}</th>{cells}"
+                    f"{_cell(tph.get('total', 0), cph.get('total', 0.0))}</tr>")
+    tcells = "".join(_cell((tok.get('by_type') or {}).get(t, 0),
+                           (cost.get('by_type') or {}).get(t, 0.0)) for t in types)
+    grand = sum((cost.get('by_type') or {}).get(t, 0.0) for t in types)
+    total_row = (f"<tr class='ttl'><th>Total</th>{tcells}"
+                 f"{_cell(tok.get('total', 0), grand)}</tr>")
+    return ("<section><details class='tokens'>"
+            f"<summary>Token usage — {ft(tok.get('total', 0))} tokens · ${grand:.2f}</summary>"
+            f"<table class='toktab'><tr><th></th>{head}<th>Total</th></tr>"
+            f"{''.join(rows)}{total_row}</table></details></section>")
 
 
 def _task_card(task_id, packets, diff_provider):
@@ -369,6 +407,12 @@ details.diff{margin-top:10px} details.diff summary{cursor:pointer;font-size:.76r
 details.handoff summary{cursor:pointer;font-weight:600}
 .st-done{color:#127a12} .st-blocked,.st-needs_review,.st-escalate{color:#b00}
 pre{background:#f7f7f7;padding:9px;border-radius:6px;font-size:11px;overflow:auto}
+details.tokens summary{cursor:pointer;font-weight:600;font-size:.82rem;margin-top:6px}
+.toktab{border-collapse:collapse;font-size:.74rem;margin-top:8px;width:100%}
+.toktab th,.toktab td{border:1px solid #eee;padding:4px 8px;text-align:right}
+.toktab th:first-child{text-align:left}
+.toktab tr.ttl th,.toktab tr.ttl td{font-weight:700;background:#fafafa}
+.toktab .tc{color:#888}
 """
 
 
@@ -412,6 +456,7 @@ def build_html_report(session_dir, task_id="", diff_provider=None):
         f"Phase 4 (Implementation)</div>",
         _dashboard(rep, list(verdicts.values()), open_count, len(ac_keys)),
         _integrity_section(pipeline),
+        _token_section(rep),
         "<h2>Tasks</h2>",
         cards,
         _handoff_section(session_dir),
