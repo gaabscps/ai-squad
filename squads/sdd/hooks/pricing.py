@@ -1,7 +1,24 @@
 """ai-squad cost pricing — pure stdlib. Applies per-model rates + universal cache multipliers."""
 import json
 import os
+import re
 from pathlib import Path
+
+# Anthropic sometimes appends a snapshot date to a model id (e.g.
+# claude-haiku-4-5-20251001). Prices are keyed by the version-stable base id
+# (claude-haiku-4-5). Strip a trailing -YYYYMMDD so dated ids resolve to their
+# base rate WITHOUT collapsing distinct versions (claude-haiku-5-0 stays unmatched).
+_DATE_SUFFIX_RE = re.compile(r"-\d{8}$")
+
+
+def _resolve_rates(model, prices):
+    """Exact match, then retry after stripping a trailing -YYYYMMDD snapshot date."""
+    rates = prices.get(model)
+    if rates is None and model:
+        base = _DATE_SUFFIX_RE.sub("", model)
+        if base != model:
+            rates = prices.get(base)
+    return rates
 
 # Resolution chain (first match wins):
 #   1. explicit path argument
@@ -67,7 +84,7 @@ def cost_for_usage(usage, model, prices):
     Returns {cost_usd, priced, model, billable_input_tokens, output_tokens}.
     On an unknown model, priced=False and cost_usd=None (never silently 0).
     """
-    rates = prices.get(model)
+    rates = _resolve_rates(model, prices)
     output = usage.get("output_tokens", 0)
     inp = usage.get("input_tokens", 0)
     read = usage.get("cache_read_input_tokens", 0)

@@ -93,3 +93,16 @@ def test_price_table_candidates_chain_order():
     # explicit path short-circuits the chain
     only = pricing._price_table_candidates("/x/y.json")
     assert [str(c) for c in only] == ["/x/y.json"]
+
+
+def test_date_snapshot_suffix_falls_back_to_base_rate():
+    prices = {"claude-haiku-4-5": {"input_per_mtok": 1_000_000.0, "output_per_mtok": 5_000_000.0}}
+    r = pricing.cost_for_usage({"input_tokens": 10}, "claude-haiku-4-5-20251001", prices)
+    assert r["priced"] is True
+    assert r["cost_usd"] == 10.0          # matched the base rate via suffix strip
+
+
+def test_different_version_does_not_collapse():
+    prices = {"claude-haiku-4-5": {"input_per_mtok": 1.0, "output_per_mtok": 5.0}}
+    r = pricing.cost_for_usage({"input_tokens": 10}, "claude-haiku-5-0", prices)
+    assert r["priced"] is False           # v5-0 must NOT be priced as v4-5
