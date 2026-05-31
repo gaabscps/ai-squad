@@ -274,14 +274,14 @@ The audit-agent's verdict is binding **and terminal**. On `blocked`/`escalate`, 
 ### 9. Pipeline-end handoff (only if step 8 passed)
 - Set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
 - **Cost report.** Before emitting the handoff (you have write authority; the read-only audit-agent does not):
-  1. **Backfill any missed capture.** Locate this session's subagent transcripts (`~/.claude/projects/<project-slug>/<sessionId>/subagents/agent-*.jsonl`) and run the write-capable backfill so a missed `SubagentStop` is recovered (the cost runtime is vendored in the per-repo hooks dir, so it resolves in any consumer repo):
+  1. **Backfill any missed capture.** Recover this session's subagent transcripts and run the write-capable backfill so a missed `SubagentStop` is recovered (the cost runtime is vendored in the per-repo hooks dir, so it resolves in any consumer repo). `session_transcripts` scopes to THIS session's `subagents/` dir (anchored from already-captured `costs/agent-*.json`) — never a machine-wide `projects/*/*` glob, which used to pull in other projects' agents and inflate the total:
      ```sh
      python3 - "$PWD/.agent-session/<spec_id>" <<'PY'
-     import sys, glob, os
+     import sys
      sys.path.insert(0, ".claude/hooks")
      import cost_report, pricing
      session_dir = sys.argv[1]
-     tps = glob.glob(os.path.expanduser("~/.claude/projects/*/*/subagents/agent-*.jsonl"))
+     tps = cost_report.session_transcripts(session_dir)
      print("backfilled:", cost_report.backfill_missing(session_dir, tps, pricing.load_prices()))
      PY
      ```

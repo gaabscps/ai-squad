@@ -18,6 +18,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Silent drop of dispatches in agentops report when status is non-canonical. Now emits warning with structured error message + `unknown_status` bucket preserving total count (FEAT-006).
+- Cost report contamination and `planning $0` (cli 0.8.1). Subagent backfill now scopes to the current session's `subagents/` dir instead of a machine-wide `projects/*/*` glob (which counted other projects' agents); `<synthetic>` non-billable messages are skipped instead of flagging the report incomplete; and historical entries captured before a model was priced are re-priced from their tokens at report time instead of staying frozen at $0.
 
 ## 0.3.0 — 2026-05-06
 

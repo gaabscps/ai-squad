@@ -59,3 +59,20 @@ def test_by_model_carries_cost_by_type(tmp_path):
     r = tc.extract_transcript_cost(str(tr), PRICES)
     cbt = r["by_model"]["m"]["cost_by_type"]
     assert cbt["input"] == 10.0 and cbt["output"] == 10.0
+
+
+def test_synthetic_model_is_ignored_not_unpriced(tmp_path):
+    # Claude Code tags non-billable messages (context summaries, synthetic
+    # errors, harness interruptions) with model "<synthetic>". These are not
+    # real API calls — they must be skipped entirely, never counted as an
+    # unpriced model (which would falsely flag the report incomplete).
+    tr = tmp_path / "t.jsonl"
+    tr.write_text(
+        '{"type":"assistant","message":{"id":"real","model":"m",'
+        '"usage":{"input_tokens":10,"output_tokens":5}}}\n'
+        '{"type":"assistant","message":{"id":"syn","model":"<synthetic>",'
+        '"usage":{"input_tokens":999,"output_tokens":999}}}\n')
+    r = tc.extract_transcript_cost(str(tr), PRICES)
+    assert r["unpriced_models"] == []          # <synthetic> not surfaced
+    assert "<synthetic>" not in r["by_model"]   # not accumulated at all
+    assert r["total_cost_usd"] == 20.0          # only the real message priced

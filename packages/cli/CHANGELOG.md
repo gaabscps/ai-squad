@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 — 2026-05-31
+
+Cost-reporting fixes surfaced by a consumer-repo `/orchestrator` run whose deployed hooks were a stale SDD version (one report showed 2804 subagents / ~$821, another showed `planning $0`, both wrong).
+
+### Bug fixes
+
+- **Subagent cost backfill scooped up other projects.** The orchestrator backfill globbed `~/.claude/projects/*/*/subagents/agent-*.jsonl` — every project and session on the machine — and `backfill_missing` trusted that list, inflating one report to 2804 agents / ~$821 when the real session had 60 / ~$74. Backfill now derives THIS session's `subagents/` dir from an already-captured `costs/agent-*.json` (`cost_report.session_transcripts` / `_session_subagents_dir`); `backfill_missing` rejects transcripts outside it (defense in depth). No anchor → empty list, never a wide glob.
+- **`<synthetic>` messages flagged the report incomplete.** Non-billable transcript messages (context summaries, synthetic errors, harness interruptions) tagged `model: "<synthetic>"` were counted as unpriced models. They are now skipped entirely in `transcript_cost`.
+- **Historical unpriced entries froze cost at $0 (the "planning $0" bug).** A session captured before its model entered the price table wrote `total_cost_usd: 0.0` with per-model `cost_usd: null`; adding the price later never repaired the file, and the report trusted the frozen zero. `build_cost_report` now treats a cost file as the immutable record of tokens and re-prices null entries at report time with the current table (verified on real data: FEAT-005 planning $0.00 → $3.73). A present `cost_usd` is trusted verbatim.
+- **Subagent capture fallback also globbed all projects.** When a `SubagentStop` payload lacks the transcript path, `capture-subagent-cost` globs for `agent-<id>.jsonl`; the glob was machine-wide (`projects/*/*`). Now scoped to the current project's Claude slug (`_glob_subagent_transcript` / `_slugify_project`, replacing both `/` and `.`), so a homonym agent id under another project is never picked up.
+
 ## 0.8.0 — 2026-05-30
 
 Post-mortem of the `[Soundwave] Orchestrator FEAT-010` run surfaced a cluster of governance, identity, and packaging bugs. This release fixes them.

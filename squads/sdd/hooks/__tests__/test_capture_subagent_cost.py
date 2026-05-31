@@ -36,6 +36,40 @@ def test_writes_cost_file(tmp_path):
     assert out == 0
 
 
+def test_slugify_project_replaces_slash_and_dot():
+    # Claude Code's project-dir slug turns BOTH '/' and '.' into '-'
+    # (e.g. /repo/.claude/worktrees -> -repo--claude-worktrees).
+    assert mod._slugify_project("/Users/x/Developer/bettersmp") == "-Users-x-Developer-bettersmp"
+    assert mod._slugify_project("/Users/x/repo/.claude/wt") == "-Users-x-repo--claude-wt"
+
+
+def test_glob_fallback_finds_transcript_in_current_project(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    slug = mod._slugify_project("/fake/projA")
+    d = tmp_path / ".claude" / "projects" / slug / "sess1" / "subagents"
+    d.mkdir(parents=True)
+    tr = d / "agent-XYZ.jsonl"
+    tr.write_text("{}\n")
+    found = mod._glob_subagent_transcript("/fake/projA", "XYZ")
+    assert found == str(tr)
+
+
+def test_glob_fallback_ignores_homonym_in_other_project(tmp_path, monkeypatch):
+    # The bug class: a wide projects/*/* glob would match an agent id that
+    # happens to exist under a DIFFERENT project. Scoping to this project's slug
+    # must exclude it.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    mine = tmp_path / ".claude" / "projects" / mod._slugify_project("/fake/projA") / "s1" / "subagents"
+    other = tmp_path / ".claude" / "projects" / mod._slugify_project("/fake/projB") / "s2" / "subagents"
+    mine.mkdir(parents=True)
+    other.mkdir(parents=True)
+    (mine / "agent-DUP.jsonl").write_text("{}\n")
+    (other / "agent-DUP.jsonl").write_text("{}\n")
+    found = mod._glob_subagent_transcript("/fake/projA", "DUP")
+    assert found == str(mine / "agent-DUP.jsonl")                # mine
+    assert mod._slugify_project("/fake/projB") not in (found or "")  # never the other project
+
+
 def test_idempotent_skip(tmp_path):
     tr = tmp_path / "agent-abc.jsonl"
     _make_transcript(tr)
