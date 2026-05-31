@@ -71,9 +71,9 @@ The orchestrator reads each task's `Tier:` field from `tasks.md` and overrides W
 | **dev L3**             | Final retry (`review_loops_max = 3`)       | sonnet, high ¹  | sonnet, high    | sonnet, high    | **opus, high** ²  |
 | **dev qa-L1**          | Retry after qa fail (skips reviewers)      | sonnet, medium  | sonnet, high    | sonnet, high    | sonnet, high      |
 | **dev qa-L2**          | Final retry after qa fail                  | sonnet, high    | sonnet, high    | sonnet, high    | **opus, high** ²  |
-| **code-reviewer**      | Any loop (L1/L2/L3)                        | haiku, high     | haiku, high     | sonnet, medium  | sonnet, medium    |
+| **code-reviewer**      | Any loop (L1/L2/L3)                        | sonnet, medium  | sonnet, medium  | sonnet, medium  | sonnet, medium    |
 | **logic-reviewer**     | Any loop (L1/L2/L3)                        | sonnet, medium  | sonnet, medium  | sonnet, high    | opus, high        |
-| **qa**                 | Any attempt                                | haiku, high     | haiku, high     | sonnet, medium  | **sonnet, high**  |
+| **qa**                 | Any attempt                                | sonnet, medium  | sonnet, medium  | sonnet, medium  | **sonnet, high**  |
 | **blocker-specialist** | Any trigger (cap, stall, conflict)         | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³     |
 | **audit-agent**        | Singleton pre-handoff                      | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴   |
 
@@ -118,7 +118,7 @@ The framework's calibration places Opus only where:
 1. The Role's value comes from reasoning quality, not throughput (`logic-reviewer`, `blocker-specialist`), AND
 2. The Role's dispatch frequency or fan-out factor does not amplify cost into a quota emergency.
 
-Tier-aware calibration sharpens this further: T1/T2 tasks run dev/code-reviewer/qa on haiku, saving quota for T3/T4 work where opus pays off. The Tier × Loop table is the framework's bet on a defensible cost/quality tradeoff for the typical Max 5x user.
+Tier-aware calibration sharpens this further: haiku is reserved for **mechanical** work — only the T1 dev (procedural single-path tasks) and the audit-agent (manifest reconciliation) run on it. **Judgment roles — code-reviewer, logic-reviewer, qa — run sonnet+ at every tier and are never trusted to haiku** (quality-first; reviews and AC-coverage validation are where quality is won or lost). This keeps haiku on cheap mechanical work without compromising review quality. The Tier × Loop table is the framework's bet on a defensible cost/quality tradeoff for the typical Max 5x user.
 
 Worst-case rough estimate for one feature with `fan_out` of 2 on dev and reviewers + 1 qa, single review cycle:
 

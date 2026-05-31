@@ -271,8 +271,8 @@ _TIER_LOOP_TABLE: dict[str, dict[str, tuple[str, str]]] = {
     # Reviewer / qa: loop-independent — key is role name only.
     # Loop_kind for these roles resolves to "<role> L1" but lookup uses role.
     "code-reviewer": {
-        "T1": ("haiku", "high"),
-        "T2": ("haiku", "high"),
+        "T1": ("sonnet", "medium"),
+        "T2": ("sonnet", "medium"),
         "T3": ("sonnet", "medium"),
         "T4": ("sonnet", "medium"),
     },
@@ -283,8 +283,8 @@ _TIER_LOOP_TABLE: dict[str, dict[str, tuple[str, str]]] = {
         "T4": ("opus", "high"),
     },
     "qa": {
-        "T1": ("haiku", "high"),
-        "T2": ("haiku", "high"),
+        "T1": ("sonnet", "medium"),
+        "T2": ("sonnet", "medium"),
         "T3": ("sonnet", "medium"),
         "T4": ("sonnet", "high"),
     },

@@ -486,10 +486,10 @@ class TestLookupCanonical(unittest.TestCase):
 
     # code-reviewer row (loop-independent)
     def test_code_reviewer_t1(self):
-        self.assertEqual(_lookup_canonical("code-reviewer", "T1", "code-reviewer L1"), ("haiku", "high"))
+        self.assertEqual(_lookup_canonical("code-reviewer", "T1", "code-reviewer L1"), ("sonnet", "medium"))
 
     def test_code_reviewer_t2(self):
-        self.assertEqual(_lookup_canonical("code-reviewer", "T2", "code-reviewer L1"), ("haiku", "high"))
+        self.assertEqual(_lookup_canonical("code-reviewer", "T2", "code-reviewer L1"), ("sonnet", "medium"))
 
     def test_code_reviewer_t3(self):
         self.assertEqual(_lookup_canonical("code-reviewer", "T3", "code-reviewer L1"), ("sonnet", "medium"))
@@ -512,10 +512,10 @@ class TestLookupCanonical(unittest.TestCase):
 
     # qa row (loop-independent)
     def test_qa_t1(self):
-        self.assertEqual(_lookup_canonical("qa", "T1", "qa L1"), ("haiku", "high"))
+        self.assertEqual(_lookup_canonical("qa", "T1", "qa L1"), ("sonnet", "medium"))
 
     def test_qa_t2(self):
-        self.assertEqual(_lookup_canonical("qa", "T2", "qa L1"), ("haiku", "high"))
+        self.assertEqual(_lookup_canonical("qa", "T2", "qa L1"), ("sonnet", "medium"))
 
     def test_qa_t3(self):
         self.assertEqual(_lookup_canonical("qa", "T3", "qa L1"), ("sonnet", "medium"))
@@ -807,9 +807,9 @@ subagent_type: {subagent_type}
         result = self._run_verify("T-001", "sonnet", "high", "T4", "qa")
         self.assertNotIn("decision", result)
 
-    def test_qa_t1_haiku_high_allows(self):
-        """haiku+high for qa T1 → canonical match → allow."""
-        result = self._run_verify("T-001", "haiku", "high", "T1", "qa")
+    def test_qa_t1_sonnet_medium_allows(self):
+        """sonnet+medium for qa T1 → canonical match → allow (qa is judgment, never haiku)."""
+        result = self._run_verify("T-001", "sonnet", "medium", "T1", "qa")
         self.assertNotIn("decision", result)
 
 
@@ -1267,36 +1267,36 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
         self.assertEqual(result["decision"], "block")
         self.assertIn("task_tool_model_missing", result.get("reason", ""))
         # Reason must name the canonical model the orchestrator should have passed.
-        self.assertIn("haiku", result.get("reason", ""),
-                      "Block reason should suggest canonical model (haiku for qa T1)")
+        self.assertIn("sonnet", result.get("reason", ""),
+                      "Block reason should suggest canonical model (sonnet for qa T1)")
 
     def test_tool_model_mismatch_qa_t1_opus_blocks(self):
-        """qa T1 canonical=haiku, tool_model=opus → block: task_tool_model_mismatch.
+        """qa T1 canonical=sonnet, tool_model=opus → block: task_tool_model_mismatch.
 
-        This is the EXACT bug we found in FEAT-004: qa ran in opus despite
-        tier_calibration saying haiku.  Hook must block.
+        Variant of the FEAT-004 class of bug (subagent ran on the wrong model
+        despite tier_calibration). Hook must block any model ≠ canonical.
         """
         result = self._run_verify_with_tool_model(
             "T-001", "T1", "qa", tool_model="opus",
         )
         self.assertEqual(result["decision"], "block",
-                         f"Expected block when tool_model='opus' but canonical='haiku': {result}")
+                         f"Expected block when tool_model='opus' but canonical='sonnet': {result}")
         self.assertIn("task_tool_model_mismatch", result.get("reason", ""))
         # Reason should name both the wrong model and the canonical.
         self.assertIn("opus", result.get("reason", ""))
-        self.assertIn("haiku", result.get("reason", ""))
+        self.assertIn("sonnet", result.get("reason", ""))
 
     def test_tool_model_matches_canonical_allows(self):
-        """qa T1 canonical=haiku, tool_model=haiku → allow."""
+        """qa T1 canonical=sonnet, tool_model=sonnet → allow."""
         result = self._run_verify_with_tool_model(
-            "T-001", "T1", "qa", tool_model="haiku",
+            "T-001", "T1", "qa", tool_model="sonnet",
         )
         self.assertNotIn("decision", result, f"Got: {result}")
 
     def test_tool_model_case_insensitive(self):
-        """Uppercase tool_model should normalize → 'HAIKU' matches canonical 'haiku'."""
+        """Uppercase tool_model should normalize → 'SONNET' matches canonical 'sonnet'."""
         result = self._run_verify_with_tool_model(
-            "T-001", "T1", "qa", tool_model="HAIKU",
+            "T-001", "T1", "qa", tool_model="SONNET",
         )
         self.assertNotIn("decision", result, f"Got: {result}")
 
@@ -1322,18 +1322,18 @@ class TestAC009ToolModelEnforcement(unittest.TestCase):
         Mismatch in either blocks.
         """
         session_dir, _ = _write_temp_files("T-001", "T1", [])
-        prompt = "WorkPacket:\n```yaml\ntask_id: T-001\nmodel: haiku\neffort: high\nsubagent_type: qa\n```"
+        prompt = "WorkPacket:\n```yaml\ntask_id: T-001\nmodel: sonnet\neffort: medium\nsubagent_type: qa\n```"
         # tool_model right, WP right → allow
         ok = _verify_tier_calibration_for_task(
-            task_id="T-001", model="haiku", effort="high", tier="T1",
+            task_id="T-001", model="sonnet", effort="medium", tier="T1",
             subagent_type="qa", prompt=prompt,
-            tool_model="haiku", session_dir=session_dir,
+            tool_model="sonnet", session_dir=session_dir,
         )
         self.assertNotIn("decision", ok)
 
         # tool_model wrong, WP right → block on tool_model
         bad_tool = _verify_tier_calibration_for_task(
-            task_id="T-001", model="haiku", effort="high", tier="T1",
+            task_id="T-001", model="sonnet", effort="medium", tier="T1",
             subagent_type="qa", prompt=prompt,
             tool_model="opus", session_dir=session_dir,
         )
@@ -1392,9 +1392,9 @@ class TestAC009MainPipeline(unittest.TestCase):
         self.assertIn("task_tool_model_missing", result["reason"])
 
     def test_main_blocks_when_tool_model_wrong(self):
-        """main(): qa T1 (canonical=haiku) with tool_input.model='opus' → block.
+        """main(): qa T1 (canonical=sonnet) with tool_input.model='opus' → block.
 
-        This is the exact bug observed in FEAT-004.
+        Variant of the FEAT-004 class of bug (wrong run-model vs calibration).
         """
         prompt = _fenced_packet(
             task_id="T-001", model="haiku", effort="high",
@@ -1407,12 +1407,12 @@ class TestAC009MainPipeline(unittest.TestCase):
         self.assertIn("task_tool_model_mismatch", result["reason"])
 
     def test_main_allows_when_tool_model_matches(self):
-        """main(): qa T1 with tool_input.model='haiku' → allow."""
+        """main(): qa T1 with tool_input.model='sonnet' → allow."""
         prompt = _fenced_packet(
-            task_id="T-001", model="haiku", effort="high",
+            task_id="T-001", model="sonnet", effort="medium",
             tier="T1", subagent_type="qa",
         )
-        rc, out = _run_main(self._payload(prompt, tool_model="haiku"))
+        rc, out = _run_main(self._payload(prompt, tool_model="sonnet"))
         self.assertEqual(rc, 0)
         self.assertEqual(out, "", f"Expected silent allow, got: {out!r}")
 
