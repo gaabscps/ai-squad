@@ -37,7 +37,28 @@ if str(_SHARED_LIB) not in sys.path:
     sys.path.append(str(_SHARED_LIB))
 
 from hook_runtime import detect_active_subagent, resolve_project_root
-from canonical_statuses import VALID_STATUSES as _CANONICAL_VALID_STATUSES, format_valid_list as _format_valid_list
+
+# canonical_statuses lives in shared/lib/ and reads dispatch-manifest.schema.json at
+# import time via a SOURCE-tree-relative path (Path(__file__).parents[2]/shared/schemas/).
+# In a deployed consumer repo neither that module nor the schema is present, so a
+# top-level import would crash this Stop hook on load (ModuleNotFoundError /
+# FileNotFoundError) — and a crashing Stop hook emits no block decision, i.e. it fails
+# OPEN. Try the canonical source first (source tree → live schema, no drift); fall back
+# to a faithful literal so the hook is self-contained and runs in EVERY layout.
+# Keep this fallback in sync with shared/schemas/dispatch-manifest.schema.json (status enum).
+try:
+    from canonical_statuses import (
+        VALID_STATUSES as _CANONICAL_VALID_STATUSES,
+        format_valid_list as _format_valid_list,
+    )
+except Exception:
+    _CANONICAL_VALID_STATUSES = frozenset({
+        "pending", "running", "done", "needs_review", "needs_changes",
+        "partial", "blocked", "escalate", "failed",
+    })
+
+    def _format_valid_list(values) -> str:  # mirrors canonical_statuses.format_valid_list
+        return ", ".join(sorted(values))
 
 # Subagent roles for which an Output Packet is mandatory at SubagentStop.
 # Other subagent_types (e.g., user-dispatched general-purpose, Explore) are
@@ -213,7 +234,12 @@ def extract_dispatch_id(transcript_path: Path) -> str | None:
                         c.get("text", "") if isinstance(c, dict) else str(c)
                         for c in content
                     )
-                m = re.search(r"dispatch_id:\s*[\"']?([0-9a-fA-F-]{8,})[\"']?", content)
+                # Match the real dispatch_id token the orchestrator emits:
+                # role+loop are embedded (e.g. d-T-001-dev-l1, d-FEAT-011-audit-7f0c2e91),
+                # so the charset must allow non-hex letters. The old [0-9a-fA-F-]{8,}
+                # only matched pure UUIDs and returned None for every real id — making
+                # this Stop hook fail OPEN for the entire pipeline.
+                m = re.search(r"dispatch_id:\s*[\"']?([A-Za-z0-9][A-Za-z0-9_-]{2,})", content)
                 if m:
                     return m.group(1)
     except OSError:
@@ -285,10 +311,21 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
     missing = REQUIRED_FIELDS - set(packet.keys())
     if missing:
         return False, f"Output Packet missing required fields: {sorted(missing)}"
-    if packet.get("status") not in VALID_STATUSES:
+    status = packet.get("status")
+    if status not in VALID_STATUSES:
         return False, (
-            f"Output Packet status '{packet.get('status')}' not in valid statuses: "
+            f"Output Packet status '{status}' not in valid statuses: "
             f"{_format_valid_list(VALID_STATUSES)}"
+        )
+    # BUG 2 fix: a blocked/escalate packet MUST name its cause. The schema describes
+    # blocker_kind as "required when status is blocked or escalate" but never enforced
+    # it; an audit packet shipped status=blocked with blocker_kind absent and the
+    # orchestrator could not branch its handoff. Catch it at the write point.
+    if status in {"blocked", "escalate"} and not packet.get("blocker_kind"):
+        return False, (
+            f"Output Packet status '{status}' requires a non-empty 'blocker_kind' field "
+            "(e.g. bypass_detected, schema_violation, missing_output_packet, "
+            "contract_violation) — see shared/schemas/output-packet.schema.json"
         )
     # AC-001: usage field enforcement (universal, pm-orchestrator exempt).
     # Checked separately from REQUIRED_FIELDS to emit role-specific error message.
@@ -417,20 +454,47 @@ def main() -> int:
     active_subagent = detect_active_subagent(payload)
     if active_subagent is not None and active_subagent not in _PHASE_4_SUBAGENTS:
         return 0
+    # Fail-closed posture: when we positively identify a Phase 4 dispatch role, any
+    # failure to resolve its Output Packet below is a BLOCK, not a silent pass. A
+    # confirmed Phase 4 role that cannot produce a verifiable packet is exactly the
+    # malformed-artifact case this hook exists to stop. Roles we cannot identify
+    # (active_subagent is None — e.g. user-dispatched Explore/general-purpose) keep
+    # failing open so unrelated subagents are never blocked.
+    is_phase4 = active_subagent in _PHASE_4_SUBAGENTS
+
+    def _block(reason: str) -> int:
+        print(json.dumps({"decision": "block", "reason": reason}))
+        return 0
 
     transcript_path_str = payload.get("transcript_path") or payload.get("agent_transcript_path")
     if not transcript_path_str:
-        return 0  # no transcript — can't extract dispatch_id; fail open
+        if is_phase4:
+            return _block(
+                f"{active_subagent} (Phase 4 role) stopped without a transcript to verify "
+                "its Output Packet. Emit the packet per your role's output contract."
+            )
+        return 0  # unidentified subagent, no transcript — fail open
     transcript_path = Path(transcript_path_str)
 
     dispatch_id = extract_dispatch_id(transcript_path)
     if not dispatch_id:
-        # Subagent prompt didn't carry a dispatch_id — likely a non-dispatched invocation
-        # (e.g., user-triggered direct call). Don't block.
+        if is_phase4:
+            return _block(
+                f"{active_subagent} (Phase 4 role) stopped but no dispatch_id was found in "
+                "its Work Packet/transcript — cannot locate the Output Packet to verify. "
+                "Echo dispatch_id from the Work Packet and emit outputs/<dispatch_id>.json."
+            )
+        # Unidentified subagent without a dispatch_id — likely a non-dispatched
+        # invocation (e.g., user-triggered direct call). Don't block.
         return 0
 
     project_dir = resolve_project_root(payload)
     session_dir = find_active_session(project_dir)
+    if session_dir is None and is_phase4:
+        return _block(
+            f"{active_subagent} (Phase 4 role, dispatch_id={dispatch_id}) stopped but no "
+            "active .agent-session/<spec_id>/ directory was found to hold its Output Packet."
+        )
     if session_dir is None:
         # AC-007: soft-fail — dispatch_id found but no session dir; warn if task_id extractable.
         # Derivation: take the first two dash-separated segments (e.g. "FEAT-003-dev" → "FEAT-003").

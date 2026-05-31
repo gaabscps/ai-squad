@@ -28,6 +28,7 @@ _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
 validate_packet = _mod.validate_packet
 check_only = _mod.check_only
 _derive_dispatch_id = _mod._derive_dispatch_id
+extract_dispatch_id = _mod.extract_dispatch_id
 
 
 def _write_packet(tmp_dir: Path, data: dict) -> Path:
@@ -541,6 +542,162 @@ class TestFEAT008ModelDriftDetection(unittest.TestCase):
         }), encoding="utf-8")
         _check_model_drift = _mod._check_model_drift
         self.assertEqual(_check_model_drift(op_path), [])
+
+
+# ===========================================================================
+# BUG 1 (mechanism): extract_dispatch_id must match REAL dispatch_ids.
+# The original regex [0-9a-fA-F-]{8,} only matched pure hex/UUID ids, so every
+# real id like d-T-001-dev-l1 returned None and the Stop hook failed OPEN.
+# ===========================================================================
+
+class TestExtractDispatchIdRealFormats(unittest.TestCase):
+    """extract_dispatch_id must recover the canonical dispatch_id token that the
+    orchestrator emits in the Work Packet (role+loop embedded, non-hex letters)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def _transcript_with(self, dispatch_line: str) -> Path:
+        p = self.tmp / "transcript.jsonl"
+        # One JSONL entry whose content carries the Work Packet text.
+        entry = {"content": f"WorkPacket:\nsubagent_type: dev\n{dispatch_line}\n"}
+        p.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+        return p
+
+    def test_dev_dispatch_id_recovered(self):
+        tp = self._transcript_with("dispatch_id: d-T-001-dev-l1")
+        self.assertEqual(extract_dispatch_id(tp), "d-T-001-dev-l1")
+
+    def test_qa_dispatch_id_recovered(self):
+        tp = self._transcript_with("dispatch_id: d-T-007-qa-l1")
+        self.assertEqual(extract_dispatch_id(tp), "d-T-007-qa-l1")
+
+    def test_audit_dispatch_id_recovered(self):
+        tp = self._transcript_with("dispatch_id: d-FEAT-011-audit-7f0c2e91")
+        self.assertEqual(extract_dispatch_id(tp), "d-FEAT-011-audit-7f0c2e91")
+
+    def test_reviewer_dispatch_id_recovered(self):
+        tp = self._transcript_with("dispatch_id: d-T-003-cr-l2")
+        self.assertEqual(extract_dispatch_id(tp), "d-T-003-cr-l2")
+
+    def test_quoted_dispatch_id_recovered(self):
+        tp = self._transcript_with('dispatch_id: "d-T-001-dev-l1"')
+        self.assertEqual(extract_dispatch_id(tp), "d-T-001-dev-l1")
+
+    def test_pure_uuid_still_recovered(self):
+        """Backward-compat: a pure-UUID dispatch_id must still match."""
+        tp = self._transcript_with("dispatch_id: 7f0c2e91-1234-4abc-9def-0123456789ab")
+        self.assertEqual(extract_dispatch_id(tp), "7f0c2e91-1234-4abc-9def-0123456789ab")
+
+    def test_trailing_comment_not_captured(self):
+        tp = self._transcript_with("dispatch_id: d-T-001-dev-l1  # set by orchestrator")
+        self.assertEqual(extract_dispatch_id(tp), "d-T-001-dev-l1")
+
+
+# ===========================================================================
+# BUG 2: blocker_kind must be mechanically required when status is blocked/escalate.
+# The audit packet shipped status=blocked with blocker_kind absent and nothing caught it.
+# ===========================================================================
+
+class TestBlockerKindEnforcement(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def test_blocked_without_blocker_kind_fails(self):
+        data = {**BASE_PACKET, "role": "audit-agent", "status": "blocked"}
+        data.pop("task_id", None)  # audit-agent is pipeline-scoped
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("blocker_kind", reason)
+
+    def test_escalate_without_blocker_kind_fails(self):
+        data = {**BASE_PACKET, "role": "audit-agent", "status": "escalate"}
+        data.pop("task_id", None)
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("blocker_kind", reason)
+
+    def test_blocked_with_blocker_kind_passes(self):
+        data = {**BASE_PACKET, "role": "audit-agent", "status": "blocked",
+                "blocker_kind": "schema_violation"}
+        data.pop("task_id", None)
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_done_without_blocker_kind_passes(self):
+        """Non-blocked statuses do not require blocker_kind."""
+        data = {**BASE_PACKET, "role": "dev", "status": "done"}
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_blocked_with_empty_blocker_kind_fails(self):
+        data = {**BASE_PACKET, "role": "audit-agent", "status": "blocked", "blocker_kind": ""}
+        data.pop("task_id", None)
+        p = _write_packet(self.tmp, data)
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("blocker_kind", reason)
+
+
+# ===========================================================================
+# BUG 1 (fail-closed): the Stop hook, invoked end-to-end, must BLOCK a Phase-4
+# subagent whose Output Packet is malformed or missing — not fail open.
+# Exercises main() via subprocess, the way Claude Code actually runs the hook.
+# ===========================================================================
+
+class TestStopHookFailClosed(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.project = self.tmp / "proj"
+        self.session = self.project / ".agent-session" / "FEAT-011"
+        (self.session / "outputs").mkdir(parents=True)
+
+    def _transcript(self, role: str, dispatch_id: str) -> Path:
+        p = self.tmp / "transcript.jsonl"
+        entry = {"content": f"WorkPacket:\nsubagent_type: {role}\ndispatch_id: {dispatch_id}\n"}
+        p.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+        return p
+
+    def _run_hook(self, transcript: Path):
+        import os
+        payload = {"transcript_path": str(transcript), "cwd": str(self.project)}
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.project)}
+        proc = subprocess.run(
+            [sys.executable, str(_HOOK_FILE)],
+            input=json.dumps(payload),
+            capture_output=True, text=True, env=env,
+        )
+        return proc
+
+    def test_malformed_dev_packet_is_blocked(self):
+        """dev packet missing role/summary must be blocked at SubagentStop."""
+        dispatch_id = "d-T-001-dev-l1"
+        bad = {"spec_id": "FEAT-011", "task_id": "T-001", "dispatch_id": dispatch_id,
+               "status": "done", "evidence": [], "usage": None}  # no role, no summary
+        (self.session / "outputs" / f"{dispatch_id}.json").write_text(json.dumps(bad))
+        proc = self._run_hook(self._transcript("dev", dispatch_id))
+        self.assertIn('"decision": "block"', proc.stdout, proc.stdout + proc.stderr)
+
+    def test_missing_qa_packet_is_blocked(self):
+        """Phase-4 role with no packet on disk must be blocked, not passed."""
+        proc = self._run_hook(self._transcript("qa", "d-T-002-qa-l1"))
+        self.assertIn('"decision": "block"', proc.stdout, proc.stdout + proc.stderr)
+
+    def test_valid_dev_packet_allows_stop(self):
+        dispatch_id = "d-T-001-dev-l1"
+        good = {**BASE_PACKET, "role": "dev", "dispatch_id": dispatch_id}
+        (self.session / "outputs" / f"{dispatch_id}.json").write_text(json.dumps(good))
+        proc = self._run_hook(self._transcript("dev", dispatch_id))
+        self.assertNotIn('"decision": "block"', proc.stdout)
+
+    def test_non_phase4_subagent_not_blocked(self):
+        """An Explore/general-purpose subagent owes no packet — must not be blocked."""
+        proc = self._run_hook(self._transcript("Explore", "whatever-id"))
+        self.assertNotIn('"decision": "block"', proc.stdout)
 
 
 if __name__ == "__main__":
