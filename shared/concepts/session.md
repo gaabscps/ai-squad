@@ -187,6 +187,7 @@ completed_at: ""                                 # set on Phase 4 done OR escala
 # Current state
 current_phase: "implementation"                  # specify | plan | tasks | implementation | paused | done | escalated
 current_owner: "orchestrator"                    # which Role currently has write authority
+output_locale: "pt-BR"                           # BCP-47 tag; language of all human-facing prose the Roles emit (summary, findings, blockers, notes, evidence.reason, handoff.md). Set by spec-writer (Phase 1), confirmed with the human. Absent on legacy Sessions → readers default to "en". Enums/identifiers stay canonical. See shared/concepts/output-locale.md.
 
 # Planned phases (set at /spec-writer entry; consumed by every subsequent Skill)
 planned_phases:

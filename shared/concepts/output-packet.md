@@ -125,6 +125,16 @@ The orchestrator dispatches `blocker-specialist` with the blocking Output Packet
 - **No interpretive prose.** Wrong: `summary: "This was a tricky edge case because..."` Belongs in `findings` with `severity: info` if worth recording at all.
 - **Machine-parseable preferred.** The orchestrator concatenates summaries into the human-readable handoff; dense factual one-liners read better than narrative.
 
+## Human-facing prose follows `output_locale`
+
+The free-prose fields a Subagent writes for eventual human reading — `summary`,
+`findings[].rationale`/`message`, `blockers[].*`, `notes`, `evidence[].reason` —
+are written in the Session's `output_locale` (see [`output-locale.md`](output-locale.md)).
+The enums (`status`, `severity`, `kind`, `role`, `blocker_kind`) and identifiers
+stay canonical (English): the orchestrator routes on them and must never parse a
+translated value. `output_locale` is carried in the Work Packet, not echoed back
+in the Output Packet — the packet schema is unchanged.
+
 ## next_role semantics
 
 `next_role` is a **suggestion** from the Subagent, not a command.

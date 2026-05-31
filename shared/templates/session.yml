@@ -45,6 +45,13 @@ planned_phases:
 # Pre-v0.7 sessions without this field default to `standard` (orchestrator reads with fallback).
 pipeline_mode: "standard"
 
+# Output language — BCP-47 tag for ALL human-facing prose the Roles emit
+# (summary, findings, blockers, notes, evidence.reason, handoff.md). Set by
+# spec-writer (Phase 1) from the conversation, confirmed with the human.
+# Absent → readers default to "en". Enums/identifiers stay canonical (English).
+# See shared/concepts/output-locale.md.
+output_locale: "en"
+
 # Phase 4 only — Pipeline-level state
 pipeline_started_at: ""
 pipeline_completed_at: ""

@@ -93,7 +93,7 @@ def test_each_task_becomes_a_card(tmp_path):
 
 def test_audit_packet_goes_to_integrity_not_a_card(tmp_path):
     html = _build(tmp_path)
-    assert "Integridade" in html
+    assert "Pipeline integrity" in html
     assert "6/6 checks de reconciliacao passam" in html
 
 
@@ -107,12 +107,12 @@ def test_resolved_and_open_findings_are_distinguished(tmp_path):
 def test_open_findings_counted_in_dashboard(tmp_path):
     html = _build(tmp_path)
     # exactly one open finding (T-002 f-002) in this fixture
-    assert "1 achado aberto" in html
+    assert "1 open finding" in html
 
 
 def test_dashboard_has_verdict_and_svg(tmp_path):
     html = _build(tmp_path)
-    assert "Veredito" in html
+    assert "Verdict" in html
     assert "<svg" in html
 
 
@@ -134,13 +134,13 @@ def test_report_is_self_contained_offline(tmp_path):
     assert "https://" not in html
 
 
-def test_fixed_labels_are_portuguese(tmp_path):
+def test_fixed_labels_are_english(tmp_path):
     html = _build(tmp_path)
-    assert "Relatório da sessão" in html
-    assert "Session report" not in html
-    assert "Fase 4" in html
-    assert "Tarefas" in html          # section heading
-    assert "concluído" in html        # verdict badge (done -> concluído)
+    assert "Session report" in html
+    assert "Relatório da sessão" not in html
+    assert "Phase 4" in html
+    assert "Tasks" in html            # section heading
+    assert "done" in html             # verdict badge (canonical English)
 
 
 _DIFF = (
