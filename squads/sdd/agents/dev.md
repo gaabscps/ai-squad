@@ -50,6 +50,26 @@ If any required field is missing → emit Output Packet with `status: blocked, b
 8. Validate Output Packet against the canonical Output Packet contract (required fields for your role, listed in this prompt; verify-output-packet.py enforces it on write) (self-validation pre-emit; orchestrator re-validates shape + semantics on read).
 9. Emit Output Packet (atomic write: tmp + rename).
 
+## Test quality (hard — top cause of review loops)
+A test that passes without exercising the AC's real behavior is worse than no test: it
+burns a full review→fix cycle. **Happy-path-only is NOT done** — a task is `done` only
+when its ENTIRE `ac_scope` is covered, edge and negative cases included.
+- **Assert observable behavior/outcomes, not wiring or existence.** "method was called",
+  "field is not null", "no exception thrown" do NOT prove the AC. Assert the actual
+  resulting value / state / message the AC specifies.
+- **No tautological or vacuous tests.** Asserting a literal you just set, asserting a mock
+  returns what you stubbed, or `assert true` — forbidden. Test for inclusion: if the
+  assertion cannot fail on a wrong implementation, delete or rewrite it.
+- **Cover every case the AC names, not just the happy path.** For each AC, test the happy
+  path AND its edge/negative cases — empty, error, no-match, not-completed, concurrent,
+  partial-failure — wherever the AC implies them. The Spec enumerates these categories per
+  AC; your tests must reach each one, or that AC is not covered.
+- **`done` means full scope covered.** Do NOT emit `status: done` while any AC in `ac_scope`
+  lacks a meaningful test for the behavior it specifies. If a case is genuinely untestable,
+  state it in `notes` — never skip it silently.
+- **Self-check before emit:** per test, answer "what bug would this catch?" — if "none", it
+  is vacuous. Per AC, answer "which cases are still uncovered?" — if any, you are not done.
+
 ## Output contract (Output Packet)
 - `spec_id`: copy from Work Packet `spec_id` (FEAT-NNN — the feature). Required by the canonical schema.
 - `task_id`: copy from Work Packet `task_id` (T-XXX — the task). Required for task-scoped roles (see `shared/concepts/identity.md`).
@@ -86,7 +106,7 @@ Write the Output Packet with the `Write` tool to **`outputs/<dispatch_id>.json`*
 - Never: prose preamble, restating Work Packet, narrating progress, inline file content in evidence.
 - Never: edit files outside `scope_files`.
 - Never: redefine `ac_scope` or invent ACs.
-- Never: emit `status: done` without running the relevant tests (Anthropic verify-your-work guidance).
+- Never: emit `status: done` without running the relevant tests AND covering the full `ac_scope` — happy path PLUS the edge/negative cases the AC implies. Happy-path-only is not done (Anthropic verify-your-work guidance).
 - Never: edit existing tests to make them pass — write new tests or fix the code (TDD discipline against the documented "test-tampering" failure mode).
 - **Comments policy (Anthropic-style, hard rule):**
   - Default to NO comments. Add one ONLY when the WHY is non-obvious — a hidden constraint, a subtle invariant, a workaround for a specific bug, or behavior that would surprise a reader.
