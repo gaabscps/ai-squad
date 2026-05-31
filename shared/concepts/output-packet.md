@@ -66,7 +66,7 @@ Items in `findings[]` represent issues the Subagent identified. Reviewers (`code
 {
   "id": "FIND-001",
   "severity": "error",
-  "message": "Off-by-one at exact expiry instant — uses < instead of <=.",
+  "rationale": "Off-by-one at exact expiry instant — uses < instead of <=.",
   "evidence_ref": "EV-002",
   "ac_ref": "FEAT-042/AC-003",
   "suggested_fix": "Change < to <= at src/auth/reset.ts:52"
@@ -77,7 +77,7 @@ Items in `findings[]` represent issues the Subagent identified. Reviewers (`code
 |-------|------|----------|-------------|
 | `id` | string | yes | Monotonic per dispatch (`FIND-001`, `FIND-002`, …). |
 | `severity` | enum | yes | `info | warning | error | critical | major | blocker`. See severity table below. |
-| `message` | string | yes | One sentence stating the issue. |
+| `rationale` | string | yes | One sentence stating the issue. (Canonical field name — reviewers, logic-reviewer, and audit-agent all emit `rationale`; `session_report.py` keeps `message`/`concern` only as a defensive fallback for legacy packets.) |
 | `evidence_ref` | string | yes | Pointer to the evidence ID (in this same packet's `evidence[]`) that sustains the finding. |
 | `ac_ref` | string | no | `FEAT-XXX/AC-XXX` if the finding violates a specific Spec acceptance criterion. |
 | `suggested_fix` | string | no | One line. Does not mandate the fix; the next dispatch decides. |

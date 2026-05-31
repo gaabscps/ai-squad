@@ -147,7 +147,7 @@ logic-reviewer's Output Packet:
   evidence:
     - { kind: "file", path: "src/auth/reset.ts", lines: "52" }       # zooms into a specific line dev introduced
   findings:
-    - { ac_ref: "FEAT-042/AC-003", concern: "expiry check uses < instead of <=, off-by-one at exact expiry instant" }
+    - { ac_ref: "FEAT-042/AC-003", rationale: "expiry check uses < instead of <=, off-by-one at exact expiry instant" }
 
 qa's Output Packet:
   evidence:
