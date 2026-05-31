@@ -95,6 +95,11 @@ Skip this check on `--resume` after the first turn of the same Session has confi
     - **Fan-out cap (step 3):** `lite` clamps concurrent dispatches to 1 (sequential); `standard` keeps the 5-cap.
     - **Tier ceiling (Model/effort selection):** `lite` clamps every task's effective tier to **T2 max** regardless of `tasks.md` declaration; `standard` honors the declared tier as-is.
     Skip-reviewers markers (per task) are honored in both modes — they are independent of `pipeline_mode`.
+2b. **Read `session.yml.output_locale`** (defaults to `en` if absent — legacy
+    Sessions). This value is copied verbatim into the stable block of every Work
+    Packet (see Dispatch contract) and used to write `handoff.md` (step 9). Enums
+    and identifiers in packets stay canonical regardless. See
+    [`shared/concepts/output-locale.md`](../../../shared/concepts/output-locale.md).
 3. **Preflight: validate `ac_scope` and `Tier:` on every task.** Before any dispatch, iterate every `T-XXX` in `tasks.md`. If any task does not declare an `ac_scope` field (or `ac_scope` is empty), abort with error:
    ```
    "Task <T-XXX> in tasks.md missing required ac_scope field"
@@ -282,7 +287,7 @@ The audit-agent's verdict is binding **and terminal**. On `blocked`/`escalate`, 
      ```
   2. **Emit the report:** `python3 .claude/hooks/cost-report.py <spec_id>` — writes `.agent-session/<spec_id>/cost-report.json` and prints the planning/orchestration/implementation table.
   3. Include the one-line total in the handoff message, and if the audit raised `cost_capture_incomplete` OR the report's `complete` is false, flag the gap (unpriced models / uncaptured agents) explicitly — never present an incomplete total as final.
-- Emit handoff message (see "Handoff" section); also save to `.agent-session/<spec_id>/handoff.md`.
+- Emit handoff message (see "Handoff" section); also save to `.agent-session/<spec_id>/handoff.md`. **Write the handoff prose in `session.yml.output_locale`** (the narrative sentences, the Summary/Validation/Follow-ups bullets). Keep the fixed skeleton — section headers, the Conventional Commits title `type(scope):`, table column keys, enum values (`done`/`pending_human`), and identifiers — canonical (English); only the prose follows the locale. Absent → `en`.
 
 ## Dispatch contract (Work Packet embedded in `Task` prompt)
 Claude Code's `Task` tool accepts: `subagent_type` (string, must match a file in `agents/`), `description` (short), `prompt` (free-form string), AND `model` (enum: `sonnet` | `opus` | `haiku`). The `model` parameter is **mandatory for tiered roles** (`dev`, `code-reviewer`, `logic-reviewer`, `qa`) — see "Task tool `model` parameter" below. The Work Packet is embedded as a fenced YAML block inside `prompt`:
@@ -295,6 +300,7 @@ spec_id: FEAT-NNN        # the feature/Session id (FEAT-007); used by hooks for 
 spec_ref: ./.agent-session/FEAT-NNN/spec.md
 plan_ref: ./.agent-session/FEAT-NNN/plan.md
 tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
+output_locale: pt-BR     # from session.yml; language of human-facing prose. Absent → en. Stable across dispatches.
 project_context:
   standards_ref: ./CLAUDE.md
 # --- Variable block (per-dispatch — placed AFTER stable block so prefix matches across dispatches) ---
@@ -385,6 +391,7 @@ session_id: FEAT-NNN
 spec_ref: ./.agent-session/FEAT-NNN/spec.md
 plan_ref: ./.agent-session/FEAT-NNN/plan.md
 tasks_ref: ./.agent-session/FEAT-NNN/tasks.md
+output_locale: pt-BR
 project_context:
   standards_ref: ./CLAUDE.md
 # Variable block (per-dispatch)
