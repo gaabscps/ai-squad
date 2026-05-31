@@ -96,6 +96,22 @@ async function listFiles(p, ext) {
   return entries.filter((e) => e.isFile() && e.name.endsWith(ext)).map((e) => e.name);
 }
 
+/**
+ * Return the subdirectories of a skills/ dir that are actual skills — i.e. that
+ * contain a `skill.md`. This is the Claude Code definition of a skill, and the
+ * gate keeps non-skill siblings (notably `skills/__tests__/`, which holds test
+ * fixtures, not a skill.md) from being copied into ~/.claude/skills/ as if they
+ * were skills. Chosen over a hard-coded `__tests__` skip so any future non-skill
+ * dir is excluded for free.
+ */
+async function listSkillDirs(skillsSrc) {
+  const dirs = await listDirs(skillsSrc);
+  const checks = await Promise.all(
+    dirs.map(async (name) => (await exists(join(skillsSrc, name, 'skill.md'))) ? name : null),
+  );
+  return checks.filter((name) => name !== null);
+}
+
 async function lineCount(filePath) {
   const txt = await readFile(filePath, 'utf8');
   return txt.split('\n').length;
@@ -161,7 +177,7 @@ async function deployClaudeCodeGlobal({ componentsRoot, squads }) {
     const squadRoot = join(componentsRoot, squad);
 
     const skillsSrc = join(squadRoot, 'skills');
-    for (const skill of await listDirs(skillsSrc)) {
+    for (const skill of await listSkillDirs(skillsSrc)) {
       const src = join(skillsSrc, skill);
       const dst = join(skillsDst, skill);
       const action = (await exists(dst)) ? '[update skill]' : '[install skill]';
@@ -209,7 +225,7 @@ async function deploySharedSkills({ componentsRoot }) {
   await mkdir(skillsDst, { recursive: true });
 
   console.log('[shared tier]');
-  for (const skill of await listDirs(skillsSrc)) {
+  for (const skill of await listSkillDirs(skillsSrc)) {
     const src = join(skillsSrc, skill);
     const dst = join(skillsDst, skill);
     const action = (await exists(dst)) ? '[update skill]' : '[install skill]';

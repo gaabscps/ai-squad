@@ -11,10 +11,23 @@
  * it is regenerated on every publish. The directory is gitignored.
  */
 import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const PYCACHE_FILTER = (src) => !src.includes('__pycache__') && !src.endsWith('.pyc');
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+/**
+ * cp() filter for the bundle. Drops artifacts that must never reach the
+ * published tarball:
+ *   - Python bytecode caches (`__pycache__/`, `*.pyc`)
+ *   - test fixtures (`__tests__/`) — these are not deployable assets, and a
+ *     `skills/__tests__/` dir would otherwise be bundled and then installed
+ *     into ~/.claude/skills/ by deploy as if it were a skill.
+ * Matched on path *segments* so a file merely named like one isn't dropped.
+ */
+export function bundleFilter(src) {
+  if (src.endsWith('.pyc')) return false;
+  const segments = src.split(sep);
+  return !segments.includes('__pycache__') && !segments.includes('__tests__');
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
@@ -57,7 +70,7 @@ async function syncSquad(squad) {
     if (!(await exists(src))) continue;
     const dst = join(dstRoot, sub);
     await rm(dst, { recursive: true, force: true });
-    await cp(src, dst, { recursive: true, filter: PYCACHE_FILTER });
+    await cp(src, dst, { recursive: true, filter: bundleFilter });
     console.log(`  [sync] ${squad}/${sub}`);
   }
 }
@@ -71,7 +84,7 @@ async function syncShared() {
     if (!(await exists(src))) continue;
     const dst = join(dstRoot, sub);
     await rm(dst, { recursive: true, force: true });
-    await cp(src, dst, { recursive: true, filter: PYCACHE_FILTER });
+    await cp(src, dst, { recursive: true, filter: bundleFilter });
     console.log(`  [sync] shared/${sub}`);
   }
 }
@@ -90,7 +103,11 @@ async function main() {
   console.log(`Done. squads bundled: ${squads.join(', ')}; shared tier bundled.`);
 }
 
-main().catch((err) => {
-  console.error('sync-components failed:', err);
-  process.exit(1);
-});
+// Only run the sync when invoked as a script (`node sync-components.mjs`), not
+// when imported by a test that just wants to exercise bundleFilter.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error('sync-components failed:', err);
+    process.exit(1);
+  });
+}
