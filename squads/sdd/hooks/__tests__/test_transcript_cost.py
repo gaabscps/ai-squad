@@ -50,3 +50,12 @@ def test_timestamp_bracketing():
     # since excludes msg_a -> only msg_b = 10
     r2 = tc.extract_transcript_cost(FIXTURE, PRICES, since="2026-05-27T10:01:00Z")
     assert r2["total_cost_usd"] == 10.0
+
+
+def test_by_model_carries_cost_by_type(tmp_path):
+    tr = tmp_path / "t.jsonl"
+    tr.write_text('{"type":"assistant","message":{"id":"x","model":"m",'
+                  '"usage":{"input_tokens":10,"output_tokens":5}}}\n')
+    r = tc.extract_transcript_cost(str(tr), PRICES)
+    cbt = r["by_model"]["m"]["cost_by_type"]
+    assert cbt["input"] == 10.0 and cbt["output"] == 10.0
