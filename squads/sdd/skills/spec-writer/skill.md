@@ -112,7 +112,7 @@ from the conversation, NOT pattern-matched from prior Sessions.
 5. Save to `session.yml.output_locale` (atomic write: tmp + rename).
 
 Power-user flag `--locale=<tag>` bypasses detection and the prompt with explicit
-semantics (normalized to hyphen). See [`shared/concepts/output-locale.md`](../../../../shared/concepts/output-locale.md).
+semantics (normalized to hyphen). See `shared/concepts/output-locale.md`.
 
 ### 3. Capture initial pitch (if not provided)
 If the human didn't pass a pitch in the invocation, ask in chat (free-form, generative — not `AskUserQuestion`): `"What's the feature? One paragraph — problem, who it's for, what success looks like."`
