@@ -311,4 +311,11 @@ describe("Resumo IA + Detalhes técnicos", () => {
     expect(screen.getByRole("button", { name: /gerar resumo/i })).toBeInTheDocument();
     expect(screen.getByText(/Detalhes t[ée]cnicos/i)).toBeInTheDocument();
   });
+
+  it("desabilita 'gerar resumo' quando a task não tem dispatches", async () => {
+    render(<TaskItem task={makeTask({ id: "T-001", dispatches: [] })} specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    expect(screen.getByRole("button", { name: /gerar resumo/i })).toBeDisabled();
+    expect(screen.getByText(/sem dados para resumir/i)).toBeInTheDocument();
+  });
 });
