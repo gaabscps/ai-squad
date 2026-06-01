@@ -65,7 +65,7 @@ export function DetailDrawer({
             <li className="drawer-tasks-empty">sem tarefas registradas</li>
           )}
           {spec.tasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
+            <TaskItem key={task.id} task={task} specId={spec.id} />
           ))}
         </ul>
 
