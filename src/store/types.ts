@@ -1,0 +1,58 @@
+// Status derivado da Session inteira (não lido cru do YAML).
+export type SpecStatus = "running" | "paused" | "blocked" | "done" | "escalated";
+
+// Estado de uma task individual (task_states.<T>.state no session.yml).
+export type TaskState = "pending" | "running" | "done" | "blocked";
+
+export interface Task {
+  id: string; // "T-008"
+  state: TaskState;
+  loops: number; // loops>1 = reviewer rejeitou (retrabalho)
+}
+
+// Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.
+export interface CostRollup {
+  totalCostUsd: number | null; // soma dos total_cost_usd; null se sem dados
+  partial: boolean; // true se algum arquivo tinha unpriced_models não-vazio
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheCreation: number;
+  };
+  totalTokens: number;
+  reportPath: string | null; // caminho do report.html, se existir
+}
+
+export interface TimelineEntry {
+  kind: string;
+  timestamp: string;
+  note: string;
+  phase?: string;
+}
+
+export interface Spec {
+  id: string; // "FEAT-006" / "DISC-001"
+  squad: "sdd" | "discovery";
+  title: string;
+  phase: string; // current_phase cru
+  plannedPhases: string[];
+  status: SpecStatus; // derivado
+  tasks: Task[];
+  health: {
+    pendingHuman: number;
+    escalationRate: number;
+    auditException: boolean;
+  };
+  lastActivityAt: string | null;
+  timeline: TimelineEntry[];
+  cost: CostRollup;
+}
+
+export interface Project {
+  id: string; // slug do path, ex. "ai-squad"
+  path: string;
+  name: string;
+  specs: Spec[];
+  hidden: boolean;
+}
