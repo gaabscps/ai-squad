@@ -155,6 +155,14 @@ type CostRollup = {
 2. **Reusar a soma, não reimplementá-la.** A agregação dos `costs/agent-*.json` já existe em `cost_report.py`. O aiOS porta/reusa essa soma, garantindo que o número do board é **exatamente** o número do report. *Mesmo princípio do GAP A: fonte de custo única.*
 3. **Formato compacto, igual ao report.** Reusa `fmt_tokens` (1.4M / 775K / 500) pra o card falar a mesma língua do report.
 
+### Invariante de custo (NÃO-NEGOCIÁVEL)
+
+1. **Fonte única da verdade.** O número de tokens do board e o do report vêm dos **mesmos** `costs/agent-*.json`, somados pela **mesma** função (`cost_report.py` reusada/portada). Board e report **não podem mostrar valores diferentes** — eles leem o mesmo dado com o mesmo código.
+2. **Só valores concretos reais.** O board exibe apenas tokens efetivamente lidos do disco. **Nunca** estima, interpola ou sintetiza um número.
+3. **Ausência é explícita, não inventada.** Se uma feature não tem `costs/` ainda (pipeline não rodou, ou sem dados), o card mostra `—` / "sem dados de custo" — jamais um valor chutado. Honestidade sobre ausência > número falso.
+
+Critério de aceitação: para qualquer feature, o total de tokens no card é byte-a-byte o mesmo que o `report.html` daquela feature apresenta.
+
 **Fora (YAGNI):** qualquer cálculo de $, tabela de pricing, alertas de orçamento, gráfico histórico. Tudo isso ou é do report, ou é camada posterior.
 
 ---
