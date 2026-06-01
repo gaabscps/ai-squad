@@ -14,7 +14,7 @@ describe("parseSession", () => {
     expect(s.title).toBe("exemplo concluido");
     expect(s.plannedPhases).toEqual(["specify", "plan", "tasks", "implementation"]);
     expect(s.tasks).toHaveLength(2);
-    expect(s.tasks[1]).toEqual({ id: "T-002", state: "done", loops: 2 });
+    expect(s.tasks.find((t) => t.id === "T-002")).toEqual({ id: "T-002", state: "done", loops: 2 });
     expect(s.health.pendingHuman).toBe(0);
     expect(s.timeline[0].kind).toBe("pm_init");
     expect(s.status).toBe("done");
@@ -22,6 +22,13 @@ describe("parseSession", () => {
 
   it("retorna null quando não há session.yml", () => {
     expect(parseSession(fixt("spec-sem-custo"))).toBeNull();
+  });
+
+  it("deriva status paused e mapeia health no fixture pausado", () => {
+    const s = parseSession(fixt("feat-paused"))!;
+    expect(s.status).toBe("paused");
+    expect(s.health.pendingHuman).toBe(1);
+    expect(s.tasks.find((t) => t.id === "T-001")?.state).toBe("blocked");
   });
 });
 

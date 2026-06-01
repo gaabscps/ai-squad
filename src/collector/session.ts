@@ -4,6 +4,8 @@ import { parse as parseYaml } from "yaml";
 import type { Spec, SpecStatus, Task, TimelineEntry } from "../store/types.js";
 import { readCostRollup } from "./cost.js";
 
+// View parcial do session.yml: só os campos que deriveStatus consulta.
+// O objeto bruto tem mais chaves; isto declara apenas o que esta função lê.
 interface RawSession {
   current_phase?: string;
   paused_at?: string;
@@ -30,19 +32,16 @@ export function parseSession(specDir: string): Spec | null {
   const raw = parseYaml(readFileSync(file, "utf-8")) as Record<string, any>;
 
   const tasks: Task[] = Object.entries(raw.task_states ?? {}).map(
-    ([id, v]: [string, any]) => ({
-      id,
-      state: v?.state ?? "pending",
-      loops: v?.loops ?? 0,
-    })
+    ([id, v]: [string, unknown]) => {
+      const tv = (v ?? {}) as { state?: string; loops?: number };
+      return { id, state: (tv.state ?? "pending") as Task["state"], loops: tv.loops ?? 0 };
+    }
   );
 
-  const timeline: TimelineEntry[] = (raw.notes ?? []).map((n: any) => ({
-    kind: n?.kind ?? "",
-    timestamp: n?.timestamp ?? "",
-    note: n?.note ?? "",
-    phase: n?.phase,
-  }));
+  const timeline: TimelineEntry[] = (raw.notes ?? []).map((n: unknown) => {
+    const nn = (n ?? {}) as { kind?: string; timestamp?: string; note?: string; phase?: string };
+    return { kind: nn.kind ?? "", timestamp: nn.timestamp ?? "", note: nn.note ?? "", phase: nn.phase };
+  });
 
   const em = raw.escalation_metrics ?? {};
 
