@@ -21,8 +21,14 @@ function isDir(p: string): boolean {
 function loadSpecs(projectPath: string): Spec[] {
   const agentDir = join(projectPath, ".agent-session");
   if (!existsSync(agentDir)) return [];
+  let entries: string[];
+  try {
+    entries = readdirSync(agentDir);
+  } catch {
+    return []; // .agent-session ilegível: não derruba o scan inteiro
+  }
   const specs: Spec[] = [];
-  for (const entry of readdirSync(agentDir)) {
+  for (const entry of entries) {
     const specDir = join(agentDir, entry);
     if (!isDir(specDir)) continue;
     const spec = parseSession(specDir);
@@ -48,7 +54,7 @@ function toProject(projectPath: string, hide: Set<string>): Project {
  */
 export function discoverProjects(opts: DiscoveryOptions): Project[] {
   const hide = new Set(opts.hide ?? []);
-  const found = new Map<string, string>(); // path absoluto -> path
+  const found = new Set<string>();
 
   for (const root of opts.roots) {
     if (!isDir(root)) continue;
@@ -56,15 +62,15 @@ export function discoverProjects(opts: DiscoveryOptions): Project[] {
       const candidate = resolve(root, entry);
       if (!isDir(candidate)) continue;
       if (existsSync(join(candidate, ".agent-session"))) {
-        found.set(candidate, candidate);
+        found.add(candidate);
       }
     }
   }
 
   for (const p of opts.include ?? []) {
     const abs = resolve(p);
-    if (existsSync(join(abs, ".agent-session"))) found.set(abs, abs);
+    if (isDir(abs) && existsSync(join(abs, ".agent-session"))) found.add(abs);
   }
 
-  return [...found.values()].map((p) => toProject(p, hide));
+  return [...found].map((p) => toProject(p, hide));
 }
