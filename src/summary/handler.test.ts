@@ -67,4 +67,25 @@ describe("makeSummaryHandler", () => {
     expect(JSON.parse(send.mock.calls[0][0]).type).toBe("summary:error");
     rmSync(root, { recursive: true, force: true });
   });
+
+  it("regerar a mesma task: o close do processo antigo não vaza o handle do novo", () => {
+    const root = mkdtempSync(join(tmpdir(), "h-"));
+    const procs: any[] = [];
+    const spawnFn = (() => { const p = fakeProc(); procs.push(p); return p; }) as any;
+    const send = vi.fn();
+    const handle = makeSummaryHandler(store, { cacheRoot: root, spawnFn, now: () => "T0" });
+
+    handle({ type: "summary:generate", specId: "FEAT-001", taskId: "T-001" }, send); // proc 0
+    handle({ type: "summary:generate", specId: "FEAT-001", taskId: "T-001" }, send); // cancela 0, vira proc 1
+    expect(procs[0].kill).toHaveBeenCalled();
+
+    // O processo ANTIGO (0), já cancelado, fecha agora e dispara seu onError tardio.
+    procs[0].emit("close", null);
+
+    // Um terceiro generate ainda deve achar e cancelar o proc 1 (o atual) —
+    // só acontece se o close do 0 NÃO apagou a entrada do 1 do mapa.
+    handle({ type: "summary:generate", specId: "FEAT-001", taskId: "T-001" }, send); // cancela 1, vira proc 2
+    expect(procs[1].kill).toHaveBeenCalled();
+    rmSync(root, { recursive: true, force: true });
+  });
 });
