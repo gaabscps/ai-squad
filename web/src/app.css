@@ -1,0 +1,306 @@
+/* ai-squad-os — tema dark mínimo do cockpit.
+   Estiliza as classes que os componentes já emitem (status-*, phase-*, data-squad,
+   cost-*, etc.). Sem framework: variáveis CSS + flex/grid. */
+
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-soft: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+
+  /* cores de status */
+  --running: #3b82f6;
+  --paused: #f59e0b;
+  --blocked: #ef4444;
+  --done: #22c55e;
+  --escalated: #a855f7;
+
+  /* discriminador de squad */
+  --sdd: #58a6ff;
+  --discovery: #2dd4bf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Board + barra superior ---- */
+.board {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.board-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.conn {
+  font-weight: 600;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.conn-up {
+  color: var(--done);
+  background: color-mix(in srgb, var(--done) 15%, transparent);
+}
+.conn-down {
+  color: var(--paused);
+  background: color-mix(in srgb, var(--paused) 15%, transparent);
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tag {
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tag:hover {
+  color: var(--text);
+}
+.tag.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.show-hidden {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+/* ---- Grupo de projeto ---- */
+.project-group {
+  margin-bottom: 24px;
+}
+.project-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.project-tag {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+.project-hide {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.project-hide:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+/* ---- Card de spec ---- */
+.spec-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--sdd);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.spec-card[data-squad="discovery"] {
+  border-left-color: var(--discovery);
+}
+
+.spec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.spec-id {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.spec-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+}
+
+/* ---- Status + flags ---- */
+.status-badge {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.status-running {
+  color: var(--running);
+  background: color-mix(in srgb, var(--running) 16%, transparent);
+}
+.status-paused {
+  color: var(--paused);
+  background: color-mix(in srgb, var(--paused) 16%, transparent);
+}
+.status-blocked {
+  color: var(--blocked);
+  background: color-mix(in srgb, var(--blocked) 16%, transparent);
+}
+.status-done {
+  color: var(--done);
+  background: color-mix(in srgb, var(--done) 16%, transparent);
+}
+.status-escalated {
+  color: var(--escalated);
+  background: color-mix(in srgb, var(--escalated) 16%, transparent);
+}
+.flag-audit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--paused);
+  background: color-mix(in srgb, var(--paused) 16%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* ---- Barra de fases ---- */
+.phase-bar {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+.phase {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+}
+.phase-done {
+  color: var(--done);
+  border-color: color-mix(in srgb, var(--done) 40%, transparent);
+  background: color-mix(in srgb, var(--done) 10%, transparent);
+}
+.phase-current {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.phase-future {
+  color: var(--text-dim);
+}
+
+/* ---- Custo ---- */
+.cost-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.cost-usd {
+  font-weight: 700;
+}
+.cost-tokens {
+  color: var(--text-dim);
+}
+.cost-partial {
+  color: var(--paused);
+  font-weight: 600;
+}
+.cost-report {
+  margin-left: auto;
+}
+
+/* ---- Timeline ---- */
+.timeline-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.timeline-notes time {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.timeline-notes b {
+  color: var(--text);
+}
+.timeline-docs {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+}
