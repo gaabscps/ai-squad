@@ -30,10 +30,10 @@ export function createServer(
     JSON.stringify({ type: "snapshot", projects: store.getSnapshot() });
 
   wss.on("connection", (socket) => {
-    // setTimeout(0) adia o envio para além do tick em que o evento 'open' dispara
-    // no cliente, evitando a race condition onde a mensagem chega antes de o teste
-    // conseguir registrar o listener (Promise chain + microtask).
-    setTimeout(() => socket.send(snapshotMessage()), 0); // estado atual assim que conecta
+    // Envia no próximo tick (não no mesmo tick do 'connection'): garante que o
+    // socket terminou de inicializar e que o consumidor já registrou seu listener
+    // antes do primeiro frame chegar. Entrega mais previsível; custo ~0 (app local).
+    setTimeout(() => socket.send(snapshotMessage()), 0);
     socket.on("message", (raw) => {
       let msg: { type?: string; id?: string };
       try {
@@ -48,12 +48,15 @@ export function createServer(
   });
 
   // o Store é a fonte; quando ele muda, todo cliente conectado recebe o novo snapshot.
-  store.on("changed", () => {
+  const onChanged = (): void => {
     const data = snapshotMessage();
     for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) client.send(data);
     }
-  });
+  };
+  store.on("changed", onChanged);
+  // remove o listener ao fechar — createServer pode ser chamado de novo sobre o mesmo Store
+  server.on("close", () => store.removeListener("changed", onChanged));
 
   return server;
 }
