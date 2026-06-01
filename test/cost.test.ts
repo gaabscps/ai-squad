@@ -23,4 +23,16 @@ describe("readCostRollup", () => {
     expect(c.totalCostUsd).toBeNull();
     expect(c.totalTokens).toBe(0);
   });
+
+  it("marca partial=true quando há unpriced_models", () => {
+    const c = readCostRollup(fixt("spec-unpriced"));
+    expect(c.partial).toBe(true);
+    expect(c.totalCostUsd).toBeCloseTo(0.1, 6);
+  });
+
+  it("retorna null quando costs/ existe mas não tem .json", () => {
+    const c = readCostRollup(fixt("spec-costs-vazia"));
+    expect(c.totalCostUsd).toBeNull();
+    expect(c.totalTokens).toBe(0);
+  });
 });

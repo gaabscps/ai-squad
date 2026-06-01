@@ -39,7 +39,7 @@ export function readCostRollup(specDir: string): CostRollup {
   const files = readdirSync(costsDir).filter((f) => f.endsWith(".json"));
   if (files.length === 0) return emptyRollup(reportPath);
 
-  let totalCostUsd = 0;
+  let totalCostUsd: number | null = null;
   let partial = false;
   const tokens = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
 
@@ -50,7 +50,7 @@ export function readCostRollup(specDir: string): CostRollup {
     } catch {
       continue; // arquivo corrompido: ignora, não inventa número
     }
-    if (typeof raw.total_cost_usd === "number") totalCostUsd += raw.total_cost_usd;
+    if (typeof raw.total_cost_usd === "number") totalCostUsd = (totalCostUsd ?? 0) + raw.total_cost_usd;
     if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0)
       partial = true;
     for (const usage of Object.values(raw.by_model ?? {})) {
