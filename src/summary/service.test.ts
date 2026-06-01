@@ -42,6 +42,20 @@ describe("runSummary", () => {
     expect(onChunk).toHaveBeenCalledWith("X");
   });
 
+  it("não corrompe caractere multi-byte (ã) partido entre dois chunks", () => {
+    const proc = fakeProc();
+    const onChunk = vi.fn(), onDone = vi.fn(), onError = vi.fn();
+    runSummary("P", { onChunk, onDone, onError }, { spawnFn: (() => proc) as any });
+    // "Implementação" tem 'ç' e 'ã' (2 bytes cada em UTF-8). Cortamos os bytes no meio.
+    const line = JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Implementação" } } }) + "\n";
+    const bytes = Buffer.from(line, "utf8");
+    const cut = bytes.indexOf(Buffer.from("ç", "utf8")) + 1; // corta NO MEIO do 'ç'
+    proc.stdout.emit("data", bytes.subarray(0, cut));
+    proc.stdout.emit("data", bytes.subarray(cut));
+    expect(onChunk).toHaveBeenCalledWith("Implementação");
+    expect(onChunk).not.toHaveBeenCalledWith(expect.stringContaining("�"));
+  });
+
   it("emite error quando o CLI não existe (ENOENT)", () => {
     const proc = fakeProc();
     const onError = vi.fn();

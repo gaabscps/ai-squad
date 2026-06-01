@@ -1,4 +1,5 @@
 import { spawn as realSpawn } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 import { parseStreamLine } from "./parse.js";
 
 export interface SummaryCallbacks {
@@ -29,11 +30,15 @@ export function runSummary(prompt: string, cb: SummaryCallbacks, deps: SummaryDe
 
   let buffer = "";
   let done = false;
+  // StringDecoder segura bytes de um caractere multi-byte (ã, ç, é) que ficou partido
+  // entre dois chunks do pipe — sem ele, cada metade viraria '�'. O resumo é em
+  // português, então esse split aconteceria na prática.
+  const decoder = new StringDecoder("utf8");
   const finishDone = (text: string) => { if (!done) { done = true; cb.onDone(text); } };
   const finishError = (msg: string) => { if (!done) { done = true; cb.onError(msg); } };
 
   proc.stdout?.on("data", (chunk: Buffer) => {
-    buffer += chunk.toString("utf8");
+    buffer += decoder.write(chunk);
     let nl: number;
     while ((nl = buffer.indexOf("\n")) >= 0) {
       const line = buffer.slice(0, nl);
