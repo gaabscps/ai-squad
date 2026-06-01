@@ -1,0 +1,6 @@
+task_id: "FEAT-099"
+squad: "sdd"
+feature_name: "feature do projeto A"
+current_phase: "done"
+last_activity_at: "2026-05-20T10:00:00Z"
+planned_phases: ["specify", "implementation"]

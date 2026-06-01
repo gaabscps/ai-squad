@@ -1,0 +1,5 @@
+task_id: "FEAT-OK"
+squad: "sdd"
+feature_name: "ok"
+current_phase: "done"
+planned_phases: ["specify"]

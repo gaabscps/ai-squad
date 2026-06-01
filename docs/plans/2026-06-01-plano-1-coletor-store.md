@@ -327,7 +327,7 @@ export function readCostRollup(specDir: string): CostRollup {
   const files = readdirSync(costsDir).filter((f) => f.endsWith(".json"));
   if (files.length === 0) return emptyRollup(reportPath);
 
-  let totalCostUsd = 0;
+  let totalCostUsd: number | null = null;
   let partial = false;
   const tokens = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
 
@@ -338,7 +338,7 @@ export function readCostRollup(specDir: string): CostRollup {
     } catch {
       continue; // arquivo corrompido: ignora, não inventa número
     }
-    if (typeof raw.total_cost_usd === "number") totalCostUsd += raw.total_cost_usd;
+    if (typeof raw.total_cost_usd === "number") totalCostUsd = (totalCostUsd ?? 0) + raw.total_cost_usd;
     if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0)
       partial = true;
     for (const usage of Object.values(raw.by_model ?? {})) {
@@ -810,3 +810,8 @@ git commit -m "feat: CLI de dump do Store (prova end-to-end)"
 - **Store em memória + saída inspecionável** → Task 5. ✓
 
 **Fora deste plano (próximos):** servidor Express + WebSocket + watcher (Plano 2); UI React (Plano 3). O Store aqui é a fundação que ambos consomem.
+
+## Notas pro Plano 2 (achados da execução)
+
+- **`Project.id` colide entre roots.** Hoje `id = name = basename(path)`. Dois repos com o mesmo nome de pasta em roots diferentes geram `id` igual. No Plano 2 o WebSocket vai usar `id` como chave de referência — antes disso, trocar `Project.id` por algo estável (ex.: o path absoluto ou um hash dele). Levantado no review final do Plano 1.
+- **Schema inconsistente do ai-squad:** `notes` no `session.yml` é ora `array` de eventos, ora `string` de prosa (FEAT-002/004/005). O coletor já é robusto aos dois, mas vale investigar/normalizar no próprio ai-squad em algum momento.

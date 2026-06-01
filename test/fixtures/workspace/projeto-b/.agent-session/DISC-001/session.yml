@@ -1,0 +1,6 @@
+task_id: "DISC-001"
+squad: "discovery"
+feature_name: "discovery do projeto B"
+current_phase: "implementation"
+last_activity_at: "2026-05-22T10:00:00Z"
+planned_phases: ["frame", "investigate", "decide"]

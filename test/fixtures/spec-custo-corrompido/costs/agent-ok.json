@@ -1,0 +1,8 @@
+{
+  "agent_id": "ok",
+  "total_cost_usd": 0.7,
+  "by_model": {
+    "claude-opus-4-8": { "input_tokens": 7, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0 }
+  },
+  "unpriced_models": []
+}
