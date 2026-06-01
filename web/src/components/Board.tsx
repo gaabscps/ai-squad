@@ -13,6 +13,13 @@ export function Board({ onHide }: { onHide: (id: string, hidden: boolean) => voi
   const [filter, setFilter] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
 
+  // Ao ocultar o projeto que está filtrado, o board ficaria vazio — reseta o
+  // filtro pra null antes de delegar, pra não deixar a tela em branco.
+  const handleHide = (id: string, hidden: boolean) => {
+    if (hidden && filter === id) setFilter(null);
+    onHide(id, hidden);
+  };
+
   const visible = projects
     .filter((p) => showHidden || !p.hidden)
     .filter((p) => filter === null || p.id === filter);
@@ -47,7 +54,7 @@ export function Board({ onHide }: { onHide: (id: string, hidden: boolean) => voi
         </label>
       </header>
       {visible.map((p) => (
-        <ProjectGroup key={p.id} project={p} onHide={onHide} />
+        <ProjectGroup key={p.id} project={p} onHide={handleHide} />
       ))}
     </div>
   );

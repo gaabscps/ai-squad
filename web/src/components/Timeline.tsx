@@ -24,7 +24,7 @@ export function Timeline({ spec, projectPath }: { spec: Spec; projectPath: strin
             key={d}
             href={`/file?path=${encodeURIComponent(`${specDir}/${d}`)}`}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             {d}
           </a>

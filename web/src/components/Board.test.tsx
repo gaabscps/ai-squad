@@ -49,4 +49,16 @@ describe("Board", () => {
     await userEvent.click(screen.getByRole("button", { name: "ocultar" }));
     expect(onHide).toHaveBeenCalledWith("proj-abc", true);
   });
+
+  it("reseta o filtro ao ocultar o projeto filtrado (não deixa o board em branco)", async () => {
+    renderBoard([
+      { id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] },
+      { id: "b", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })] },
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "proj-a" })); // filtra proj-a
+    expect(screen.queryByText("FEAT-2")).toBeNull(); // proj-b filtrado fora
+    // com o filtro em proj-a, só o grupo de proj-a aparece → há um único botão "ocultar"
+    await userEvent.click(screen.getByRole("button", { name: "ocultar" }));
+    expect(screen.getByText("FEAT-2")).toBeInTheDocument(); // filtro resetou: proj-b reaparece
+  });
 });

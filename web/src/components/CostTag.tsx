@@ -21,7 +21,7 @@ export function CostTag({ cost }: { cost: CostRollup }) {
           className="cost-report"
           href={`/file?path=${encodeURIComponent(cost.reportPath)}`}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
         >
           report
         </a>
