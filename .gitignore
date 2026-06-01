@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.log
 aios.config.json
+
+.superpowers/
