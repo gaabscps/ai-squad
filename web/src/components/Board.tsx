@@ -1,61 +1,65 @@
 import { useState } from "react";
 import { useProjects } from "../state/projects";
-import { ProjectGroup } from "./ProjectGroup";
+import { flattenSpecs, matchesQuery, type SpecWithProject } from "../lib/kanban";
+import { TopBar, type ViewMode } from "./TopBar";
+import { ProjectFilter } from "./ProjectFilter";
+import { KanbanBoard } from "./KanbanBoard";
+import { SpecTable } from "./SpecTable";
+import { DetailDrawer } from "./DetailDrawer";
 
 /**
- * O board: barra com indicador de conexão (ao vivo/reconectando) + filtro por tag
- * de projeto, e a lista de grupos. Por padrão esconde os projetos hidden (o
- * "ocultar avulso" do §6), com um toggle pra revê-los. O filtro e o toggle são
- * estado de UI puramente local (useState) — não tocam o estado vindo do WS.
+ * Orquestrador da UI. O estado vindo do WS (projects + connected) é só leitura;
+ * todo o resto é estado de UI local: visão (kanban/tabela), filtro de projeto,
+ * busca, "mostrar ocultos" e a spec selecionada (drawer). Achata as specs uma vez
+ * e aplica filtro+busca antes de passar pro kanban/tabela. A seleção guarda
+ * (projectId, specId) e re-localiza o item a cada render — se a spec sumir num
+ * novo snapshot, o drawer fecha sozinho.
  */
 export function Board({ onHide }: { onHide: (id: string, hidden: boolean) => void }) {
   const { projects, connected } = useProjects();
+  const [view, setView] = useState<ViewMode>("kanban");
   const [filter, setFilter] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [showHidden, setShowHidden] = useState(false);
+  const [selected, setSelected] = useState<{ projectId: string; specId: string } | null>(null);
 
-  // Ao ocultar o projeto que está filtrado, o board ficaria vazio — reseta o
-  // filtro pra null antes de delegar, pra não deixar a tela em branco.
+  const all = flattenSpecs(projects, showHidden);
+  const visible = all
+    .filter((sp) => filter === null || sp.projectId === filter)
+    .filter((sp) => matchesQuery(sp, query));
+
+  const selectedItem: SpecWithProject | null =
+    selected
+      ? all.find((sp) => sp.projectId === selected.projectId && sp.spec.id === selected.specId) ?? null
+      : null;
+
   const handleHide = (id: string, hidden: boolean) => {
     if (hidden && filter === id) setFilter(null);
     onHide(id, hidden);
   };
 
-  const visible = projects
-    .filter((p) => showHidden || !p.hidden)
-    .filter((p) => filter === null || p.id === filter);
+  const onSelect = (item: SpecWithProject) =>
+    setSelected({ projectId: item.projectId, specId: item.spec.id });
 
   return (
-    <div className="board">
-      <header className="board-bar">
-        <span className={`conn conn-${connected ? "up" : "down"}`}>
-          {connected ? "ao vivo" : "reconectando…"}
-        </span>
-        <div className="tags">
-          <button className={filter === null ? "tag active" : "tag"} onClick={() => setFilter(null)}>
-            todos
-          </button>
-          {projects.map((p) => (
-            <button
-              key={p.id}
-              className={filter === p.id ? "tag active" : "tag"}
-              onClick={() => setFilter(p.id)}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        <label className="show-hidden">
-          <input
-            type="checkbox"
-            checked={showHidden}
-            onChange={(e) => setShowHidden(e.target.checked)}
-          />{" "}
-          mostrar ocultos
-        </label>
-      </header>
-      {visible.map((p) => (
-        <ProjectGroup key={p.id} project={p} onHide={handleHide} />
-      ))}
+    <div className="app-shell">
+      <TopBar connected={connected} query={query} onQuery={setQuery} view={view} onView={setView} />
+      <ProjectFilter
+        projects={projects}
+        filter={filter}
+        onFilter={setFilter}
+        showHidden={showHidden}
+        onShowHidden={setShowHidden}
+        onHide={handleHide}
+      />
+      <main className="board-body">
+        {view === "kanban" ? (
+          <KanbanBoard items={visible} onSelect={onSelect} />
+        ) : (
+          <SpecTable items={visible} onSelect={onSelect} />
+        )}
+      </main>
+      <DetailDrawer item={selectedItem} onClose={() => setSelected(null)} />
     </div>
   );
 }

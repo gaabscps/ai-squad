@@ -18,47 +18,54 @@ function renderBoard(projects: Parameters<typeof makeProject>[0][] = [], onHide 
 }
 
 describe("Board", () => {
-  it("lista os projetos visíveis e seus cards", () => {
-    renderBoard([
-      { id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", title: "um" })] },
-      { id: "b", name: "proj-b", specs: [makeSpec({ id: "FEAT-2", title: "dois" })] },
-    ]);
+  it("mostra os cards das specs no kanban por padrão", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", status: "running" })] }]);
     expect(screen.getByText("FEAT-1")).toBeInTheDocument();
-    expect(screen.getByText("FEAT-2")).toBeInTheDocument();
+    expect(screen.getByText("Em andamento")).toBeInTheDocument();
   });
 
-  it("filtra por tag de projeto ao clicar", async () => {
+  it("filtra por projeto", async () => {
     renderBoard([
       { id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] },
       { id: "b", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })] },
     ]);
     await userEvent.click(screen.getByRole("button", { name: "proj-a" }));
     expect(screen.getByText("FEAT-1")).toBeInTheDocument();
-    expect(screen.queryByText("FEAT-2")).toBeNull(); // proj-b sumiu do filtro
+    expect(screen.queryByText("FEAT-2")).toBeNull();
   });
 
-  it("esconde projetos hidden por padrão, com toggle pra mostrar", async () => {
-    renderBoard([{ id: "a", name: "proj-a", hidden: true, specs: [makeSpec({ id: "FEAT-1" })] }]);
-    expect(screen.queryByText("FEAT-1")).toBeNull(); // hidden não aparece
-    await userEvent.click(screen.getByLabelText("mostrar ocultos"));
+  it("busca filtra por texto", async () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [
+      makeSpec({ id: "FEAT-1", title: "Exportar PDF" }),
+      makeSpec({ id: "FEAT-2", title: "Login social" }),
+    ] }]);
+    await userEvent.type(screen.getByPlaceholderText(/buscar/i), "pdf");
     expect(screen.getByText("FEAT-1")).toBeInTheDocument();
+    expect(screen.queryByText("FEAT-2")).toBeNull();
   });
 
-  it("o botão ocultar manda o id estável pro callback", async () => {
-    const { onHide } = renderBoard([{ id: "proj-abc", name: "proj-a", specs: [] }]);
-    await userEvent.click(screen.getByRole("button", { name: "ocultar" }));
-    expect(onHide).toHaveBeenCalledWith("proj-abc", true);
+  it("alterna pra tabela", async () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] }]);
+    await userEvent.click(screen.getByRole("button", { name: /tabela/i }));
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
-  it("reseta o filtro ao ocultar o projeto filtrado (não deixa o board em branco)", async () => {
-    renderBoard([
-      { id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] },
-      { id: "b", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })] },
+  it("clicar num card abre o drawer; fechar o esconde", async () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", title: "Checkout" })] }]);
+    await userEvent.click(screen.getByText("FEAT-1"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /fechar/i }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("ocultar manda o id estável e reseta o filtro do projeto oculto", async () => {
+    const { onHide } = renderBoard([
+      { id: "proj-abc", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] },
+      { id: "proj-xyz", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })] },
     ]);
     await userEvent.click(screen.getByRole("button", { name: "proj-a" })); // filtra proj-a
-    expect(screen.queryByText("FEAT-2")).toBeNull(); // proj-b filtrado fora
-    // com o filtro em proj-a, só o grupo de proj-a aparece → há um único botão "ocultar"
-    await userEvent.click(screen.getByRole("button", { name: "ocultar" }));
-    expect(screen.getByText("FEAT-2")).toBeInTheDocument(); // filtro resetou: proj-b reaparece
+    await userEvent.click(screen.getByRole("button", { name: /ocultar proj-a/i }));
+    expect(onHide).toHaveBeenCalledWith("proj-abc", true);
+    expect(screen.getByText("FEAT-2")).toBeInTheDocument(); // filtro resetou
   });
 });
