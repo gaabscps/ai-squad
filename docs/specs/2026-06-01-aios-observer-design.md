@@ -80,7 +80,7 @@ type Spec = {               // uma Session (.agent-session/<id>/session.yml)
   health: { pendingHuman: number; escalationRate: number; auditException: boolean };
   lastActivityAt: string;                            // ← last_activity_at
   timeline: TimelineEntry[];                         // ← notes[]
-  cost: CostRollup;                                  // ← manifest × jsonl
+  cost: CostRollup;                                  // ← soma de costs/agent-*.json + link pro report
 };
 
 type Task = {               // task_states.T-XXX
@@ -120,29 +120,42 @@ agente termina T-008 → orchestrator reescreve session.yml
 
 ---
 
-## 5. Custo em $
+## 5. Custo (tokens já agregados das fontes da feature)
 
-Nenhum arquivo guarda o $ pronto; ele nasce do cruzamento de duas fontes.
+O aiOS **não calcula custo em $**. A conversão `pricing × tokens` é trabalho do **report do ai-squad** — a fonte da verdade de custo, renderizada em `.agent-session/<spec>/report.html`. O aiOS apenas **soma as fontes de custo que cada feature já carrega**, mostra um indicador resumido (em tokens), e **encaminha pro report** pra revisão humana detalhada. O report é complementar, nunca substituído.
+
+### Fontes já existentes (gravadas pelos hooks do ai-squad)
+
+- `.agent-session/<spec>/costs/agent-<id>.json` — um arquivo de custo **por subagente** (tokens por tipo: `input`, `output`, `cache_read`, `cache_creation`).
+- `.agent-session/<spec>/report.html` — o report renderizado (custo + code review + git diff), gerado no hook de fim de sessão. É o destino do "encaminhar pra revisão humana".
+- `cost_report.py` (stdlib puro) — já contém a lógica de **somar** os `costs/agent-*.json` e o formatador `fmt_tokens` (1.4M / 775K).
+
+### O que o aiOS faz
 
 ```
-1. QUAIS sessões pertencem ao spec?
-   ├─ autoritativo: implementation_sessions no session.yml (GAP A, CLI ≥0.9.0)
-   └─ fallback: dispatch-manifest.json × session-*.jsonl
-2. SOMAR tokens por sessão, separando POR MODELO
-   └─ ler .jsonl, cada linha "assistant" → usage:{input_tokens, output_tokens}
-3. tokens × tabela de preço por modelo → US$ (soma ponderada)
+1. ler todos os costs/agent-*.json da feature
+2. somar tokens por tipo (input / output / cache_read / cache_creation)
+3. exibir no card: total de tokens (formato compacto) + link → report.html
 ```
 
-- **JSONL** (JSON Lines): um JSON por linha, log append-only — formato dos transcripts em `~/.claude/projects/<hash>/`.
-- **Token:** unidade de cobrança da LLM (~4 chars). Custo é sempre `tokens × preço`, nunca está pronto.
+```typescript
+type CostRollup = {
+  tokens: { input: number; output: number; cacheRead: number; cacheCreation: number };
+  totalTokens: number;        // soma — NUNCA convertido em $ pelo aiOS
+  reportPath: string | null;  // .agent-session/<spec>/report.html, se existir
+};
+```
+
+- **JSONL** (JSON Lines): um JSON por linha, log append-only — formato dos transcripts de custo.
+- **Token:** unidade de cobrança da LLM (~4 chars). O aiOS mostra a **contagem**, não o preço.
 
 **Decisões:**
 
-1. **Reusar o scoping do GAP A, não reimplementar.** O GAP A (CLI 0.9.0) já resolveu *quais* sessões contam (`implementation_sessions`) e *quais subagentes excluir* (`excluded_subagents`). Sem esse escopo, contaria custo de outra feature e inflaria o número. Importar/portar de `packages/cli/lib`, não recriar.
-2. **Tabela de preço é config (`pricing.json`), não código.** Preços de Opus/Sonnet/Haiku mudam; editar um JSON, não caçar número no código.
-3. **Rotular como estimativa.** O cálculo local pode divergir levemente da fatura real do Console. "≈ US$ X,XX (estimativa)" promete menos do que não garante.
+1. **Não recalcular $ — encaminhar pro report.** O report já faz `pricing × tokens` e é a fonte da verdade. Se o aiOS recalculasse, criaria um segundo número que poderia divergir — confusão garantida. O board mostra tokens (métrica crua, sempre consistente com a fonte) e linka pro `report.html` pro $ detalhado. *Alternativa rejeitada: o aiOS exibir seu próprio $ — descartada porque duplica responsabilidade e arrisca divergência; o report é complementar, não substituído.*
+2. **Reusar a soma, não reimplementá-la.** A agregação dos `costs/agent-*.json` já existe em `cost_report.py`. O aiOS porta/reusa essa soma, garantindo que o número do board é **exatamente** o número do report. *Mesmo princípio do GAP A: fonte de custo única.*
+3. **Formato compacto, igual ao report.** Reusa `fmt_tokens` (1.4M / 775K / 500) pra o card falar a mesma língua do report.
 
-**Fora (YAGNI):** alertas de orçamento, gráfico histórico, custo por token individual.
+**Fora (YAGNI):** qualquer cálculo de $, tabela de pricing, alertas de orçamento, gráfico histórico. Tudo isso ou é do report, ou é camada posterior.
 
 ---
 
@@ -156,7 +169,7 @@ Critério de corte: o MVP responde **"o que está rodando, em que fase, e quanto
 | Board: cards por spec, agrupados/filtráveis por projeto (tags) | Busca full-text nas specs |
 | Barra de fases (`plannedPhases` vs `phase`) | Gráfico histórico de custo |
 | Status colorido + flags (`blocked`/`paused`/`audit_exception`) | Alertas de orçamento |
-| Custo estimado por spec/projeto | Fase 2 (montar comandos) e Fase 3 (controle) |
+| Tokens agregados por spec/projeto + link pro report | Fase 2 (montar comandos) e Fase 3 (controle) |
 | Timeline (`notes[]`) + link pros `.md` | Multi-usuário / nuvem |
 | SDD **e** Discovery (squad discriminador) | — |
 

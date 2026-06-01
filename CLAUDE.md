@@ -1,8 +1,10 @@
 # ai-squad-os
 
-Cockpit local (web, single-user) que **observa** os pipelines do framework [ai-squad](https://github.com/gaabscps/ai-squad) rodando em todos os seus projetos: board de specs com tags por projeto, status de fase em tempo real e custo de token/$ agregado.
+Cockpit local (web, single-user) que **observa** os pipelines do framework [ai-squad](https://github.com/gaabscps/ai-squad) rodando em todos os seus projetos: board de specs com tags por projeto, status de fase em tempo real e **contagem de tokens agregada** por feature.
 
-Este repo é **separado e consumidor** do ai-squad: lê os artefatos que o framework produz (`.agent-session/<spec_id>/session.yml`, manifests, transcripts de custo) e **nunca escreve** neles. O ai-squad continua agnóstico; o aiOS é específico dos projetos do usuário e por isso vive aqui, fora do framework.
+Este repo é **separado e consumidor** do ai-squad: lê os artefatos que o framework produz (`.agent-session/<spec_id>/session.yml`, manifests, `costs/agent-*.json`) e **nunca escreve** neles. O ai-squad continua agnóstico; o aiOS é específico dos projetos do usuário e por isso vive aqui, fora do framework.
+
+**Custo:** o aiOS **não calcula $** — soma os tokens que cada feature já registra em `costs/agent-*.json` e **encaminha pro report do ai-squad** (`.agent-session/<spec>/report.html`) pra revisão humana do custo em $. O report é a fonte da verdade de custo, complementar e não substituído.
 
 ## Regras de comunicação (inegociável)
 
