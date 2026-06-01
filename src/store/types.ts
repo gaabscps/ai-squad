@@ -50,7 +50,7 @@ export interface Spec {
 }
 
 export interface Project {
-  id: string; // slug do path, ex. "ai-squad"
+  id: string; // estável e único: `${name}-${hash12(path)}` (ver collector/project-id.ts)
   path: string;
   name: string;
   specs: Spec[];
