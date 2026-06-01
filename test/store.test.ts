@@ -33,6 +33,8 @@ describe("Store", () => {
     const store = new Store(() => opts);
     store.rebuild();
     expect(store.getSnapshot().find((p) => p.name === "projeto-b")!.hidden).toBe(false);
+    // A closure `() => opts` lê a mesma referência de objeto, então mutar opts.hide
+    // faz o próximo rebuild() enxergar o novo valor — simula o config mudando entre dois rebuilds.
     opts.hide = ["projeto-b"];
     store.rebuild();
     expect(store.getSnapshot().find((p) => p.name === "projeto-b")!.hidden).toBe(true);
