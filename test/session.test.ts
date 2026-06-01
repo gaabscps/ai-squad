@@ -30,6 +30,19 @@ describe("parseSession", () => {
     expect(s.health.pendingHuman).toBe(1);
     expect(s.tasks.find((t) => t.id === "T-001")?.state).toBe("blocked");
   });
+
+  it("não quebra quando notes é uma string (preserva como 1 entrada)", () => {
+    const s = parseSession(fixt("feat-notes-string"))!;
+    expect(s).not.toBeNull();
+    expect(s.timeline).toHaveLength(1);
+    expect(s.timeline[0].note).toContain("resumo livre");
+    expect(s.status).toBe("done");
+  });
+
+  it("retorna null em YAML malformado (não lança)", () => {
+    expect(() => parseSession(fixt("feat-yaml-invalido"))).not.toThrow();
+    expect(parseSession(fixt("feat-yaml-invalido"))).toBeNull();
+  });
 });
 
 describe("deriveStatus", () => {

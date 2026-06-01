@@ -1,0 +1,6 @@
+task_id: "FEAT-NS"
+squad: "sdd"
+feature_name: "notes como string"
+current_phase: "done"
+planned_phases: ["specify", "implementation"]
+notes: "Um resumo livre em prosa, sem estrutura de eventos."

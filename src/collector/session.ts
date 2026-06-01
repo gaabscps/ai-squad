@@ -29,19 +29,33 @@ export function parseSession(specDir: string): Spec | null {
   const file = join(specDir, "session.yml");
   if (!existsSync(file)) return null;
 
-  const raw = parseYaml(readFileSync(file, "utf-8")) as Record<string, any>;
+  let raw: Record<string, any>;
+  try {
+    raw = (parseYaml(readFileSync(file, "utf-8")) as Record<string, any>) ?? {};
+  } catch {
+    return null; // YAML malformado: não derruba, trata como ausência
+  }
 
-  const tasks: Task[] = Object.entries(raw.task_states ?? {}).map(
-    ([id, v]: [string, unknown]) => {
-      const tv = (v ?? {}) as { state?: string; loops?: number };
-      return { id, state: (tv.state ?? "pending") as Task["state"], loops: tv.loops ?? 0 };
-    }
-  );
-
-  const timeline: TimelineEntry[] = (raw.notes ?? []).map((n: unknown) => {
-    const nn = (n ?? {}) as { kind?: string; timestamp?: string; note?: string; phase?: string };
-    return { kind: nn.kind ?? "", timestamp: nn.timestamp ?? "", note: nn.note ?? "", phase: nn.phase };
+  const rawTaskStates =
+    raw.task_states && typeof raw.task_states === "object" && !Array.isArray(raw.task_states)
+      ? raw.task_states
+      : {};
+  const tasks: Task[] = Object.entries(rawTaskStates).map(([id, v]: [string, unknown]) => {
+    const tv = (v ?? {}) as { state?: string; loops?: number };
+    return { id, state: (tv.state ?? "pending") as Task["state"], loops: tv.loops ?? 0 };
   });
+
+  let timeline: TimelineEntry[];
+  if (Array.isArray(raw.notes)) {
+    timeline = raw.notes.map((n: unknown) => {
+      const nn = (n ?? {}) as { kind?: string; timestamp?: string; note?: string; phase?: string };
+      return { kind: nn.kind ?? "", timestamp: nn.timestamp ?? "", note: nn.note ?? "", phase: nn.phase };
+    });
+  } else if (typeof raw.notes === "string" && raw.notes.trim() !== "") {
+    timeline = [{ kind: "summary", timestamp: "", note: raw.notes }];
+  } else {
+    timeline = [];
+  }
 
   const em = raw.escalation_metrics ?? {};
 
@@ -50,7 +64,7 @@ export function parseSession(specDir: string): Spec | null {
     squad: raw.squad === "discovery" ? "discovery" : "sdd",
     title: raw.feature_name ?? raw.task_id ?? "(sem título)",
     phase: raw.current_phase ?? "",
-    plannedPhases: raw.planned_phases ?? [],
+    plannedPhases: Array.isArray(raw.planned_phases) ? raw.planned_phases : [],
     status: deriveStatus(raw, tasks),
     tasks,
     health: {

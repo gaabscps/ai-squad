@@ -26,4 +26,15 @@ describe("discoverProjects", () => {
     const b = projects.find((p) => p.name === "projeto-b")!;
     expect(b.hidden).toBe(true);
   });
+
+  it("um session.yml ruim não derruba o scan dos outros", () => {
+    const ws = join(here, "fixtures", "workspace-resiliente");
+    const projects = discoverProjects({ roots: [ws] });
+    const names = projects.map((p) => p.name).sort();
+    expect(names).toEqual(["projeto-ok", "projeto-ruim"]); // ambos descobertos
+    const ok = projects.find((p) => p.name === "projeto-ok")!;
+    expect(ok.specs).toHaveLength(1); // o bom carregou
+    const ruim = projects.find((p) => p.name === "projeto-ruim")!;
+    expect(ruim.specs).toHaveLength(0); // o ruim foi pulado, sem crash
+  });
 });

@@ -31,7 +31,12 @@ function loadSpecs(projectPath: string): Spec[] {
   for (const entry of entries) {
     const specDir = join(agentDir, entry);
     if (!isDir(specDir)) continue;
-    const spec = parseSession(specDir);
+    let spec;
+    try {
+      spec = parseSession(specDir);
+    } catch {
+      continue; // um spec ruim não derruba o scan dos outros
+    }
     if (spec) specs.push(spec);
   }
   return specs;
