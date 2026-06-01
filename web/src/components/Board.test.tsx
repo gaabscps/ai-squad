@@ -68,4 +68,16 @@ describe("Board", () => {
     expect(onHide).toHaveBeenCalledWith("proj-abc", true);
     expect(screen.getByText("FEAT-2")).toBeInTheDocument(); // filtro resetou
   });
+
+  it("desligar 'mostrar ocultos' reseta o filtro de um projeto oculto (não deixa o board vazio)", async () => {
+    renderBoard([
+      { id: "proj-abc", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })] },
+      { id: "proj-xyz", name: "proj-b", hidden: true, specs: [makeSpec({ id: "FEAT-2" })] },
+    ]);
+    await userEvent.click(screen.getByLabelText(/mostrar ocultos/i)); // revela proj-b
+    await userEvent.click(screen.getByRole("button", { name: "proj-b" })); // filtra o oculto
+    expect(screen.queryByText("FEAT-1")).toBeNull(); // só proj-b
+    await userEvent.click(screen.getByLabelText(/mostrar ocultos/i)); // desliga de novo
+    expect(screen.getByText("FEAT-1")).toBeInTheDocument(); // filtro resetou, board não ficou vazio
+  });
 });

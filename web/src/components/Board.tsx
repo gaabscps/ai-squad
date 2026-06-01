@@ -38,6 +38,14 @@ export function Board({ onHide }: { onHide: (id: string, hidden: boolean) => voi
     onHide(id, hidden);
   };
 
+  // Ao desligar "mostrar ocultos", um filtro apontando pra um projeto oculto
+  // deixaria o board vazio (o projeto some de flattenSpecs e dos chips). Reseta o
+  // filtro nesse caso pra não exibir uma tela em branco sem explicação.
+  const handleShowHidden = (v: boolean) => {
+    if (!v) setFilter(null);
+    setShowHidden(v);
+  };
+
   const onSelect = (item: SpecWithProject) =>
     setSelected({ projectId: item.projectId, specId: item.spec.id });
 
@@ -49,7 +57,7 @@ export function Board({ onHide }: { onHide: (id: string, hidden: boolean) => voi
         filter={filter}
         onFilter={setFilter}
         showHidden={showHidden}
-        onShowHidden={setShowHidden}
+        onShowHidden={handleShowHidden}
         onHide={handleHide}
       />
       <main className="board-body">
