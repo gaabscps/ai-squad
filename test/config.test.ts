@@ -29,6 +29,11 @@ describe("loadConfig", () => {
     const p = tmpConfig(JSON.stringify({ roots: ["~/Dev"] }));
     expect(loadConfig(p).roots[0]).toBe(join(homedir(), "Dev"));
   });
+
+  it("expande ~ no include (análogo às roots)", () => {
+    const p = tmpConfig(JSON.stringify({ include: ["~/Other"] }));
+    expect(loadConfig(p).include[0]).toBe(join(homedir(), "Other"));
+  });
 });
 
 describe("saveHidden", () => {
@@ -39,5 +44,12 @@ describe("saveHidden", () => {
     expect(reread.roots).toEqual(["/x"]); // roots preservadas
     expect(reread.hide).toEqual(["/x/foo"]);
     expect(loadConfig(p).hide).toEqual(["/x/foo"]);
+  });
+
+  it("preserva include após o save", () => {
+    const p = tmpConfig(JSON.stringify({ roots: [], include: ["/y"], hide: [] }));
+    saveHidden(p, ["/x/foo"]);
+    const reread = JSON.parse(readFileSync(p, "utf-8"));
+    expect(reread.include).toEqual(["/y"]); // include não é tocado pelo saveHidden
   });
 });
