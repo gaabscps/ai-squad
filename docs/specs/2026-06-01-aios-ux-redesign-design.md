@@ -161,3 +161,14 @@ Hoje o aiOS lê só `session.yml` + `costs/`. A fase 2 adiciona um **coletor** q
 **Fase 2 — Tarefa expandível rica.** Coletor de `outputs/` + `dispatch-manifest.json`; `Task.dispatches[]` no store; tarefa colapsável no drawer. Independente da Fase 1.
 
 **Fase 3 (contingente) — Decisão por finding.** Só quando [ai-squad#43](https://github.com/gaabscps/ai-squad/issues/43) entregar o campo de resolução.
+
+### Estratégia de execução (decidida com o usuário)
+
+**Modo híbrido.** Razão: as duas fases têm naturezas diferentes.
+
+| Fase | Quem executa | Por quê |
+|---|---|---|
+| **Fase 1** (visual) | Interativo nesta sessão (superpowers: `writing-plans` → implementação) | Guiada por gosto/estética; os reviewers do ai-squad julgam lógica/padrão, não "ficou moderno". Iterar visual pede o humano no loop. |
+| **Fase 2** (coletor) | Pipeline ai-squad (`/spec-writer` → `/designer` → `/task-builder` → `/orchestrator`) | Engenharia de dados com ACs claros e TDD — ponto forte do framework. **Bônus dogfood:** roda como FEAT neste próprio repo → gera `.agent-session/` real que o cockpit redesenhado passa a exibir (dado real em vez de fixture). |
+
+Alternativas rejeitadas: **tudo via ai-squad** (mais tokens; reviewers não avaliam estética na Fase 1) e **tudo manual** (perde o dogfood e a sessão real neste repo).
