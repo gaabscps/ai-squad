@@ -15,6 +15,28 @@ function startedStore() {
   return store;
 }
 
+/**
+ * Coleta as mensagens do socket numa fila desde já e permite aguardar a próxima
+ * sem perder nenhuma. Evita a janela de corrida do padrão "espera open, depois
+ * escuta": uma mensagem pode chegar entre os dois passos e se perder.
+ */
+function messageReader(ws: WebSocket): () => Promise<string> {
+  const queue: string[] = [];
+  const waiters: Array<(m: string) => void> = [];
+  ws.on("message", (d) => {
+    const m = d.toString();
+    const w = waiters.shift();
+    if (w) w(m);
+    else queue.push(m);
+  });
+  return () =>
+    new Promise<string>((resolve) => {
+      const m = queue.shift();
+      if (m !== undefined) resolve(m);
+      else waiters.push(resolve);
+    });
+}
+
 describe("createServer", () => {
   it("GET /api/projects retorna o snapshot atual", async () => {
     const server = createServer(startedStore(), () => {});
@@ -35,10 +57,8 @@ describe("createServer", () => {
     const { port } = server.address() as AddressInfo;
 
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
-    const raw = await new Promise<string>((res) =>
-      ws.on("message", (d) => res(d.toString())),
-    );
-    const msg = JSON.parse(raw);
+    const nextMessage = messageReader(ws); // listener registrado já, sem janela de corrida
+    const msg = JSON.parse(await nextMessage());
     expect(msg.type).toBe("snapshot");
     expect(msg.projects).toHaveLength(2);
 
@@ -53,12 +73,11 @@ describe("createServer", () => {
     const { port } = server.address() as AddressInfo;
 
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
-    await new Promise<void>((res) => ws.on("open", () => res()));
-    await new Promise<void>((res) => ws.once("message", () => res())); // drena o snapshot inicial
-
-    const next = new Promise<string>((res) => ws.once("message", (d) => res(d.toString())));
+    const nextMessage = messageReader(ws);
+    await nextMessage(); // drena o snapshot inicial
+    const pending = nextMessage(); // aguarda a próxima (registra antes do rebuild)
     store.rebuild(); // dispara 'changed' → broadcast
-    const msg = JSON.parse(await next);
+    const msg = JSON.parse(await pending);
     expect(msg.type).toBe("snapshot");
 
     ws.close();
@@ -66,10 +85,13 @@ describe("createServer", () => {
   });
 
   it("encaminha comando hide ao callback com o id recebido", async () => {
-    let captured: { id: string; hidden: boolean } | null = null;
-    const server = createServer(startedStore(), (id, hidden) => {
-      captured = { id, hidden };
+    let resolveHide: (v: { id: string; hidden: boolean }) => void;
+    const hidden = new Promise<{ id: string; hidden: boolean }>((res) => {
+      resolveHide = res;
     });
+    const server = createServer(startedStore(), (id, hidden) =>
+      resolveHide({ id, hidden }),
+    );
     await new Promise<void>((r) => server.listen(0, r));
     const { port } = server.address() as AddressInfo;
 
@@ -77,7 +99,7 @@ describe("createServer", () => {
     await new Promise<void>((res) => ws.on("open", () => res()));
     ws.send(JSON.stringify({ type: "hide", id: "projeto-x-abc123" }));
 
-    await new Promise<void>((res) => setTimeout(res, 50)); // deixa a msg chegar
+    const captured = await hidden;
     expect(captured).toEqual({ id: "projeto-x-abc123", hidden: true });
 
     ws.close();
