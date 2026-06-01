@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Spec, SpecStatus, Task, TimelineEntry } from "../store/types.js";
 import { readCostRollup } from "./cost.js";
@@ -60,7 +60,7 @@ export function parseSession(specDir: string): Spec | null {
   const em = raw.escalation_metrics ?? {};
 
   return {
-    id: raw.task_id ?? specDir,
+    id: raw.task_id ?? basename(specDir),
     squad: raw.squad === "discovery" ? "discovery" : "sdd",
     title: raw.feature_name ?? raw.task_id ?? "(sem título)",
     phase: raw.current_phase ?? "",

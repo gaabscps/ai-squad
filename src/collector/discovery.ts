@@ -63,7 +63,13 @@ export function discoverProjects(opts: DiscoveryOptions): Project[] {
 
   for (const root of opts.roots) {
     if (!isDir(root)) continue;
-    for (const entry of readdirSync(root)) {
+    let entries: string[];
+    try {
+      entries = readdirSync(root);
+    } catch {
+      continue; // root ilegível: pula, não derruba a descoberta
+    }
+    for (const entry of entries) {
       const candidate = resolve(root, entry);
       if (!isDir(candidate)) continue;
       if (existsSync(join(candidate, ".agent-session"))) {

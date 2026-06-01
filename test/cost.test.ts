@@ -35,4 +35,10 @@ describe("readCostRollup", () => {
     expect(c.totalCostUsd).toBeNull();
     expect(c.totalTokens).toBe(0);
   });
+
+  it("ignora arquivo corrompido e soma só os válidos", () => {
+    const c = readCostRollup(fixt("spec-custo-corrompido"));
+    expect(c.totalCostUsd).toBeCloseTo(0.7, 6); // só o agent-ok.json conta
+    expect(c.tokens.input).toBe(7);
+  });
 });
