@@ -28,7 +28,7 @@ describe("attentionReason", () => {
   it("blocked aponta a task bloqueada quando existe", () => {
     const spec = makeSpec({
       status: "blocked",
-      tasks: [{ id: "T-005", state: "blocked", loops: 1 }],
+      tasks: [{ id: "T-005", state: "blocked", loops: 1, dispatches: [] }],
     });
     expect(attentionReason(spec)).toEqual({ kind: "blocked", label: "T-005 bloqueada" });
   });
@@ -91,7 +91,7 @@ describe("bucketByColumn", () => {
     const flat = flattenSpecs(
       [makeProject({ specs: [
         makeSpec({ id: "A", status: "running" }),
-        makeSpec({ id: "B", status: "blocked", tasks: [{ id: "T-1", state: "blocked", loops: 0 }] }),
+        makeSpec({ id: "B", status: "blocked", tasks: [{ id: "T-1", state: "blocked", loops: 0, dispatches: [] }] }),
         makeSpec({ id: "C", status: "done" }),
         makeSpec({ id: "D", status: "running" }),
       ] })],

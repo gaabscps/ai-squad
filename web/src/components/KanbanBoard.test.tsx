@@ -7,7 +7,7 @@ import { flattenSpecs } from "../lib/kanban";
 const items = flattenSpecs(
   [makeProject({ specs: [
     makeSpec({ id: "R", status: "running" }),
-    makeSpec({ id: "B", status: "blocked", tasks: [{ id: "T-1", state: "blocked", loops: 0 }] }),
+    makeSpec({ id: "B", status: "blocked", tasks: [{ id: "T-1", state: "blocked", loops: 0, dispatches: [] }] }),
     makeSpec({ id: "D", status: "done" }),
   ] })],
   false,
