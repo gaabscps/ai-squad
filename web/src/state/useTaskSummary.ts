@@ -17,7 +17,7 @@ export interface TaskSummary {
  * `generate`/`regenerate` chamam o CLI (gasta quota — só por clique). Acumula os
  * chunks de streaming em `text`. O cliente é injetável pra teste.
  */
-export function useTaskSummary(specId: string, taskId: string, client: SummaryClient = defaultClient): TaskSummary {
+export function useTaskSummary(projectId: string, specId: string, taskId: string, client: SummaryClient = defaultClient): TaskSummary {
   const [state, setState] = useState<SummaryState>("empty");
   const [text, setText] = useState("");
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function useTaskSummary(specId: string, taskId: string, client: SummaryCl
   const textRef = useRef("");
 
   useEffect(() => {
-    const key = `${specId}|${taskId}`;
+    const key = `${projectId}|${specId}|${taskId}`;
     const off = client.subscribe(key, (m: SummaryServerMsg) => {
       if (m.type === "summary:cached") {
         textRef.current = m.text ?? "";
@@ -46,17 +46,17 @@ export function useTaskSummary(specId: string, taskId: string, client: SummaryCl
         setState("error");
       }
     });
-    client.fetch(specId, taskId);
+    client.fetch(projectId, specId, taskId);
     return off;
-  }, [specId, taskId, client]);
+  }, [projectId, specId, taskId, client]);
 
   const start = useCallback((force: boolean) => {
     textRef.current = "";
     setText("");
     setError(null);
     setState("loading");
-    client.generate(specId, taskId, force);
-  }, [specId, taskId, client]);
+    client.generate(projectId, specId, taskId, force);
+  }, [projectId, specId, taskId, client]);
 
   return {
     state, text, generatedAt, error,

@@ -19,8 +19,8 @@ function FindingRow({ finding }: { finding: DispatchFinding }) {
 }
 
 /** Bloco de resumo de ensino, gerado por IA sob demanda (nunca automático). */
-function SummaryBlock({ specId, task }: { specId: string; task: Task }) {
-  const s = useTaskSummary(specId, task.id);
+function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: string; task: Task }) {
+  const s = useTaskSummary(projectId, specId, task.id);
   const hasDispatches = task.dispatches.length > 0;
   return (
     <section className="task-summary" data-state={s.state}>
@@ -130,7 +130,7 @@ function TechDetails({ dispatches }: { dispatches: Dispatch[] }) {
   );
 }
 
-export function TaskItem({ task, specId }: { task: Task; specId: string }) {
+export function TaskItem({ task, projectId, specId }: { task: Task; projectId: string; specId: string }) {
   const [expanded, setExpanded] = useState(false);
   const totalTokens = taskTotalTokens(task);
   return (
@@ -144,7 +144,7 @@ export function TaskItem({ task, specId }: { task: Task; specId: string }) {
       </button>
       {expanded && (
         <div className="task-expanded">
-          <SummaryBlock specId={specId} task={task} />
+          <SummaryBlock projectId={projectId} specId={specId} task={task} />
           <TechDetails dispatches={task.dispatches} />
         </div>
       )}

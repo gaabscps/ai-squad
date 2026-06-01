@@ -9,30 +9,31 @@ function fakeSocket() {
 }
 
 describe("createSummaryClient", () => {
-  it("manda summary:fetch com specId/taskId", () => {
+  it("manda summary:fetch com projectId/specId/taskId", () => {
     const sock = fakeSocket();
     const client = createSummaryClient(() => sock);
-    client.fetch("FEAT-001", "T-001");
+    client.fetch("proj-1", "FEAT-001", "T-001");
     sock.onopen?.();
-    expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:fetch", specId: "FEAT-001", taskId: "T-001" });
+    expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:fetch", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001" });
   });
 
   it("generate manda type generate + force", () => {
     const sock = fakeSocket();
     const client = createSummaryClient(() => sock);
-    client.generate("FEAT-001", "T-001", true);
+    client.generate("proj-1", "FEAT-001", "T-001", true);
     sock.onopen?.();
-    expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:generate", force: true });
+    expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:generate", projectId: "proj-1", force: true });
   });
 
-  it("entrega mensagens só ao subscriber da chave certa", () => {
+  it("entrega mensagens só ao subscriber da chave certa (projectId|specId|taskId)", () => {
     const sock = fakeSocket();
     const client = createSummaryClient(() => sock);
     const got: any[] = [];
-    client.subscribe("FEAT-001|T-001", (m) => got.push(m));
+    client.subscribe("proj-1|FEAT-001|T-001", (m) => got.push(m));
     const other: any[] = [];
-    client.subscribe("FEAT-001|T-999", (m) => other.push(m));
-    sock.onmessage?.({ data: JSON.stringify({ type: "summary:chunk", specId: "FEAT-001", taskId: "T-001", delta: "oi" }) });
+    // mesmo spec/task, OUTRO projeto → não deve receber (o bug que isso previne)
+    client.subscribe("proj-2|FEAT-001|T-001", (m) => other.push(m));
+    sock.onmessage?.({ data: JSON.stringify({ type: "summary:chunk", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001", delta: "oi" }) });
     expect(got).toHaveLength(1);
     expect(got[0].delta).toBe("oi");
     expect(other).toHaveLength(0);
@@ -42,9 +43,9 @@ describe("createSummaryClient", () => {
     const sock = fakeSocket();
     const client = createSummaryClient(() => sock);
     const got: any[] = [];
-    const off = client.subscribe("K|1", (m) => got.push(m));
+    const off = client.subscribe("P|K|1", (m) => got.push(m));
     off();
-    sock.onmessage?.({ data: JSON.stringify({ type: "summary:chunk", specId: "K", taskId: "1", delta: "x" }) });
+    sock.onmessage?.({ data: JSON.stringify({ type: "summary:chunk", projectId: "P", specId: "K", taskId: "1", delta: "x" }) });
     expect(got).toHaveLength(0);
   });
 });
