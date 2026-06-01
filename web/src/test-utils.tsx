@@ -1,4 +1,18 @@
-import type { Project, Spec, CostRollup } from "../../src/store/types";
+import type { Project, Spec, Task, CostRollup, Dispatch } from "../../src/store/types";
+
+export function makeDispatch(over: Partial<Dispatch> = {}): Dispatch {
+  return {
+    role: "dev",
+    loop: 1,
+    status: "done",
+    summary: null,
+    filesChanged: [],
+    findings: [],
+    testEvidence: [],
+    tokens: null,
+    ...over,
+  };
+}
 
 export function makeCost(over: Partial<CostRollup> = {}): CostRollup {
   return {
@@ -9,6 +23,10 @@ export function makeCost(over: Partial<CostRollup> = {}): CostRollup {
     reportPath: null,
     ...over,
   };
+}
+
+export function makeTask(over: Partial<Task> = {}): Task {
+  return { id: "T-001", state: "pending", loops: 0, dispatches: [], ...over };
 }
 
 export function makeSpec(over: Partial<Spec> = {}): Spec {

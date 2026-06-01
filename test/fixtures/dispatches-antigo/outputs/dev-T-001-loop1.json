@@ -1,0 +1,20 @@
+{
+  "spec_id": "FEAT-003",
+  "dispatch_id": "dev-T-001-loop1",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implementou todas as ACs: schema+hook+audit, helpers compartilhados, orquestrador.",
+  "evidence": {
+    "files_changed": [
+      { "path": "shared/schemas/output-packet.schema.json", "lines_changed": 31, "kind": "modified" },
+      { "path": "shared/lib/warnings.py", "lines_changed": 132, "kind": "created" },
+      { "path": "shared/lib/warnings.ts", "lines_changed": 136, "kind": "created" }
+    ],
+    "ac_implementations": {
+      "AC-001": "shared/lib/warnings.py:10",
+      "AC-002": "shared/lib/warnings.ts:10"
+    }
+  },
+  "findings": [],
+  "usage": null
+}

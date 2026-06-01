@@ -1,0 +1,11 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "task_id": "T-001",
+  "dispatch_id": "d-T-001-dev-l1",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implementou módulo de teste.",
+  "evidence": [],
+  "files_changed": [],
+  "usage": null
+}

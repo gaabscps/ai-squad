@@ -1,0 +1,20 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "dispatch_id": "d-T-001-code-reviewer-l1",
+  "role": "code-reviewer",
+  "status": "needs_changes",
+  "summary": "Loop 1 review.",
+  "evidence": [
+    { "id": "e-001", "kind": "file", "ref": "src/x.ts" }
+  ],
+  "findings": [
+    {
+      "id": "f-001",
+      "severity": "minor",
+      "file": "src/x.ts",
+      "line_start": 10,
+      "rationale": "Comentário desnecessário."
+    }
+  ],
+  "usage": null
+}

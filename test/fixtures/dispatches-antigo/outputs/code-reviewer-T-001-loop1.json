@@ -1,0 +1,30 @@
+{
+  "spec_id": "FEAT-003",
+  "dispatch_id": "code-reviewer-T-001-loop1",
+  "role": "code-reviewer",
+  "status": "needs_changes",
+  "summary": "Dois findings majors encontrados.",
+  "evidence": {
+    "files_reviewed": ["shared/lib/warnings.ts"],
+    "patterns_checked": ["naming", "atomic write"]
+  },
+  "findings": [
+    {
+      "severity": "major",
+      "file": "shared/lib/warnings.ts",
+      "line": 42,
+      "ac_ref": "AC-001",
+      "issue": "Duplicação de lógica em vez de chamar helper.",
+      "suggestion": "Substituir pelo helper compartilhado."
+    },
+    {
+      "severity": "minor",
+      "file": "shared/lib/warnings.ts",
+      "line": 80,
+      "ac_ref": "AC-002",
+      "issue": "Entropia inconsistente no sufixo tmp.",
+      "suggestion": "Usar crypto.randomBytes."
+    }
+  ],
+  "usage": null
+}

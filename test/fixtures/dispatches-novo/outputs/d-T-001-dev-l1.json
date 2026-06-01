@@ -1,0 +1,31 @@
+{
+  "spec_id": "FEAT-004",
+  "dispatch_id": "d-T-001-dev-l1",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implementou _pm_shared.py com 3 helpers + 44 testes passando.",
+  "evidence": [
+    { "id": "e-001", "kind": "file", "ref": "squads/sdd/hooks/_pm_shared.py" },
+    { "id": "e-002", "kind": "file", "ref": "squads/sdd/hooks/__tests__/test_pm_shared.py" },
+    {
+      "id": "e-003",
+      "kind": "command",
+      "ref": "python3 -m unittest squads.sdd.hooks.__tests__.test_pm_shared -v",
+      "exit": 0,
+      "detail": "44 tests OK"
+    },
+    {
+      "id": "e-004",
+      "kind": "command",
+      "ref": "python3 -m unittest discover -s squads/sdd/hooks/__tests__ -p test_*.py",
+      "exit": 0,
+      "detail": "104 tests OK"
+    }
+  ],
+  "files_changed": [
+    "squads/sdd/hooks/_pm_shared.py",
+    "squads/sdd/hooks/__tests__/test_pm_shared.py"
+  ],
+  "findings": [],
+  "usage": null
+}

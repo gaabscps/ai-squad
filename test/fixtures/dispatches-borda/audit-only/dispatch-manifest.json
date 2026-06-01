@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-BORDA",
+  "actual_dispatches": [
+    {
+      "dispatch_id": "audit-AUDIT-loop1",
+      "task_id": "AUDIT",
+      "role": "audit-agent",
+      "status": "blocked",
+      "loop": 1,
+      "output_packet_ref": "outputs/audit-AUDIT-loop1.json",
+      "usage": {
+        "total_tokens": 44517,
+        "tool_uses": 30,
+        "duration_ms": 120000,
+        "model": "claude-sonnet-4-6"
+      }
+    },
+    {
+      "dispatch_id": "d-audit-l1",
+      "task_id": "FEAT-BORDA",
+      "role": "audit-agent",
+      "status": "blocked",
+      "loop": 1,
+      "output_packet_ref": "outputs/d-audit-l1.json",
+      "usage": null
+    }
+  ]
+}

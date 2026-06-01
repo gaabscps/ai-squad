@@ -1,0 +1,15 @@
+{
+  "spec_id": "FEAT-003",
+  "dispatch_id": "dev-T-001-loop2",
+  "role": "dev",
+  "status": "done",
+  "summary": "Corrigiu findings do loop 1: refatorou para usar helper compartilhado.",
+  "evidence": {
+    "files_changed": [
+      { "path": "shared/lib/warnings.ts", "lines_changed": 20, "kind": "modified" }
+    ],
+    "ac_implementations": {}
+  },
+  "findings": [],
+  "usage": null
+}

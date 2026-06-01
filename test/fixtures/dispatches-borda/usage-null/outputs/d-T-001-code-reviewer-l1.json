@@ -1,0 +1,11 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "dispatch_id": "d-T-001-code-reviewer-l1",
+  "role": "code-reviewer",
+  "status": "done",
+  "summary": "Fixture sem campo usage no manifest.",
+  "evidence": [],
+  "files_changed": [],
+  "findings": [],
+  "usage": null
+}

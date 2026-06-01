@@ -24,9 +24,10 @@ export interface WatchHandle {
 }
 
 /**
- * Observa só os arquivos que afetam o board — session.yml, costs/*.json e
- * manifests — e NÃO os .md (mudam na escrita interativa e não mexem em
- * status/custo: design §4). Chama onChange (debounced) a cada mudança.
+ * Observa só os arquivos que afetam o board — session.yml, costs/*.json,
+ * manifests e outputs/*.json (packets de dispatch) — e NÃO os .md (mudam na
+ * escrita interativa e não mexem em status/custo: design §4). Chama onChange
+ * (debounced) a cada mudança.
  * Glob anchorado em "*\/.agent-session" pra não varrer a árvore inteira. Read-only.
  */
 export function watchProjects(
@@ -38,6 +39,7 @@ export function watchProjects(
     join(r, "*", ".agent-session", "**", "session.yml"),
     join(r, "*", ".agent-session", "**", "costs", "*.json"),
     join(r, "*", ".agent-session", "**", "*manifest*.json"),
+    join(r, "*", ".agent-session", "**", "outputs", "*.json"),
   ]);
   const debounced = debounce(onChange, debounceMs);
   const watcher = chokidar.watch(patterns, {

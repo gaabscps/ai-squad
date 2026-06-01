@@ -1,0 +1,22 @@
+{
+  "spec_id": "FEAT-004",
+  "dispatch_id": "d-T-002-dev-l1",
+  "role": "dev",
+  "status": "done",
+  "summary": "Implementou T-002: validação de schema no dispatch-manifest.",
+  "evidence": [
+    { "id": "e-001", "kind": "file", "ref": "shared/schemas/dispatch-manifest.schema.json" },
+    {
+      "id": "e-002",
+      "kind": "test",
+      "ref": "npx ajv validate -s shared/schemas/dispatch-manifest.schema.json -d fixture.json",
+      "exit": 0,
+      "detail": "schema valid"
+    }
+  ],
+  "files_changed": [
+    "shared/schemas/dispatch-manifest.schema.json"
+  ],
+  "findings": [],
+  "usage": null
+}

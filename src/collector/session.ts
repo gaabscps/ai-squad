@@ -3,6 +3,7 @@ import { join, basename } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Spec, SpecStatus, Task, TimelineEntry } from "../store/types.js";
 import { readCostRollup } from "./cost.js";
+import { collectDispatches } from "./dispatches.js";
 
 // View parcial do session.yml: só os campos que deriveStatus consulta.
 // O objeto bruto tem mais chaves; isto declara apenas o que esta função lê.
@@ -40,9 +41,18 @@ export function parseSession(specDir: string): Spec | null {
     raw.task_states && typeof raw.task_states === "object" && !Array.isArray(raw.task_states)
       ? raw.task_states
       : {};
+
+  // Carrega uma vez antes do .map() para que todas as tasks compartilhem o mesmo dispatchMap
+  const dispatchMap = collectDispatches(specDir);
+
   const tasks: Task[] = Object.entries(rawTaskStates).map(([id, v]: [string, unknown]) => {
     const tv = (v ?? {}) as { state?: string; loops?: number };
-    return { id, state: (tv.state ?? "pending") as Task["state"], loops: tv.loops ?? 0 };
+    return {
+      id,
+      state: (tv.state ?? "pending") as Task["state"],
+      loops: tv.loops ?? 0,
+      dispatches: dispatchMap.get(id) ?? [],
+    };
   });
 
   let timeline: TimelineEntry[];

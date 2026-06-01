@@ -4,10 +4,35 @@ export type SpecStatus = "running" | "paused" | "blocked" | "done" | "escalated"
 // Estado de uma task individual (task_states.<T>.state no session.yml).
 export type TaskState = "pending" | "running" | "done" | "blocked";
 
+export interface DispatchFinding {
+  severity: string;
+  file: string | null;
+  line: number | null;
+  text: string;
+}
+
+export interface DispatchTestEvidence {
+  command: string;
+  passed: boolean | null;
+  detail: string | null;
+}
+
+export interface Dispatch {
+  role: string;
+  loop: number;
+  status: string;
+  summary: string | null;
+  filesChanged: string[];
+  findings: DispatchFinding[];
+  testEvidence: DispatchTestEvidence[];
+  tokens: number | null;
+}
+
 export interface Task {
   id: string; // "T-008"
   state: TaskState;
   loops: number; // loops>1 = reviewer rejeitou (retrabalho)
+  dispatches: Dispatch[];
 }
 
 // Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.

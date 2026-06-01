@@ -14,7 +14,7 @@ describe("parseSession", () => {
     expect(s.title).toBe("exemplo concluido");
     expect(s.plannedPhases).toEqual(["specify", "plan", "tasks", "implementation"]);
     expect(s.tasks).toHaveLength(2);
-    expect(s.tasks.find((t) => t.id === "T-002")).toEqual({ id: "T-002", state: "done", loops: 2 });
+    expect(s.tasks.find((t) => t.id === "T-002")).toEqual({ id: "T-002", state: "done", loops: 2, dispatches: [] });
     expect(s.health.pendingHuman).toBe(0);
     expect(s.timeline[0].kind).toBe("pm_init");
     expect(s.status).toBe("done");
@@ -60,7 +60,7 @@ describe("deriveStatus", () => {
   it("blocked quando alguma task está blocked", () => {
     expect(
       deriveStatus({ current_phase: "implementation" }, [
-        { id: "T-001", state: "blocked", loops: 3 },
+        { id: "T-001", state: "blocked", loops: 3, dispatches: [] },
       ])
     ).toBe("blocked");
   });

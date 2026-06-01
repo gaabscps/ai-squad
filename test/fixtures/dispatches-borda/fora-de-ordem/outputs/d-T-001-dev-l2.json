@@ -1,0 +1,13 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "dispatch_id": "d-T-001-dev-l2",
+  "role": "dev",
+  "status": "done",
+  "summary": "Loop 2 dev: corrigiu finding.",
+  "evidence": [
+    { "id": "e-001", "kind": "command", "ref": "npx vitest run src/x.test.ts", "exit": 0, "detail": "3 tests OK" }
+  ],
+  "files_changed": ["src/x.ts"],
+  "findings": [],
+  "usage": null
+}

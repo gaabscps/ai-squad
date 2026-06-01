@@ -4,19 +4,14 @@ import { fmtTokens, fmtUsd } from "../format";
 import { PhaseBar } from "./PhaseBar";
 import { StatusBadge } from "./StatusBadge";
 import { Timeline } from "./Timeline";
+import { TaskItem } from "./TaskItem";
 
 /**
  * Painel lateral que abre ao clicar num card/linha — onde mora a "investigação".
- * Reúne motivo (quando em atenção), fases, tarefas (lista plana; a versão rica
- * colapsável é a Fase 2), custo destrinchado por tipo de token, e a timeline +
- * links dos .md (reusa <Timeline>). item null = fechado. Tudo leitura.
+ * Reúne motivo (quando em atenção), fases, tarefas colapsáveis ricas (via TaskItem),
+ * custo destrinchado por tipo de token, e a timeline + links dos .md (reusa <Timeline>).
+ * item null = fechado. Tudo leitura.
  */
-const STATE_LABEL: Record<string, string> = {
-  pending: "pendente",
-  running: "rodando",
-  done: "concluída",
-  blocked: "bloqueada",
-};
 
 export function DetailDrawer({
   item,
@@ -70,15 +65,7 @@ export function DetailDrawer({
             <li className="drawer-tasks-empty">sem tarefas registradas</li>
           )}
           {spec.tasks.map((task) => (
-            <li key={task.id} data-state={task.state}>
-              <span className="mono">{task.id}</span>
-              <span className="task-state">
-                {STATE_LABEL[task.state] ?? task.state}
-              </span>
-              {task.loops > 1 && (
-                <span className="task-loops">↻ {task.loops} loops</span>
-              )}
-            </li>
+            <TaskItem key={task.id} task={task} />
           ))}
         </ul>
 
