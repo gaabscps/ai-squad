@@ -120,50 +120,53 @@ agente termina T-008 → orchestrator reescreve session.yml
 
 ---
 
-## 5. Custo (tokens já agregados das fontes da feature)
+## 5. Custo (somar os valores já gravados nas fontes da feature)
 
-O aiOS **não calcula custo em $**. A conversão `pricing × tokens` é trabalho do **report do ai-squad** — a fonte da verdade de custo, renderizada em `.agent-session/<spec>/report.html`. O aiOS apenas **soma as fontes de custo que cada feature já carrega**, mostra um indicador resumido (em tokens), e **encaminha pro report** pra revisão humana detalhada. O report é complementar, nunca substituído.
+O `$` **já vem calculado e gravado** em cada `costs/agent-*.json`: o hook do ai-squad faz `pricing × tokens` **no momento da captura** e persiste `total_cost_usd`. O aiOS portanto **não recalcula pricing** — ele apenas **soma os `total_cost_usd` (e os tokens) já gravados** e mostra o resultado. O report do ai-squad soma exatamente os mesmos campos dos mesmos arquivos; por isso board e report **não podem divergir**. O report continua sendo o destino da revisão humana detalhada (complementar, nunca substituído).
 
 ### Fontes já existentes (gravadas pelos hooks do ai-squad)
 
-- `.agent-session/<spec>/costs/agent-<id>.json` — um arquivo de custo **por subagente** (tokens por tipo: `input`, `output`, `cache_read`, `cache_creation`).
-- `.agent-session/<spec>/report.html` — o report renderizado (custo + code review + git diff), gerado no hook de fim de sessão. É o destino do "encaminhar pra revisão humana".
-- `cost_report.py` (stdlib puro) — já contém a lógica de **somar** os `costs/agent-*.json` e o formatador `fmt_tokens` (1.4M / 775K).
+- `.agent-session/<spec>/costs/agent-<id>.json` — custo **por subagente**, já com `total_cost_usd` e `by_model.<modelo>.{input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, cost_usd}` + `unpriced_models[]`.
+- `.agent-session/<spec>/costs/session-*.json` — custo da sessão principal (mesmo formato).
+- `.agent-session/<spec>/report.html` — report renderizado (custo + code review + git diff), gerado no hook de fim de sessão. Destino do "encaminhar pra revisão humana".
+- `cost_report.py` (stdlib puro) — lógica de referência que **soma** esses arquivos; o aiOS reproduz a mesma soma.
 
 ### O que o aiOS faz
 
 ```
-1. ler todos os costs/agent-*.json da feature
-2. somar tokens por tipo (input / output / cache_read / cache_creation)
-3. exibir no card: total de tokens (formato compacto) + link → report.html
+1. ler todos os costs/agent-*.json (+ session-*.json) da feature
+2. somar total_cost_usd  → $ real (NUNCA recalculado, só somado)
+3. somar tokens por tipo (de by_model)
+4. card: "≈ US$ 0,35" + tokens compactos (1.4M) + link → report.html
 ```
 
 ```typescript
 type CostRollup = {
+  totalCostUsd: number | null;  // soma dos total_cost_usd JÁ GRAVADOS; null se sem dados
   tokens: { input: number; output: number; cacheRead: number; cacheCreation: number };
-  totalTokens: number;        // soma — NUNCA convertido em $ pelo aiOS
-  reportPath: string | null;  // .agent-session/<spec>/report.html, se existir
+  totalTokens: number;
+  reportPath: string | null;    // .agent-session/<spec>/report.html, se existir
 };
 ```
 
-- **JSONL** (JSON Lines): um JSON por linha, log append-only — formato dos transcripts de custo.
-- **Token:** unidade de cobrança da LLM (~4 chars). O aiOS mostra a **contagem**, não o preço.
+- **Token:** unidade de cobrança da LLM (~4 chars). O `$` no arquivo já é o preço aplicado a esses tokens, no momento da captura — o aiOS só soma.
 
 **Decisões:**
 
-1. **Não recalcular $ — encaminhar pro report.** O report já faz `pricing × tokens` e é a fonte da verdade. Se o aiOS recalculasse, criaria um segundo número que poderia divergir — confusão garantida. O board mostra tokens (métrica crua, sempre consistente com a fonte) e linka pro `report.html` pro $ detalhado. *Alternativa rejeitada: o aiOS exibir seu próprio $ — descartada porque duplica responsabilidade e arrisca divergência; o report é complementar, não substituído.*
-2. **Reusar a soma, não reimplementá-la.** A agregação dos `costs/agent-*.json` já existe em `cost_report.py`. O aiOS porta/reusa essa soma, garantindo que o número do board é **exatamente** o número do report. *Mesmo princípio do GAP A: fonte de custo única.*
-3. **Formato compacto, igual ao report.** Reusa `fmt_tokens` (1.4M / 775K / 500) pra o card falar a mesma língua do report.
+1. **Somar o `$` pronto, não recalcular.** O `total_cost_usd` já está no arquivo (o hook aplicou pricing na captura). O aiOS soma esse campo — não toca em tabela de preço. *Por quê: recalcular criaria um segundo número que poderia divergir do report se a tabela de preço mudasse entre a captura e a leitura; somar o valor gravado garante que o board mostra o mesmo $ histórico que o report. Alternativa rejeitada: aplicar `pricing × token` na leitura — descartada porque duplica a autoridade do hook e arrisca divergência temporal.*
+2. **Mesma soma do report = mesmos números.** O aiOS reproduz a agregação do `cost_report.py` sobre os mesmos arquivos. *Mesmo princípio do GAP A: fonte de custo única.*
+3. **Formato compacto + $ curto.** Tokens em `fmt_tokens` (1.4M / 775K) e $ com 2 casas; mesma língua do report.
 
 ### Invariante de custo (NÃO-NEGOCIÁVEL)
 
-1. **Fonte única da verdade.** O número de tokens do board e o do report vêm dos **mesmos** `costs/agent-*.json`, somados pela **mesma** função (`cost_report.py` reusada/portada). Board e report **não podem mostrar valores diferentes** — eles leem o mesmo dado com o mesmo código.
-2. **Só valores concretos reais.** O board exibe apenas tokens efetivamente lidos do disco. **Nunca** estima, interpola ou sintetiza um número.
-3. **Ausência é explícita, não inventada.** Se uma feature não tem `costs/` ainda (pipeline não rodou, ou sem dados), o card mostra `—` / "sem dados de custo" — jamais um valor chutado. Honestidade sobre ausência > número falso.
+1. **Fonte única da verdade.** O `$` e os tokens do board e do report vêm dos **mesmos** `costs/agent-*.json`, somados pela **mesma** conta. Board e report **não podem mostrar valores diferentes**.
+2. **Só valores concretos reais.** O board exibe apenas `total_cost_usd` e tokens efetivamente lidos do disco. **Nunca** estima, recalcula com pricing próprio, interpola ou sintetiza.
+3. **Ausência é explícita, não inventada.** Se uma feature não tem `costs/` (pipeline não rodou), o card mostra `—` / "sem dados de custo" — jamais um valor chutado.
+4. **Modelo sem preço não vira zero.** Se um `costs/*.json` trouxer `unpriced_models` não-vazio (modelo sem tabela de preço → `total_cost_usd` parcial), o card sinaliza "$ parcial" em vez de somar como se fosse completo. Honestidade sobre incerteza.
 
-Critério de aceitação: para qualquer feature, o total de tokens no card é byte-a-byte o mesmo que o `report.html` daquela feature apresenta.
+Critério de aceitação: para qualquer feature, o `$` e o total de tokens no card são idênticos aos que o `report.html` daquela feature apresenta.
 
-**Fora (YAGNI):** qualquer cálculo de $, tabela de pricing, alertas de orçamento, gráfico histórico. Tudo isso ou é do report, ou é camada posterior.
+**Fora (YAGNI):** tabela de pricing própria, recálculo de $, alertas de orçamento, gráfico histórico. O $ exibido é sempre o valor já gravado; o resto é do report ou de camada posterior.
 
 ---
 
