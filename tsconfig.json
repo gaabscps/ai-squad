@@ -7,8 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "outDir": "dist"
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "web", "vitest.setup.ts"]
 }
