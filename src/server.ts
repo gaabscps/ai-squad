@@ -6,9 +6,10 @@ import { createServer } from "./ui/app.js";
 
 const configPath = join(process.cwd(), "aios.config.json");
 const config: AiosConfig = loadConfig(configPath);
-const port = Number(process.env.AIOS_PORT ?? 4317);
+// 4717 por padrão; configurável via AIOS_PORT (evita-se 4317, que é a porta do OpenTelemetry/OTLP).
+const port = Number(process.env.AIOS_PORT ?? 4717);
 
-// O Store lê `config` por função → cada rebuild pega o hide atual.
+// O Store recebe `config` por função, então cada rebuild lê o hide mais atual em vez de uma cópia congelada.
 const store = new Store(() => config);
 store.rebuild();
 
@@ -31,6 +32,8 @@ const toggleHide = (id: string, hidden: boolean): void => {
 };
 
 const server = createServer(store, toggleHide);
+// As roots são lidas só aqui, na inicialização: mudá-las em aios.config.json exige reiniciar
+// o servidor (o hide, ao contrário, é relido a cada rebuild via a função passada ao Store).
 const watcher = watchProjects(config.roots, () => store.rebuild());
 
 server.listen(port, () => {
