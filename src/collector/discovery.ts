@@ -2,6 +2,7 @@ import { readdirSync, existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Project, Spec } from "../store/types.js";
 import { parseSession } from "./session.js";
+import { projectId } from "./project-id.js";
 
 export interface DiscoveryOptions {
   roots: string[]; // pastas-raiz pra auto-scan (subpastas diretas)
@@ -45,7 +46,7 @@ function loadSpecs(projectPath: string): Spec[] {
 function toProject(projectPath: string, hide: Set<string>): Project {
   const name = basename(projectPath);
   return {
-    id: name,
+    id: projectId(projectPath), // estável e único; name pode colidir entre roots
     path: projectPath,
     name,
     specs: loadSpecs(projectPath),
