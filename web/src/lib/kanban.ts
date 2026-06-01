@@ -1,4 +1,4 @@
-import type { Spec } from "../../../src/store/types";
+import type { Spec, Project } from "../../../src/store/types";
 
 /**
  * Lógica pura do kanban: a que coluna uma spec pertence e, quando exige atenção,
@@ -42,4 +42,43 @@ export function attentionReason(spec: Spec): AttentionReason | null {
   if (spec.status === "paused") return { kind: "paused", label: "pausado" };
   if (spec.health.auditException) return { kind: "audit", label: "exceção de auditoria" };
   return null;
+}
+
+/** Uma spec carregada com os metadados do projeto que o drawer/tabela precisam. */
+export interface SpecWithProject {
+  spec: Spec;
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+}
+
+/**
+ * Achata Project[] → SpecWithProject[] (o kanban cruza projetos; o agrupamento por
+ * projeto vira só a tag/cor). Esconde specs de projetos hidden a menos que
+ * showHidden. Preserva a ordem (projeto, depois spec).
+ */
+export function flattenSpecs(projects: Project[], showHidden: boolean): SpecWithProject[] {
+  const out: SpecWithProject[] = [];
+  for (const p of projects) {
+    if (p.hidden && !showHidden) continue;
+    for (const spec of p.specs) {
+      out.push({ spec, projectId: p.id, projectName: p.name, projectPath: p.path });
+    }
+  }
+  return out;
+}
+
+/** Agrupa por coluna, preservando a ordem de entrada dentro de cada balde. */
+export function bucketByColumn(items: SpecWithProject[]): Record<ColumnKey, SpecWithProject[]> {
+  const buckets: Record<ColumnKey, SpecWithProject[]> = { attention: [], running: [], done: [] };
+  for (const item of items) buckets[columnForSpec(item.spec)].push(item);
+  return buckets;
+}
+
+/** Busca simples: casa o termo (case-insensitive) em id, título ou nome do projeto. */
+export function matchesQuery(item: SpecWithProject, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === "") return true;
+  const hay = `${item.spec.id} ${item.spec.title} ${item.projectName}`.toLowerCase();
+  return hay.includes(q);
 }
