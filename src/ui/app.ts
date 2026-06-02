@@ -5,6 +5,7 @@ import { resolve, relative, isAbsolute, join } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Store } from "../store/store.js";
 import { makeSummaryHandler } from "../summary/handler.js";
+import { makeDiagnosisHandler } from "../attention/handler.js";
 
 // pasta do build do Vite (npm run build → dist/web); em dev pode não existir.
 const FRONT_DIR = join(process.cwd(), "dist", "web");
@@ -76,6 +77,7 @@ export function createServer(
     // antes do primeiro frame chegar. Entrega mais previsível; custo ~0 (app local).
     setTimeout(() => socket.send(snapshotMessage()), 0);
     const onSummary = makeSummaryHandler(store);
+    const onDiagnosis = makeDiagnosisHandler(store);
     socket.on("message", (raw) => {
       let msg: { type?: string; id?: string; specId?: string; taskId?: string; force?: boolean };
       try {
@@ -85,6 +87,12 @@ export function createServer(
       }
       if (msg.type === "summary:fetch" || msg.type === "summary:generate") {
         onSummary(msg as never, (data) => {
+          if (socket.readyState === WebSocket.OPEN) socket.send(data);
+        });
+        return;
+      }
+      if (msg.type === "attention:fetch" || msg.type === "attention:generate") {
+        onDiagnosis(msg as never, (data) => {
           if (socket.readyState === WebSocket.OPEN) socket.send(data);
         });
         return;
