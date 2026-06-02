@@ -116,7 +116,7 @@ This is the **only** case in which the orchestrator may add a phase to `planned_
 5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
 ### 1b. Write the dispatch manifest (Outbox + GitHub required-checks pattern)
-Before any `Task` dispatch, atomically write `.agent-session/<spec_id>/dispatch-manifest.json`, then append to it after every dispatch. Full schema, field rules, and `--resume` behavior: [`dispatch-manifest.md`](dispatch-manifest.md). Manifest-first, dispatch-second — it is the audit trail step 8 reconciles.
+Before any `Task` dispatch, write `.agent-session/<spec_id>/dispatch-manifest.json` with its initial structure (`expected_pipeline` + empty `actual_dispatches`). After every dispatch, append the dispatch entry by piping it to `manifest_append.py` — NEVER hand-edit the manifest JSON (by-hand edits corrupted it in FEAT-001). Full schema, the CLI call, field rules, and `--resume` behavior: [`dispatch-manifest.md`](dispatch-manifest.md). Manifest-first, dispatch-second — it is the audit trail step 8 reconciles.
 
 ### 2. Build the per-task pipeline graph
 For each `T-XXX`: compute edges from `Depends on:` constraints; mark `[P]` tasks eligible for parallel dispatch within their phase (subject to predecessors being `done`). Independent tasks form the **ready queue**; dependent tasks wait for predecessors.
@@ -215,5 +215,6 @@ The audit verdict is **binding and terminal.** On `blocked`/`escalate` the orche
 - Never: re-dispatch `audit-agent` in the same run to flip a `blocked` verdict. One audit per run; terminal. (Re-running over hand-edited packets was the FEAT-010 failure.)
 - Never: emit a "uniform success" or "mixed status" handoff if the audit returned `blocked`/`escalate`. Emit the audit-failure handoff instead.
 - Never: append to `actual_dispatches[]` without a corresponding real `Task` dispatch.
+- Never: hand-edit `dispatch-manifest.json` with Edit/Write. Append only via `manifest_append.py` (atomic). By-hand JSON editing corrupted the manifest in FEAT-001.
 - Always: write the dispatch manifest (step 1b) BEFORE any `Task` dispatch. Manifest-first; dispatch-second.
 - Always: run the audit gate even on uniform-success runs. One cheap haiku dispatch; the protection is non-negotiable.

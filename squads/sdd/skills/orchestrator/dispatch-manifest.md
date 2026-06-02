@@ -38,6 +38,16 @@ Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write it atomically (tm
 
 ## After every `Task` dispatch, append to `actual_dispatches[]`
 
+NEVER hand-edit the manifest JSON. Append the entry by piping it to the atomic
+CLI (it wraps a tmp + rename + sidecar-lock write that cannot corrupt the file):
+
+```sh
+printf '%s' '<dispatch entry JSON>' | python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/manifest_append.py" .agent-session/<spec_id>/dispatch-manifest.json
+```
+
+The entry has the shape below. A non-zero exit means the append failed (e.g.
+manifest missing) — surface it; do not retry by editing the file by hand.
+
 ```json
 {
   "dispatch_id": "<uuid>",
