@@ -140,6 +140,44 @@ def _agent_in_scope(parent, allowed, present):
     return parent in present
 
 
+def _attempt_scope_recovery(excluded_records, session_dir):
+    """Decide which excluded implementation agents are safe to recover.
+
+    Called only when the sanity floor tripped (kept 0 subagents, excluded N>0) —
+    a broken allow-list/timing race, not contamination. Returns the list of
+    (parent, cost_obj) records to re-include, or [] to fail loud.
+
+    Safe to recover (Option A — dual confirmation) iff:
+      - dispatch-manifest.json witnesses a real run here: a non-empty
+        actual_dispatches list of length M; and
+      - the excluded agents are dominated by a SINGLE parent session (the
+        signature of one orchestrator run, not heterogeneous contamination):
+        the largest by-parent cluster covers >= half of the excluded agents; and
+      - the excluded count N is the same order of magnitude as M (N <= 2*M) —
+        a 2804-vs-64 pile is contamination, not this run.
+    Only the dominant cluster is recovered (stragglers stay excluded — the
+    conservative choice; legitimate multi-session resumes are already handled at
+    the root by PreToolUse(Task) registration). The 0.5 / 2x thresholds are v1
+    and tunable; see the Spec B design doc, edge case 3.
+    """
+    n = len(excluded_records)
+    try:
+        manifest = json.loads(
+            (Path(session_dir) / "dispatch-manifest.json").read_text(encoding="utf-8"))
+        m = len(manifest.get("actual_dispatches") or [])
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+        m = 0
+    if m < 1 or n > 2 * m:
+        return []
+    by_parent = {}
+    for parent, d in excluded_records:
+        by_parent.setdefault(parent, []).append((parent, d))
+    _, dominant = max(by_parent.items(), key=lambda kv: len(kv[1]))
+    if len(dominant) < 0.5 * n:
+        return []
+    return dominant
+
+
 def backfill_missing(session_dir, transcript_paths, prices):
     """Write costs/agent-<id>.json for any subagent transcript lacking one.
 
@@ -285,7 +323,19 @@ def build_cost_report(session_dir):
     recovered = 0
     scoping_suspect = False
     if subagents == 0 and excluded_records:
-        scoping_suspect = True  # recovery is added in a later task
+        to_recover = _attempt_scope_recovery(excluded_records, session_dir)
+        if to_recover:
+            recover_keys = {id(d) for _, d in to_recover}
+            for _parent, d in to_recover:
+                ic, iu = _phase_cost(d)
+                implementation += ic
+                unpriced |= iu
+                subagents += 1
+                _absorb(d.get("by_model"), "implementation")
+            recovered = len(to_recover)
+            excluded_records = [r for r in excluded_records if id(r[1]) not in recover_keys]
+        else:
+            scoping_suspect = True
     excluded = len(excluded_records)
     total = round(planning + orchestration + implementation, 6)
     tokens_by_type = _empty_typemap()
