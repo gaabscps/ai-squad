@@ -547,6 +547,23 @@ def test_cli_writes_cost_report_json(tmp_path):
     assert "Cost report" in result.stdout  # markdown table still printed
 
 
+def test_emitted_report_has_exactly_the_schema_keys(tmp_path):
+    schema_path = (Path(__file__).resolve().parents[4]
+                   / "shared" / "schemas" / "cost-report.schema.json")
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    session_dir = tmp_path / "FEAT-777"
+    _make_costs(session_dir)
+    cr.write_cost_report_json(session_dir)
+    written = json.loads((session_dir / "cost-report.json").read_text(encoding="utf-8"))
+
+    # additionalProperties:false → emitted keys must be a subset of declared
+    # properties; required keys must all be present.
+    declared = set(schema["properties"].keys())
+    assert set(written.keys()) <= declared, set(written.keys()) - declared
+    assert set(schema["required"]) <= set(written.keys())
+
+
 def test_cost_report_schema_is_valid_and_declares_required_keys():
     schema_path = (Path(__file__).resolve().parents[4]
                    / "shared" / "schemas" / "cost-report.schema.json")
