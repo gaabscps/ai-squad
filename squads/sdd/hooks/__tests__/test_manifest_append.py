@@ -94,5 +94,69 @@ class TestManifestAppend(unittest.TestCase):
         self.assertEqual(len(doc["actual_dispatches"]), 10)
 
 
+class TestReviewLoopGuard(unittest.TestCase):
+    """FEAT-041 shift-left: a task-scoped dispatch entry must record a concrete
+    review_loop (integer >= 1). The defect was dev fix-dispatch entries written
+    with review_loop: null, caught only at the final audit sweep (d)."""
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp())
+
+    def test_dev_entry_with_null_review_loop_rejected(self):
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-T-001-dev-l2", "task_id": "T-001",
+                 "role": "dev", "status": "done", "review_loop": None}
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 1)
+        self.assertFalse(out["appended"])
+        self.assertIn("review_loop", out["error"])
+        # the malformed entry must NOT have been appended
+        doc = json.loads(manifest.read_text())
+        self.assertEqual(len(doc["actual_dispatches"]), 0)
+
+    def test_qa_entry_missing_review_loop_rejected(self):
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-T-001-qa-l1", "task_id": "T-001",
+                 "role": "qa", "status": "done"}  # review_loop absent
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 1)
+        self.assertIn("review_loop", out["error"])
+
+    def test_review_loop_zero_rejected(self):
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-T-001-dev-l1", "task_id": "T-001",
+                 "role": "dev", "status": "done", "review_loop": 0}
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 1)
+        self.assertIn("review_loop", out["error"])
+
+    def test_review_loop_bool_rejected(self):
+        """review_loop: true must not slip through as 'int' (bool is an int subclass)."""
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-T-001-dev-l1", "task_id": "T-001",
+                 "role": "dev", "status": "done", "review_loop": True}
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 1)
+        self.assertIn("review_loop", out["error"])
+
+    def test_valid_dev_entry_still_appends(self):
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-T-001-dev-l2", "task_id": "T-001",
+                 "role": "dev", "status": "done", "review_loop": 2}
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 0)
+        self.assertTrue(out["appended"])
+
+    def test_audit_agent_entry_exempt_from_review_loop(self):
+        """Pipeline-scoped roles (audit-agent, committer) derive review_loop
+        differently and are not blocked when it is absent."""
+        manifest = _seed_manifest(self._tmp)
+        entry = {"dispatch_id": "d-FEAT-001-audit-1", "role": "audit-agent",
+                 "status": "done"}  # no task_id, no review_loop
+        out, rc, stdout, stderr = _run_cli(manifest, json.dumps(entry))
+        self.assertEqual(rc, 0, stderr)
+        self.assertTrue(out["appended"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -160,6 +160,66 @@ def _validate_qa_fields(packet: dict) -> tuple[bool, str]:
     return True, "valid"
 
 
+def _normalize_ac_id(value: str) -> str:
+    """Reduce an AC reference to its bare AC-NNN suffix for set comparison.
+    'FEAT-002/AC-001' -> 'AC-001'; 'AC-001' -> 'AC-001'. The qa packet keys carry
+    the feature prefix ('FEAT-NNN/AC-NNN'); the Work Packet's ac_scope may carry it
+    or not — normalizing both ends makes the comparison form-agnostic.
+    """
+    return value.rsplit("/", 1)[-1].strip()
+
+
+def _load_dispatch_ac_scope(packet_path: Path, dispatch_id: str):
+    """Read this dispatch's Work Packet (inputs/<dispatch_id>.json, the same pairing
+    _check_model_drift uses) and return its ac_scope as a normalized set. Returns
+    None when the Work Packet is absent/unreadable or carries no usable ac_scope —
+    the caller then skips the membership check (fail-open; the audit-agent Check 5
+    remains the backstop, so an old run without inputs/ is never spuriously blocked).
+    """
+    wp_path = packet_path.parent.parent / "inputs" / f"{dispatch_id}.json"
+    try:
+        wp = json.loads(wp_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    scope = wp.get("ac_scope")
+    if not isinstance(scope, list) or not scope:
+        return None
+    normalized = {_normalize_ac_id(s) for s in scope if isinstance(s, str) and s.strip()}
+    return normalized or None
+
+
+def _validate_qa_ac_scope(packet: dict, packet_path: Path) -> tuple[bool, str]:
+    """FEAT-041 shift-left of audit Check 5: the qa packet's ac_coverage keys must
+    match this dispatch's ac_scope — every scoped AC covered, and NO AC from outside
+    the scope (a qa packet listing other tasks' ACs was the FEAT-041 defect, caught
+    only at the final audit gate). Fail-open when ac_scope is unavailable.
+    """
+    dispatch_id = packet.get("dispatch_id", "<unknown>")
+    scope = _load_dispatch_ac_scope(packet_path, str(dispatch_id))
+    if scope is None:
+        return True, "valid"  # no scope to compare against — defer to audit Check 5
+    ac_coverage = packet.get("ac_coverage")
+    if not isinstance(ac_coverage, dict):
+        return True, "valid"  # shape is _validate_qa_fields' responsibility
+    covered = {_normalize_ac_id(k) for k in ac_coverage.keys()}
+    missing = scope - covered
+    if missing:
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: qa 'ac_coverage' is missing AC(s) from this "
+            f"dispatch's ac_scope: {sorted(missing)} — every scoped AC MUST be a key",
+        )
+    extra = covered - scope
+    if extra:
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: qa 'ac_coverage' lists AC(s) outside this "
+            f"dispatch's ac_scope: {sorted(extra)} — a qa packet validates only its own "
+            "ac_scope; these belong to another task/dispatch",
+        )
+    return True, "valid"
+
+
 _FINDING_SEVERITY_VALUES = {"info", "warning", "error", "critical", "major", "blocker", "minor"}
 
 
@@ -331,6 +391,13 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
     role_validator = ROLE_REQUIRED_FIELDS.get(role)
     if role_validator is not None:
         ok, reason = role_validator(packet)
+        if not ok:
+            return False, reason
+    # FEAT-041 shift-left: qa ac_coverage must match the dispatch's ac_scope. Runs
+    # after the shape check above and needs the on-disk path to find the paired
+    # Work Packet (inputs/<dispatch_id>.json) — fail-open when that is absent.
+    if role == "qa":
+        ok, reason = _validate_qa_ac_scope(packet, packet_path)
         if not ok:
             return False, reason
     return True, "valid"

@@ -704,5 +704,83 @@ class TestStopHookFailClosed(unittest.TestCase):
         self.assertNotIn('"decision": "block"', proc.stdout)
 
 
+# ===========================================================================
+# FEAT-041 shift-left: qa ac_coverage keys must match the dispatch's ac_scope
+# (read from the paired Work Packet at inputs/<dispatch_id>.json). The audit-agent
+# Check 5 caught a qa packet whose ac_coverage listed other tasks' ACs only at the
+# final gate; this moves the same invariant to packet-emission time.
+# ===========================================================================
+
+class TestQaAcScopeMembership(unittest.TestCase):
+    """qa ac_coverage must cover exactly its dispatch's ac_scope: every scoped AC
+    present as a key, and no AC from outside the scope. Fail-open when the Work
+    Packet or its ac_scope is unavailable (audit Check 5 remains the backstop)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.session = self.tmp / ".agent-session" / "FEAT-002"
+        (self.session / "inputs").mkdir(parents=True)
+        (self.session / "outputs").mkdir(parents=True)
+
+    def _write_wp(self, dispatch_id: str, ac_scope) -> None:
+        (self.session / "inputs" / f"{dispatch_id}.json").write_text(
+            json.dumps({"dispatch_id": dispatch_id, "to_role": "qa", "ac_scope": ac_scope})
+        )
+
+    def _write_qa_packet(self, dispatch_id: str, ac_coverage: dict) -> Path:
+        data = {**BASE_PACKET, "role": "qa", "dispatch_id": dispatch_id, "ac_coverage": ac_coverage}
+        p = self.session / "outputs" / f"{dispatch_id}.json"
+        p.write_text(json.dumps(data))
+        return p
+
+    def test_coverage_matches_scope_passes(self):
+        did = "d-T-001-qa-l1"
+        self._write_wp(did, ["AC-001", "AC-002"])
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"], "FEAT-002/AC-002": ["e-2"]})
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_coverage_missing_scoped_ac_fails(self):
+        """A scoped AC absent from ac_coverage is the audit Check 5 defect — caught early."""
+        did = "d-T-001-qa-l1"
+        self._write_wp(did, ["AC-001", "AC-002"])
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"]})  # AC-002 missing
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("AC-002", reason)
+
+    def test_coverage_with_foreign_ac_fails(self):
+        """FEAT-041: qa packet lists an AC from another task — outside its ac_scope."""
+        did = "d-T-001-qa-l1"
+        self._write_wp(did, ["AC-001"])
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"], "FEAT-002/AC-099": ["e-9"]})
+        ok, reason = validate_packet(p)
+        self.assertFalse(ok)
+        self.assertIn("AC-099", reason)
+
+    def test_scope_with_feat_prefixed_ids_passes(self):
+        """ac_scope entries may carry the FEAT prefix — normalization handles both forms."""
+        did = "d-T-001-qa-l1"
+        self._write_wp(did, ["FEAT-002/AC-001"])
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"]})
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_no_work_packet_fails_open(self):
+        """No inputs/<id>.json → scope check skipped, only shape validated."""
+        did = "d-T-001-qa-l1"  # no Work Packet written
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"]})
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+    def test_empty_ac_scope_fails_open(self):
+        """Empty ac_scope in the Work Packet → nothing to compare against, skip."""
+        did = "d-T-001-qa-l1"
+        self._write_wp(did, [])
+        p = self._write_qa_packet(did, {"FEAT-002/AC-001": ["e-1"]})
+        ok, reason = validate_packet(p)
+        self.assertTrue(ok, reason)
+
+
 if __name__ == "__main__":
     unittest.main()
