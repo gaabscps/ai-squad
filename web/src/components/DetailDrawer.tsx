@@ -1,10 +1,11 @@
 import type { SpecWithProject } from "../lib/kanban";
-import { attentionReason } from "../lib/kanban";
+import { attentionReason, columnForSpec } from "../lib/kanban";
 import { fmtTokens, fmtUsd } from "../format";
 import { PhaseBar } from "./PhaseBar";
 import { StatusBadge } from "./StatusBadge";
 import { Timeline } from "./Timeline";
 import { TaskItem } from "./TaskItem";
+import { AttentionPanel } from "./AttentionPanel";
 
 /**
  * Painel lateral que abre ao clicar num card/linha — onde mora a "investigação".
@@ -54,6 +55,10 @@ export function DetailDrawer({
 
         {reason && (
           <div className={`drawer-why why-${reason.kind}`}>{reason.label}</div>
+        )}
+
+        {columnForSpec(spec) === "attention" && (
+          <AttentionPanel projectId={projectId} specId={spec.id} />
         )}
 
         <h4 className="drawer-section">Fases</h4>
