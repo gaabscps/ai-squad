@@ -5,6 +5,7 @@ export interface CachedSummary {
   text: string;
   generatedAt: string; // ISO
   fingerprint: string;
+  costUsd: number | null; // custo em $ reportado pelo CLI nessa geração
 }
 
 // O caminho inclui projectId porque specId/taskId (FEAT-001/T-001) NÃO são únicos
@@ -32,12 +33,12 @@ export function writeSummary(
   projectId: string,
   specId: string,
   taskId: string,
-  data: { text: string; fingerprint: string },
+  data: { text: string; fingerprint: string; costUsd: number | null },
   now: () => string,
 ): CachedSummary {
   const file = fileFor(cacheRoot, projectId, specId, taskId);
   mkdirSync(dirname(file), { recursive: true });
-  const record: CachedSummary = { text: data.text, fingerprint: data.fingerprint, generatedAt: now() };
+  const record: CachedSummary = { text: data.text, fingerprint: data.fingerprint, costUsd: data.costUsd, generatedAt: now() };
   writeFileSync(file, JSON.stringify(record), "utf8");
   return record;
 }

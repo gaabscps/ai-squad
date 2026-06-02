@@ -6,7 +6,7 @@ import { makeTask, makeDispatch } from "../test-utils";
 import type { DispatchFinding, DispatchTestEvidence } from "../../../src/store/types";
 
 vi.mock("../state/useTaskSummary", () => ({
-  useTaskSummary: () => ({ state: "empty", text: "", generatedAt: null, error: null, generate: vi.fn(), regenerate: vi.fn() }),
+  useTaskSummary: () => ({ state: "empty", text: "", generatedAt: null, costUsd: null, streamed: false, error: null, generate: vi.fn(), regenerate: vi.fn() }),
 }));
 
 function makeFinding(over: Partial<DispatchFinding> = {}): DispatchFinding {

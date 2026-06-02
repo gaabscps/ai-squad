@@ -4,7 +4,7 @@ import { parseStreamLine } from "./parse.js";
 
 export interface SummaryCallbacks {
   onChunk: (delta: string) => void;
-  onDone: (fullText: string) => void;
+  onDone: (fullText: string, costUsd: number | null) => void;
   onError: (message: string) => void;
 }
 
@@ -34,7 +34,7 @@ export function runSummary(prompt: string, cb: SummaryCallbacks, deps: SummaryDe
   // entre dois chunks do pipe — sem ele, cada metade viraria '�'. O resumo é em
   // português, então esse split aconteceria na prática.
   const decoder = new StringDecoder("utf8");
-  const finishDone = (text: string) => { if (!done) { done = true; cb.onDone(text); } };
+  const finishDone = (text: string, costUsd: number | null) => { if (!done) { done = true; cb.onDone(text, costUsd); } };
   const finishError = (msg: string) => { if (!done) { done = true; cb.onError(msg); } };
 
   proc.stdout?.on("data", (chunk: Buffer) => {
@@ -46,7 +46,7 @@ export function runSummary(prompt: string, cb: SummaryCallbacks, deps: SummaryDe
       const ev = parseStreamLine(line);
       if (!ev) continue;
       if (ev.kind === "chunk") cb.onChunk(ev.text);
-      else if (ev.kind === "done") finishDone(ev.text);
+      else if (ev.kind === "done") finishDone(ev.text, ev.costUsd);
       else finishError(ev.message);
     }
   });

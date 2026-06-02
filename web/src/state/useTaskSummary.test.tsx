@@ -50,6 +50,26 @@ describe("useTaskSummary", () => {
     expect(result.current.state).toBe("ready");
   });
 
+  it("streamed: false ao montar/cached, true após o primeiro chunk", () => {
+    const { client, emit } = fakeClient();
+    const { result } = renderHook(() => useTaskSummary("proj-1", "FEAT-001", "T-001", client));
+    expect(result.current.streamed).toBe(false);
+    act(() => emit({ type: "summary:cached", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001", text: "x", generatedAt: "T0", stale: false }));
+    expect(result.current.streamed).toBe(false);
+    act(() => result.current.generate());
+    act(() => emit({ type: "summary:chunk", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001", delta: "a" }));
+    expect(result.current.streamed).toBe(true);
+  });
+
+  it("costUsd vem do done e do cached", () => {
+    const { client, emit } = fakeClient();
+    const { result } = renderHook(() => useTaskSummary("proj-1", "FEAT-001", "T-001", client));
+    act(() => emit({ type: "summary:done", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001", text: "r", generatedAt: "T1", costUsd: 0.09 }));
+    expect(result.current.costUsd).toBe(0.09);
+    act(() => emit({ type: "summary:cached", projectId: "proj-1", specId: "FEAT-001", taskId: "T-001", text: "r", generatedAt: "T1", costUsd: 0.03, stale: false }));
+    expect(result.current.costUsd).toBe(0.03);
+  });
+
   it("error → state error com mensagem", () => {
     const { client, emit } = fakeClient();
     const { result } = renderHook(() => useTaskSummary("proj-1", "FEAT-001", "T-001", client));

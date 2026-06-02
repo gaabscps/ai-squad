@@ -27,8 +27,8 @@ describe("runSummary", () => {
     proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Olá" } } }) + "\n"));
     expect(onChunk).toHaveBeenCalledWith("Olá");
 
-    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Olá mundo" }) + "\n"));
-    expect(onDone).toHaveBeenCalledWith("Olá mundo");
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Olá mundo", total_cost_usd: 0.05 }) + "\n"));
+    expect(onDone).toHaveBeenCalledWith("Olá mundo", 0.05);
     expect(onError).not.toHaveBeenCalled();
   });
 

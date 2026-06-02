@@ -57,7 +57,7 @@ export function makeSummaryHandler(store: Store, deps: HandlerDeps = {}) {
       const cached = readSummary(cacheRoot, projectId, specId, taskId);
       if (!cached) return;
       const stale = found ? taskFingerprint(found.task) !== cached.fingerprint : true;
-      send(JSON.stringify({ type: "summary:cached", projectId, specId, taskId, text: cached.text, generatedAt: cached.generatedAt, stale }));
+      send(JSON.stringify({ type: "summary:cached", projectId, specId, taskId, text: cached.text, generatedAt: cached.generatedAt, costUsd: cached.costUsd ?? null, stale }));
       return;
     }
 
@@ -76,11 +76,11 @@ export function makeSummaryHandler(store: Store, deps: HandlerDeps = {}) {
       let acc = "";
       const handle = runSummary(prompt, {
         onChunk: (delta) => { acc += delta; send(JSON.stringify({ type: "summary:chunk", projectId, specId, taskId, delta })); },
-        onDone: (full) => {
+        onDone: (full, costUsd) => {
           const text = full || acc;
-          const rec = writeSummary(cacheRoot, projectId, specId, taskId, { text, fingerprint }, now);
+          const rec = writeSummary(cacheRoot, projectId, specId, taskId, { text, fingerprint, costUsd }, now);
           clearIfCurrent();
-          send(JSON.stringify({ type: "summary:done", projectId, specId, taskId, text, generatedAt: rec.generatedAt }));
+          send(JSON.stringify({ type: "summary:done", projectId, specId, taskId, text, generatedAt: rec.generatedAt, costUsd: rec.costUsd }));
         },
         onError: (message) => { clearIfCurrent(); send(JSON.stringify({ type: "summary:error", projectId, specId, taskId, message })); },
       }, { spawnFn: deps.spawnFn });

@@ -44,17 +44,19 @@ describe("makeSummaryHandler", () => {
 
     handle({ type: "summary:generate", projectId: "p1", specId: "FEAT-001", taskId: "T-001" }, send);
     proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Re" } } }) + "\n"));
-    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Resumo" }) + "\n"));
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Resumo", total_cost_usd: 0.07 }) + "\n"));
 
-    const types = send.mock.calls.map((c) => JSON.parse(c[0]).type);
-    expect(types).toContain("summary:chunk");
-    expect(types).toContain("summary:done");
+    const sent = send.mock.calls.map((c) => JSON.parse(c[0]));
+    expect(sent.map((m) => m.type)).toContain("summary:chunk");
+    const doneMsg = sent.find((m) => m.type === "summary:done");
+    expect(doneMsg.costUsd).toBe(0.07);
 
     const send2 = vi.fn();
     handle({ type: "summary:fetch", projectId: "p1", specId: "FEAT-001", taskId: "T-001" }, send2);
     const cached = JSON.parse(send2.mock.calls[0][0]);
     expect(cached.type).toBe("summary:cached");
     expect(cached.text).toBe("Resumo");
+    expect(cached.costUsd).toBe(0.07);
     expect(cached.stale).toBe(false);
     rmSync(root, { recursive: true, force: true });
   });

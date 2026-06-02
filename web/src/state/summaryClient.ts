@@ -6,6 +6,7 @@ export interface SummaryServerMsg {
   text?: string;
   delta?: string;
   generatedAt?: string;
+  costUsd?: number | null;
   stale?: boolean;
   message?: string;
 }
