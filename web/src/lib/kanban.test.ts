@@ -3,14 +3,9 @@ import {
   columnForSpec, attentionReason, COLUMN_DEFS,
   flattenSpecs, bucketByColumn, matchesQuery,
 } from "./kanban";
-import { makeSpec, makeProject } from "../test-utils";
+import { makeSpec, makeProject, makeTask } from "../test-utils";
 
 describe("columnForSpec", () => {
-  // helper local: task num dado estado
-  const task = (state: "pending" | "running" | "done" | "blocked") => ({
-    id: "T-1", state, loops: 0, dispatches: [] as never[],
-  });
-
   it("blocked/escalated/paused vão pra 'attention' (ganham de tudo)", () => {
     expect(columnForSpec(makeSpec({ status: "blocked" }))).toBe("attention");
     expect(columnForSpec(makeSpec({ status: "escalated" }))).toBe("attention");
@@ -32,16 +27,16 @@ describe("columnForSpec", () => {
   });
 
   it("tem task running/done -> 'running' (execução começou)", () => {
-    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("running")] }))).toBe("running");
-    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("done")] }))).toBe("running");
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [makeTask({ state: "running" })] }))).toBe("running");
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [makeTask({ state: "done" })] }))).toBe("running");
   });
 
   it("tem tasks e todas pending -> 'planned' (decomposto, ninguém começou)", () => {
-    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("pending"), task("pending")] }))).toBe("planned");
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [makeTask(), makeTask()] }))).toBe("planned");
   });
 
   it("tasks parado em phase=tasks (todas pending) também é 'planned'", () => {
-    expect(columnForSpec(makeSpec({ status: "running", phase: "tasks", tasks: [task("pending")] }))).toBe("planned");
+    expect(columnForSpec(makeSpec({ status: "running", phase: "tasks", tasks: [makeTask()] }))).toBe("planned");
   });
 
   it("sem tasks geradas -> 'planning' (ainda escrevendo spec/plano)", () => {
@@ -115,17 +110,14 @@ describe("flattenSpecs", () => {
 });
 
 describe("bucketByColumn", () => {
-  const task = (state: "pending" | "running" | "done" | "blocked") => ({
-    id: "T-1", state, loops: 0, dispatches: [] as never[],
-  });
   it("agrupa cada item na sua coluna", () => {
     const flat = flattenSpecs(
       [makeProject({ specs: [
-        makeSpec({ id: "A", status: "running", tasks: [task("running")] }),       // running
-        makeSpec({ id: "B", status: "blocked", tasks: [task("blocked")] }),        // attention
-        makeSpec({ id: "C", status: "done" }),                                     // done
-        makeSpec({ id: "D", status: "running", tasks: [task("pending")] }),        // planned
-        makeSpec({ id: "E", status: "running", phase: "specify", tasks: [] }),     // planning
+        makeSpec({ id: "A", status: "running", tasks: [makeTask({ state: "running" })] }), // running
+        makeSpec({ id: "B", status: "blocked", tasks: [makeTask({ state: "blocked" })] }), // attention
+        makeSpec({ id: "C", status: "done" }),                                             // done
+        makeSpec({ id: "D", status: "running", tasks: [makeTask()] }),                     // planned
+        makeSpec({ id: "E", status: "running", phase: "specify", tasks: [] }),             // planning
       ] })],
       false,
     );
