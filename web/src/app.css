@@ -19,6 +19,8 @@
   --done: #22c55e;
   --escalated: #a855f7;
   --audit: #f59e0b;
+  --planning: #9ca3af; /* cinza: rascunho, ainda escrevendo */
+  --planned: #f59e0b;  /* âmbar: decomposto, aguardando execução */
 
   --sdd: #2563eb;
   --discovery: #0d9488;
@@ -76,11 +78,13 @@ a:hover { text-decoration: underline; }
 
 /* ---- Kanban ---- */
 .board-body { padding: 14px 16px; }
-.kboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
+.kboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
 .kcol { background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
 .kcol-head { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #374151; margin-bottom: 10px; }
 .kcol-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--text-mute); }
 .kcol[data-col="attention"] .kcol-dot { background: var(--blocked); }
+.kcol[data-col="planning"] .kcol-dot { background: var(--planning); }
+.kcol[data-col="planned"] .kcol-dot { background: var(--planned); }
 .kcol[data-col="running"] .kcol-dot { background: var(--running); }
 .kcol[data-col="done"] .kcol-dot { background: var(--done); }
 .kcol-count { margin-left: auto; color: var(--text-mute); }
