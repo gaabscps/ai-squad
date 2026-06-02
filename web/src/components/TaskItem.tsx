@@ -5,6 +5,7 @@ import { fmtTokens, fmtUsd } from "../format";
 import { STATE_LABEL } from "../lib/taskState";
 import { useTaskSummary } from "../state/useTaskSummary";
 import { useTypewriter } from "../state/useTypewriter";
+import { MarkdownText } from "../lib/markdown";
 
 const SEVERITY_CLASS: Record<string, string> = { error: "finding-error", warning: "finding-warning", info: "finding-info" };
 
@@ -50,10 +51,10 @@ function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: 
       {s.state === "stale" && <p className="task-summary-warn">desatualizado — regerar para refletir o progresso recente</p>}
       {s.state === "error" && <p className="task-summary-warn">{s.error}</p>}
       {(s.state === "streaming" || s.state === "ready" || s.state === "stale") && s.text && (
-        <p className="task-summary-text">
-          {display}
+        <div className="task-summary-text">
+          <MarkdownText source={display} />
           {typing && <span className="task-summary-cursor" aria-hidden="true">▋</span>}
-        </p>
+        </div>
       )}
       {s.costUsd != null && !typing && (s.state === "ready" || s.state === "stale") && (
         <p className="task-summary-cost" title="custo real reportado pelo Claude CLI (inclui o overhead de contexto dos hooks locais)">
