@@ -6,25 +6,32 @@ import type { Spec, Project } from "../../../src/store/types";
  * tasks) — nada recalculado nem inventado. Separado dos componentes pra ser
  * testável isolado.
  */
-export type ColumnKey = "attention" | "running" | "done";
+export type ColumnKey = "attention" | "planning" | "planned" | "running" | "done";
 
 export const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: "attention", label: "Precisa de você" },
+  { key: "planning", label: "Em planejamento" },
+  { key: "planned", label: "Planejado" },
   { key: "running", label: "Em andamento" },
   { key: "done", label: "Pronto" },
 ];
 
 /**
- * Mapeia o status derivado + flag de auditoria pra coluna. Ordem importa:
- * blocked/escalated/paused e auditException → attention (exigem olho humano)
- * ANTES de done, pra um item em auditoria não se esconder em "Pronto".
+ * Mapeia a spec pra coluna numa cascata (primeira condição que casa vence).
+ * Ordem importa: atenção (exige humano) ganha de tudo; discovery não tem
+ * conceito de "planejado" (é investigação); planned vs running se decide pelo
+ * estado das tasks, não pela fase. Tudo derivado de campos que JÁ existem.
  */
 export function columnForSpec(spec: Spec): ColumnKey {
   const s = spec.status;
   if (s === "blocked" || s === "escalated" || s === "paused") return "attention";
   if (spec.health.auditException) return "attention";
   if (s === "done") return "done";
-  return "running";
+  if (spec.squad === "discovery") return "running";
+  const hasTasks = spec.tasks.length > 0;
+  if (hasTasks && spec.tasks.some((t) => t.state === "running" || t.state === "done")) return "running";
+  if (hasTasks) return "planned";
+  return "planning";
 }
 
 export interface AttentionReason {
@@ -70,7 +77,9 @@ export function flattenSpecs(projects: Project[], showHidden: boolean): SpecWith
 
 /** Agrupa por coluna, preservando a ordem de entrada dentro de cada balde. */
 export function bucketByColumn(items: SpecWithProject[]): Record<ColumnKey, SpecWithProject[]> {
-  const buckets: Record<ColumnKey, SpecWithProject[]> = { attention: [], running: [], done: [] };
+  const buckets: Record<ColumnKey, SpecWithProject[]> = {
+    attention: [], planning: [], planned: [], running: [], done: [],
+  };
   for (const item of items) buckets[columnForSpec(item.spec)].push(item);
   return buckets;
 }

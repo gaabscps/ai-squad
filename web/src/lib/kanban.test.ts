@@ -6,21 +6,47 @@ import {
 import { makeSpec, makeProject } from "../test-utils";
 
 describe("columnForSpec", () => {
-  it("running vai pra 'running'", () => {
-    expect(columnForSpec(makeSpec({ status: "running" }))).toBe("running");
+  // helper local: task num dado estado
+  const task = (state: "pending" | "running" | "done" | "blocked") => ({
+    id: "T-1", state, loops: 0, dispatches: [] as never[],
   });
-  it("done vai pra 'done'", () => {
-    expect(columnForSpec(makeSpec({ status: "done" }))).toBe("done");
-  });
-  it("blocked/escalated/paused vão pra 'attention'", () => {
+
+  it("blocked/escalated/paused vão pra 'attention' (ganham de tudo)", () => {
     expect(columnForSpec(makeSpec({ status: "blocked" }))).toBe("attention");
     expect(columnForSpec(makeSpec({ status: "escalated" }))).toBe("attention");
     expect(columnForSpec(makeSpec({ status: "paused" }))).toBe("attention");
   });
+
   it("auditException leva pra 'attention' mesmo se running ou done", () => {
     const h = { pendingHuman: 0, escalationRate: 0, auditException: true };
     expect(columnForSpec(makeSpec({ status: "running", health: h }))).toBe("attention");
     expect(columnForSpec(makeSpec({ status: "done", health: h }))).toBe("attention");
+  });
+
+  it("done vai pra 'done'", () => {
+    expect(columnForSpec(makeSpec({ status: "done" }))).toBe("done");
+  });
+
+  it("discovery em andamento vai pra 'running' (sem conceito de planejado)", () => {
+    expect(columnForSpec(makeSpec({ squad: "discovery", status: "running", tasks: [] }))).toBe("running");
+  });
+
+  it("tem task running/done -> 'running' (execução começou)", () => {
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("running")] }))).toBe("running");
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("done")] }))).toBe("running");
+  });
+
+  it("tem tasks e todas pending -> 'planned' (decomposto, ninguém começou)", () => {
+    expect(columnForSpec(makeSpec({ status: "running", tasks: [task("pending"), task("pending")] }))).toBe("planned");
+  });
+
+  it("tasks parado em phase=tasks (todas pending) também é 'planned'", () => {
+    expect(columnForSpec(makeSpec({ status: "running", phase: "tasks", tasks: [task("pending")] }))).toBe("planned");
+  });
+
+  it("sem tasks geradas -> 'planning' (ainda escrevendo spec/plano)", () => {
+    expect(columnForSpec(makeSpec({ status: "running", phase: "specify", tasks: [] }))).toBe("planning");
+    expect(columnForSpec(makeSpec({ status: "running", phase: "implementation", tasks: [] }))).toBe("planning");
   });
 });
 
@@ -61,8 +87,10 @@ describe("attentionReason", () => {
 });
 
 describe("COLUMN_DEFS", () => {
-  it("tem as 3 colunas na ordem certa", () => {
-    expect(COLUMN_DEFS.map((c) => c.key)).toEqual(["attention", "running", "done"]);
+  it("tem as 5 colunas na ordem certa", () => {
+    expect(COLUMN_DEFS.map((c) => c.key)).toEqual([
+      "attention", "planning", "planned", "running", "done",
+    ]);
   });
 });
 
@@ -87,20 +115,26 @@ describe("flattenSpecs", () => {
 });
 
 describe("bucketByColumn", () => {
+  const task = (state: "pending" | "running" | "done" | "blocked") => ({
+    id: "T-1", state, loops: 0, dispatches: [] as never[],
+  });
   it("agrupa cada item na sua coluna", () => {
     const flat = flattenSpecs(
       [makeProject({ specs: [
-        makeSpec({ id: "A", status: "running" }),
-        makeSpec({ id: "B", status: "blocked", tasks: [{ id: "T-1", state: "blocked", loops: 0, dispatches: [] }] }),
-        makeSpec({ id: "C", status: "done" }),
-        makeSpec({ id: "D", status: "running" }),
+        makeSpec({ id: "A", status: "running", tasks: [task("running")] }),       // running
+        makeSpec({ id: "B", status: "blocked", tasks: [task("blocked")] }),        // attention
+        makeSpec({ id: "C", status: "done" }),                                     // done
+        makeSpec({ id: "D", status: "running", tasks: [task("pending")] }),        // planned
+        makeSpec({ id: "E", status: "running", phase: "specify", tasks: [] }),     // planning
       ] })],
       false,
     );
     const buckets = bucketByColumn(flat);
-    expect(buckets.running.map((s) => s.spec.id)).toEqual(["A", "D"]);
+    expect(buckets.running.map((s) => s.spec.id)).toEqual(["A"]);
     expect(buckets.attention.map((s) => s.spec.id)).toEqual(["B"]);
     expect(buckets.done.map((s) => s.spec.id)).toEqual(["C"]);
+    expect(buckets.planned.map((s) => s.spec.id)).toEqual(["D"]);
+    expect(buckets.planning.map((s) => s.spec.id)).toEqual(["E"]);
   });
 });
 

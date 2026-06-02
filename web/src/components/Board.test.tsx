@@ -19,7 +19,7 @@ function renderBoard(projects: Parameters<typeof makeProject>[0][] = [], onHide 
 
 describe("Board", () => {
   it("mostra os cards das specs no kanban por padrão", () => {
-    renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", status: "running" })] }]);
+    renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", status: "running", tasks: [{ id: "T-1", state: "running", loops: 0, dispatches: [] }] })] }]);
     expect(screen.getByText("FEAT-1")).toBeInTheDocument();
     expect(screen.getByText("Em andamento")).toBeInTheDocument();
   });
