@@ -240,3 +240,60 @@ a:hover { text-decoration: underline; }
 .task-loop-dispatch { display: flex; gap: 6px; font-size: 11px; align-items: baseline; }
 .loop-status { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #f3f4f6; color: #374151; }
 .task-empty-dispatches { font-size: 12px; color: var(--text-mute); }
+
+/* Painel "Precisa de você": diagnóstico IA + handoff. Tokens light do redesign. */
+.attention-panel {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e7e9ee);
+  border-left: 3px solid var(--accent, #2563eb);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+}
+.attention-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.attention-label {
+  font-weight: 600;
+  color: var(--text, #111827);
+}
+.attention-btn {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--border, #e7e9ee);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--text-dim, #6b7280);
+  cursor: pointer;
+}
+.attention-btn.primary {
+  background: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+  color: #fff;
+}
+.attention-btn:hover { filter: brightness(0.97); }
+.attention-hint { color: var(--text-dim, #6b7280); font-size: 0.875rem; margin: 0.25rem 0; }
+.attention-warn { color: #b45309; font-size: 0.875rem; margin: 0.25rem 0; }
+.attention-text { color: var(--text, #111827); line-height: 1.5; }
+.attention-cursor { color: var(--accent, #2563eb); animation: attention-blink 1s steps(2) infinite; }
+@keyframes attention-blink { 50% { opacity: 0; } }
+.attention-cost { color: var(--text-dim, #9ca3af); font-size: 0.75rem; margin-top: 0.5rem; }
+.attention-handoff-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--border, #e7e9ee);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim, #6b7280);
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.attention-handoff-btn:hover:not(:disabled) { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
+.attention-handoff-btn:disabled { opacity: 0.5; cursor: default; }

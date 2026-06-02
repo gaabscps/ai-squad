@@ -138,6 +138,20 @@ describe("AC-015: tarefas via TaskItem — colapsadas por padrão no drawer", ()
   });
 });
 
+// ─── Painel de atenção ────────────────────────────────────────────────────────
+
+describe("DetailDrawer — painel de atenção", () => {
+  it("renderiza o AttentionPanel quando a spec está em atenção (blocked)", () => {
+    render(<DetailDrawer item={item(makeSpec({ status: "blocked" }))} onClose={() => {}} />);
+    expect(screen.getByText(/o que fazer aqui/i)).toBeInTheDocument();
+  });
+
+  it("NÃO renderiza o AttentionPanel quando a spec está running", () => {
+    render(<DetailDrawer item={item(makeSpec({ status: "running" }))} onClose={() => {}} />);
+    expect(screen.queryByText(/o que fazer aqui/i)).not.toBeInTheDocument();
+  });
+});
+
 // ─── AC-021: re-render por push WS não lança erro ────────────────────────────
 
 describe("AC-021: push WebSocket re-renderiza sem erro; expansão é efêmera", () => {
