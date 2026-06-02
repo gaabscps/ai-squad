@@ -80,6 +80,7 @@ budget_defaults:
   review_loops_max: 3                            # Reflexion canonical (Shinn et al., NeurIPS 2023)
   qa_loops_max: 2                                # conservative — qa is broader scope
   blocker_calls_max: 2                           # Anthropic Claude Code "3 denials → human" pattern
+  packet_retry_max: 2                            # re-dispatches for a missing/invalid Output Packet (infra failure, not code difficulty)
 
 # Escalation rate metric for THIS run (computed at handoff time)
 # Surfaced both in mid-Pipeline blocker handoffs and in final handoff.

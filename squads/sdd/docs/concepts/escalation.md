@@ -114,6 +114,7 @@ These live per-task in `session.yml`. They are independent across tasks.
 | `review_loops_max` | **3** | Each `dev → reviewers → dev` round | Reflexion (Shinn et al., NeurIPS 2023) — canonical `max_trials=3` |
 | `qa_loops_max` | **2** | Each `qa → dev` round (when qa fails and orchestrator loops back) | Conservative — qa is broader scope than review; cheaper to escalate sooner |
 | `blocker_calls_max` | **2** | Each `blocker-specialist` dispatch for the same task | Anthropic Claude Code's "3 denials → human" pattern — 2 chances for the specialist before human |
+| `packet_retry_max` | **2** | Each re-dispatch when the same role's Output Packet did not persist or was invalid (infra failure, not code difficulty); distinct from review/qa loop caps; exceeded → task blocked terminally (`missing_output_packet`) | Conservative infra-failure budget — 2 retries covers transient platform anomalies without masking persistent failures |
 
 **Total worst-case dispatches of `dev` per task:** 1 (initial) + 3 (review loops) + 2 (qa loops) = **6 dispatches max per task**. Comfortable for Max 5x.
 
