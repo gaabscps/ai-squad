@@ -20,7 +20,6 @@ Default: allow. Only enforce the `.agent-session/` rule when the active Skill
 Pure stdlib. Python 3.8+.
 """
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -28,45 +27,13 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from hook_runtime import edit_target_path, resolve_project_root, tool_input_dict
-
-_SKILL_MARKER_PATTERN = re.compile(
-    r"[Bb]ase directory for this [Ss]kill:\s*\S*?/skills/([A-Za-z0-9_-]+)"
+from audit_baseline import BASELINE_FILENAME
+from hook_runtime import (
+    detect_active_skill,
+    edit_target_path,
+    resolve_project_root,
+    tool_input_dict,
 )
-_TRANSCRIPT_TAIL_BYTES = 256 * 1024  # 256 KiB tail is enough for the latest skill marker
-
-
-def _detect_active_skill(payload: dict) -> str | None:
-    """Return the slug of the most recently activated Skill, or None if unknown.
-
-    Scans the tail of the JSONL transcript for the canonical Claude Code
-    Skill-activation marker `Base directory for this skill: .../skills/<name>`.
-    The LAST occurrence wins — a session may load multiple skills in sequence,
-    and only the most recent one defines the current scope.
-
-    Returns None when:
-      - transcript_path missing or not a string
-      - transcript file unreadable
-      - no skill marker found in the scanned tail
-    """
-    tp = payload.get("transcript_path") or payload.get("agent_transcript_path")
-    if not isinstance(tp, str) or not tp:
-        return None
-    transcript_path = Path(tp)
-    try:
-        with transcript_path.open("rb") as fh:
-            fh.seek(0, 2)
-            size = fh.tell()
-            start = max(0, size - _TRANSCRIPT_TAIL_BYTES)
-            fh.seek(start)
-            tail = fh.read().decode("utf-8", errors="replace")
-    except OSError:
-        return None
-
-    matches = _SKILL_MARKER_PATTERN.findall(tail)
-    if not matches:
-        return None
-    return matches[-1]
 
 
 def main() -> int:
@@ -82,7 +49,7 @@ def main() -> int:
 
     # Only enforce when the active Skill is the orchestrator. If we can't
     # identify the active skill, allow — the invariant is orchestrator-specific.
-    active_skill = _detect_active_skill(payload)
+    active_skill = detect_active_skill(payload)
     if active_skill != "orchestrator":
         return 0
 
@@ -111,7 +78,7 @@ def main() -> int:
     except ValueError:
         rel = None
     if rel is not None:
-        # rel = <spec_id>/<subdir>/...  — outputs/ is subagent-owned, off-limits.
+        # rel = <spec_id>/<subdir-or-file>/...  — some entries are off-limits.
         parts = rel.parts
         if len(parts) >= 2 and parts[1] == "outputs":
             decision = {
@@ -124,6 +91,24 @@ def main() -> int:
                         f"subagents. Editing it is evidence tampering — a blocked audit is "
                         f"terminal; recover with /orchestrator --restart "
                         f"(see squads/sdd/skills/orchestrator/skill.md step 8)."
+                    ),
+                }
+            }
+            print(json.dumps(decision))
+            return 0
+        if len(parts) >= 2 and parts[-1] == BASELINE_FILENAME:
+            # The audit baseline is the Root of Trust for Check 6 — captured by
+            # the deterministic capture-baseline hook. The orchestrator rewriting
+            # it could hide source edits from the audit (Spec A attestation).
+            decision = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"Orchestrator must not write the audit baseline. Path '{file_path}' "
+                        f"is the deterministic pre-Phase-4 dirty snapshot captured by "
+                        f"capture-baseline.py (Root of Trust for audit Check 6). Rewriting it "
+                        f"would let source edits escape detection (Spec A)."
                     ),
                 }
             }

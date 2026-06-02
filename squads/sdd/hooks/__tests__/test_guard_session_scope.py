@@ -70,6 +70,19 @@ class TestGuardSessionScope(unittest.TestCase):
         self.assertEqual(_decision(result), "deny")
         self.assertIn("outputs", result["hookSpecificOutput"]["permissionDecisionReason"])
 
+    # --- Spec A: the audit baseline is off-limits to the orchestrator ---
+    def test_deny_audit_baseline(self):
+        result, _ = _run_hook(self._payload(".agent-session/FEAT-010/audit-baseline.json"))
+        self.assertEqual(_decision(result), "deny")
+        self.assertIn("baseline", result["hookSpecificOutput"]["permissionDecisionReason"].lower())
+
+    def test_deny_audit_baseline_nested(self):
+        # Deny any audit-baseline.json under a spec dir, at any depth — not only
+        # the exact two-part path (robustness; mirrors the outputs check).
+        result, _ = _run_hook(self._payload(".agent-session/FEAT-010/sub/audit-baseline.json"))
+        self.assertEqual(_decision(result), "deny")
+        self.assertIn("baseline", result["hookSpecificOutput"]["permissionDecisionReason"].lower())
+
     # --- orchestrator-owned paths inside .agent-session/ stay allowed ---
     def test_allow_inputs(self):
         result, _ = _run_hook(self._payload(".agent-session/FEAT-010/inputs/d-T-001-dev-l1.json"))
