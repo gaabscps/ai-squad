@@ -66,6 +66,7 @@ task_states: {}
   #   review_loops: 0
   #   qa_loops: 0
   #   blocker_calls: 0
+  #   packet_retries: 0              # re-dispatches due to a missing/invalid Output Packet (cap: packet_retry_max=2)
   #   last_dispatch_id: ""
   #   last_diff_hash: ""             # for progress detection (files_changed + line ranges)
   #   last_findings_hash: ""         # for progress detection (findings count)
