@@ -170,6 +170,9 @@ a:hover { text-decoration: underline; }
 }
 
 /* ── Task item (drawer) ─────────────────────────────────────────────── */
+/* especificidade .drawer-tasks li.task-item (0-2-1) supera a regra antiga
+   .drawer-tasks li (0-1-1) que punha display:flex e quebrava o empilhamento. */
+.drawer-tasks li.task-item { display: block; padding: 0; }
 .task-item { list-style: none; border-bottom: 1px solid var(--border-soft); }
 .task-item-header { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 0; background: transparent; border: 0; cursor: pointer; font-size: 13px; text-align: left; }
 .task-item-id { color: var(--text); font-weight: 600; }
