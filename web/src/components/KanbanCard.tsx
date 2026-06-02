@@ -4,10 +4,10 @@ import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
 
 /**
  * Card compacto do kanban. O conteúdo adapta-se à coluna: em "atenção" mostra o
- * MOTIVO (bloqueio/escalada/auditoria); em "andamento" mostra a fase atual. O
- * rodapé sempre traz custo + última atividade. A borda esquerda (cor por status)
- * e a tag de squad são CSS (data-status / data-squad). Só leitura; clicar abre o
- * drawer via onSelect.
+ * MOTIVO (bloqueio/escalada/auditoria); nas colunas de progresso (planejamento,
+ * planejado, andamento) mostra a fase atual. O rodapé sempre traz custo + última
+ * atividade. A borda esquerda (cor por status) e a tag de squad são CSS
+ * (data-status / data-squad). Só leitura; clicar abre o drawer via onSelect.
  */
 export function KanbanCard({
   item,
@@ -36,7 +36,7 @@ export function KanbanCard({
         <div className={`kcard-why why-${reason.kind}`}>{reason.label}</div>
       )}
 
-      {col === "running" && spec.phase && (
+      {(col === "planning" || col === "planned" || col === "running") && spec.phase && (
         <div className="kcard-phase">{spec.phase}</div>
       )}
 
