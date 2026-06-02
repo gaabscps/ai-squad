@@ -43,7 +43,7 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .mono { font-family: var(--mono); }
 
-.app-shell { max-width: 1280px; margin: 0 auto; }
+.app-shell { max-width: 1536px; margin: 0 auto; }
 
 /* ---- TopBar ---- */
 .topbar {
