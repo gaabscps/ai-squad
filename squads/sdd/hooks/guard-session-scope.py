@@ -28,6 +28,7 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
+from audit_baseline import BASELINE_FILENAME
 from hook_runtime import edit_target_path, resolve_project_root, tool_input_dict
 
 _SKILL_MARKER_PATTERN = re.compile(
@@ -111,7 +112,7 @@ def main() -> int:
     except ValueError:
         rel = None
     if rel is not None:
-        # rel = <spec_id>/<subdir>/...  — outputs/ is subagent-owned, off-limits.
+        # rel = <spec_id>/<subdir-or-file>/...  — some entries are off-limits.
         parts = rel.parts
         if len(parts) >= 2 and parts[1] == "outputs":
             decision = {
@@ -124,6 +125,24 @@ def main() -> int:
                         f"subagents. Editing it is evidence tampering — a blocked audit is "
                         f"terminal; recover with /orchestrator --restart "
                         f"(see squads/sdd/skills/orchestrator/skill.md step 8)."
+                    ),
+                }
+            }
+            print(json.dumps(decision))
+            return 0
+        if len(parts) == 2 and parts[1] == BASELINE_FILENAME:
+            # The audit baseline is the Root of Trust for Check 6 — captured by
+            # the deterministic capture-baseline hook. The orchestrator rewriting
+            # it could hide source edits from the audit (Spec A attestation).
+            decision = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"Orchestrator must not write the audit baseline. Path '{file_path}' "
+                        f"is the deterministic pre-Phase-4 dirty snapshot captured by "
+                        f"capture-baseline.py (Root of Trust for audit Check 6). Rewriting it "
+                        f"would let source edits escape detection (Spec A)."
                     ),
                 }
             }
