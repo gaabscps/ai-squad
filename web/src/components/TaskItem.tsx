@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { Task, Dispatch, DispatchFinding } from "../../../src/store/types";
 import { taskTotalTokens } from "../lib/taskTokens";
-import { fmtTokens } from "../format";
+import { fmtTokens, fmtUsd } from "../format";
 import { STATE_LABEL } from "../lib/taskState";
 import { useTaskSummary } from "../state/useTaskSummary";
+import { useTypewriter } from "../state/useTypewriter";
 
 const SEVERITY_CLASS: Record<string, string> = { error: "finding-error", warning: "finding-warning", info: "finding-info" };
 
@@ -22,6 +23,10 @@ function FindingRow({ finding }: { finding: DispatchFinding }) {
 function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: string; task: Task }) {
   const s = useTaskSummary(projectId, specId, task.id);
   const hasDispatches = task.dispatches.length > 0;
+  // Anima a revelação só quando o texto veio do stream (cache → instantâneo).
+  const animate = s.streamed && (s.state === "streaming" || s.state === "ready");
+  const display = useTypewriter(s.text, animate);
+  const typing = s.state === "streaming" || (animate && display.length < s.text.length);
   return (
     <section className="task-summary" data-state={s.state}>
       <header className="task-summary-head">
@@ -45,7 +50,15 @@ function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: 
       {s.state === "stale" && <p className="task-summary-warn">desatualizado — regerar para refletir o progresso recente</p>}
       {s.state === "error" && <p className="task-summary-warn">{s.error}</p>}
       {(s.state === "streaming" || s.state === "ready" || s.state === "stale") && s.text && (
-        <p className="task-summary-text">{s.text}</p>
+        <p className="task-summary-text">
+          {display}
+          {typing && <span className="task-summary-cursor" aria-hidden="true">▋</span>}
+        </p>
+      )}
+      {s.costUsd != null && !typing && (s.state === "ready" || s.state === "stale") && (
+        <p className="task-summary-cost" title="custo real reportado pelo Claude CLI (inclui o overhead de contexto dos hooks locais)">
+          custo desta geração · {fmtUsd(s.costUsd)}
+        </p>
       )}
     </section>
   );

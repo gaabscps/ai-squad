@@ -1,6 +1,6 @@
 export type ParsedEvent =
   | { kind: "chunk"; text: string }
-  | { kind: "done"; text: string }
+  | { kind: "done"; text: string; costUsd: number | null }
   | { kind: "error"; message: string };
 
 /**
@@ -37,7 +37,8 @@ export function parseStreamLine(line: string): ParsedEvent | null {
     if (m.is_error === true || m.subtype !== "success") {
       return { kind: "error", message: typeof m.result === "string" && m.result ? m.result : "geração falhou" };
     }
-    return { kind: "done", text: typeof m.result === "string" ? m.result : "" };
+    const costUsd = typeof m.total_cost_usd === "number" ? m.total_cost_usd : null;
+    return { kind: "done", text: typeof m.result === "string" ? m.result : "", costUsd };
   }
 
   return null;

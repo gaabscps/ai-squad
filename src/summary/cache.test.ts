@@ -19,14 +19,14 @@ describe("cache de resumo", () => {
 
   it("round-trip: o que grava, lê de volta", () => {
     const root = tmp();
-    const written = writeSummary(root, "proj-1", "FEAT-001", "T-001", { text: "resumo", fingerprint: "abc" }, () => "2026-06-01T10:00:00Z");
-    expect(written).toEqual({ text: "resumo", fingerprint: "abc", generatedAt: "2026-06-01T10:00:00Z" });
+    const written = writeSummary(root, "proj-1", "FEAT-001", "T-001", { text: "resumo", fingerprint: "abc", costUsd: 0.04 }, () => "2026-06-01T10:00:00Z");
+    expect(written).toEqual({ text: "resumo", fingerprint: "abc", costUsd: 0.04, generatedAt: "2026-06-01T10:00:00Z" });
     expect(readSummary(root, "proj-1", "FEAT-001", "T-001")).toEqual(written);
   });
 
   it("isola por projectId, specId e taskId", () => {
     const root = tmp();
-    writeSummary(root, "proj-1", "FEAT-001", "T-001", { text: "a", fingerprint: "x" }, () => "t");
+    writeSummary(root, "proj-1", "FEAT-001", "T-001", { text: "a", fingerprint: "x", costUsd: null }, () => "t");
     expect(readSummary(root, "proj-1", "FEAT-001", "T-002")).toBeNull();
     expect(readSummary(root, "proj-1", "FEAT-002", "T-001")).toBeNull();
     // mesmo spec/task, projeto diferente → não colide (o bug que isso previne)
@@ -35,7 +35,7 @@ describe("cache de resumo", () => {
 
   it("readSummary não lança em JSON corrompido (retorna null)", () => {
     const root = tmp();
-    writeSummary(root, "proj-1", "F", "T", { text: "a", fingerprint: "x" }, () => "t");
+    writeSummary(root, "proj-1", "F", "T", { text: "a", fingerprint: "x", costUsd: null }, () => "t");
     const { writeFileSync } = require("node:fs");
     writeFileSync(join(root, "summaries", "proj-1", "F", "T.json"), "{corrompido");
     expect(readSummary(root, "proj-1", "F", "T")).toBeNull();

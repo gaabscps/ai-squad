@@ -7,9 +7,14 @@ describe("parseStreamLine", () => {
     expect(parseStreamLine(line)).toEqual({ kind: "chunk", text: "ok" });
   });
 
-  it("extrai o texto completo do result de sucesso", () => {
-    const line = JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "resumo final" });
-    expect(parseStreamLine(line)).toEqual({ kind: "done", text: "resumo final" });
+  it("extrai o texto completo e o custo do result de sucesso", () => {
+    const line = JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "resumo final", total_cost_usd: 0.042 });
+    expect(parseStreamLine(line)).toEqual({ kind: "done", text: "resumo final", costUsd: 0.042 });
+  });
+
+  it("done com costUsd null quando total_cost_usd ausente", () => {
+    const line = JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "x" });
+    expect(parseStreamLine(line)).toEqual({ kind: "done", text: "x", costUsd: null });
   });
 
   it("trata result com erro", () => {

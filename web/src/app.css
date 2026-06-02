@@ -195,6 +195,10 @@ a:hover { text-decoration: underline; }
 .task-summary-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-mute); }
 .task-summary-warn { margin: 8px 0 0; font-size: 12px; color: #b45309; }
 .task-summary-text { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+/* cursor piscando da revelação letra a letra (efeito chat moderno) */
+.task-summary-cursor { display: inline-block; margin-left: 1px; color: var(--accent); font-weight: 400; animation: tw-blink 1s steps(2, start) infinite; }
+@keyframes tw-blink { to { visibility: hidden; } }
+.task-summary-cost { margin: 10px 0 0; font-size: 11px; color: var(--text-mute); border-top: 1px solid var(--border-soft); padding-top: 8px; cursor: help; }
 
 /* Detalhes técnicos (recolhido) */
 .task-details-summary { cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-mute); padding: 4px 0; }
