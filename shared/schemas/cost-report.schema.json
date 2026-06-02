@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-squad/shared/schemas/cost-report.schema.json",
+  "title": "ai-squad Cost Report",
+  "description": "Canonical scoped cost artifact written at session end to .agent-session/<spec_id>/cost-report.json. The presence of this file means cost reconciliation ran and the numbers are authoritative; consumers must treat its absence as 'preliminary'. When scoping_suspect is true, implementation_cost_usd is NOT trustworthy and consumers must display 'unknown' rather than the figure. Produced by cost_report.write_cost_report_json; consumed read-only by external observers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planning_cost_usd",
+    "orchestration_cost_usd",
+    "implementation_cost_usd",
+    "total_cost_usd",
+    "subagent_count",
+    "excluded_subagents",
+    "recovered_subagents",
+    "scoping_suspect",
+    "unpriced_models",
+    "complete",
+    "tokens",
+    "token_cost",
+    "spec_id",
+    "generated_at"
+  ],
+  "properties": {
+    "planning_cost_usd": { "type": "number", "minimum": 0, "description": "Planning-phase cost in USD." },
+    "orchestration_cost_usd": { "type": "number", "minimum": 0, "description": "Orchestrator cost in USD." },
+    "implementation_cost_usd": { "type": "number", "minimum": 0, "description": "Implementation subagents cost in USD. Untrustworthy when scoping_suspect is true." },
+    "total_cost_usd": { "type": "number", "minimum": 0, "description": "Sum of the three phase costs." },
+    "subagent_count": { "type": "integer", "minimum": 0, "description": "In-scope, measured subagents." },
+    "excluded_subagents": { "type": "integer", "minimum": 0, "description": "Out-of-scope cost files ignored on read (foreign session/project contamination). Surfaced, never silently dropped." },
+    "recovered_subagents": { "type": "integer", "minimum": 0, "description": "Subagents recovered after the sanity floor tripped (Spec B). 0 on the normal path." },
+    "scoping_suspect": { "type": "boolean", "description": "True when scoping kept 0 subagents but excluded some AND recovery was not safe. When true, implementation_cost_usd must not be presented as final." },
+    "unpriced_models": { "type": "array", "items": { "type": "string" }, "description": "Models encountered with no known price." },
+    "complete": { "type": "boolean", "description": "True only when something was measured AND everything measured was priced." },
+    "tokens": {
+      "type": "object",
+      "description": "Token counts. by_phase keyed by phase, by_type keyed by token type, plus a total.",
+      "required": ["by_phase", "by_type", "total"],
+      "properties": {
+        "by_phase": { "type": "object" },
+        "by_type": { "type": "object" },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "token_cost": {
+      "type": "object",
+      "description": "Token cost breakdown. by_phase keyed by phase, by_type keyed by token type.",
+      "required": ["by_phase", "by_type"],
+      "properties": {
+        "by_phase": { "type": "object" },
+        "by_type": { "type": "object" }
+      }
+    },
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name." },
+    "generated_at": { "type": "string", "format": "date-time", "description": "ISO 8601 timestamp of the reconciliation that produced this report." }
+  }
+}

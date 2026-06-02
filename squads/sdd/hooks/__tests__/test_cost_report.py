@@ -477,3 +477,19 @@ def test_gap_a_minority_contamination_still_excluded(tmp_path):
     assert rep["excluded_subagents"] == 1
     assert rep["scoping_suspect"] is False
     assert rep["recovered_subagents"] == 0
+
+
+def test_cost_report_schema_is_valid_and_declares_required_keys():
+    schema_path = (Path(__file__).resolve().parents[4]
+                   / "shared" / "schemas" / "cost-report.schema.json")
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["$id"] == "ai-squad/shared/schemas/cost-report.schema.json"
+    assert schema["additionalProperties"] is False
+    required = set(schema["required"])
+    assert required == {
+        "planning_cost_usd", "orchestration_cost_usd", "implementation_cost_usd",
+        "total_cost_usd", "subagent_count", "excluded_subagents",
+        "recovered_subagents", "scoping_suspect", "unpriced_models", "complete",
+        "tokens", "token_cost", "spec_id", "generated_at",
+    }
