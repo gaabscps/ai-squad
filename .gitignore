@@ -10,3 +10,6 @@ aios.config.json
 
 # ai-squad session state (dogfood FEATs neste repo; regenerável, não é fonte)
 .agent-session/
+
+# cache do aiOS (resumos de task gerados por IA; regenerável, não é fonte)
+.aios-cache/

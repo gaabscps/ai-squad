@@ -4,6 +4,7 @@ import { existsSync, statSync } from "node:fs";
 import { resolve, relative, isAbsolute, join } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Store } from "../store/store.js";
+import { makeSummaryHandler } from "../summary/handler.js";
 
 // pasta do build do Vite (npm run build → dist/web); em dev pode não existir.
 const FRONT_DIR = join(process.cwd(), "dist", "web");
@@ -74,12 +75,19 @@ export function createServer(
     // socket terminou de inicializar e que o consumidor já registrou seu listener
     // antes do primeiro frame chegar. Entrega mais previsível; custo ~0 (app local).
     setTimeout(() => socket.send(snapshotMessage()), 0);
+    const onSummary = makeSummaryHandler(store);
     socket.on("message", (raw) => {
-      let msg: { type?: string; id?: string };
+      let msg: { type?: string; id?: string; specId?: string; taskId?: string; force?: boolean };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
         return; // mensagem inválida: ignora
+      }
+      if (msg.type === "summary:fetch" || msg.type === "summary:generate") {
+        onSummary(msg as never, (data) => {
+          if (socket.readyState === WebSocket.OPEN) socket.send(data);
+        });
+        return;
       }
       if (typeof msg.id !== "string") return;
       if (msg.type === "hide") onToggleHide(msg.id, true);

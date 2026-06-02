@@ -18,7 +18,7 @@ describe("KanbanCard", () => {
   });
 
   it("em atenção mostra o motivo", () => {
-    const spec = makeSpec({ status: "blocked", tasks: [{ id: "T-5", state: "blocked", loops: 0 }] });
+    const spec = makeSpec({ status: "blocked", tasks: [{ id: "T-5", state: "blocked", loops: 0, dispatches: [] }] });
     render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
     expect(screen.getByText(/T-5 bloqueada/)).toBeInTheDocument();
   });

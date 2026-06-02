@@ -133,7 +133,7 @@ a:hover { text-decoration: underline; }
 
 /* ---- Drawer ---- */
 .drawer-overlay { position: fixed; inset: 0; background: rgba(16, 24, 40, 0.28); display: flex; justify-content: flex-end; z-index: 30; }
-.drawer { width: min(560px, 92vw); height: 100%; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -12px 0 30px rgba(16, 24, 40, 0.12); padding: 18px 20px; }
+.drawer { width: min(1024px, 92vw); height: 100%; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -12px 0 30px rgba(16, 24, 40, 0.12); padding: 18px 20px; }
 .drawer-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .drawer-id { font-family: var(--mono); font-size: 12px; color: var(--text-mute); }
 .drawer-proj { font-size: 11px; color: var(--accent); background: #eff4ff; padding: 2px 8px; border-radius: 999px; }
@@ -168,3 +168,59 @@ a:hover { text-decoration: underline; }
 @media (max-width: 880px) {
   .kboard { grid-template-columns: 1fr; }
 }
+
+/* ── Task item (drawer) ─────────────────────────────────────────────── */
+/* especificidade .drawer-tasks li.task-item (0-2-1) supera a regra antiga
+   .drawer-tasks li (0-1-1) que punha display:flex e quebrava o empilhamento. */
+.drawer-tasks li.task-item { display: block; padding: 0; }
+.task-item { list-style: none; border-bottom: 1px solid var(--border-soft); }
+.task-item-header { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 0; background: transparent; border: 0; cursor: pointer; font-size: 13px; text-align: left; }
+.task-item-id { color: var(--text); font-weight: 600; }
+.task-item-state { color: var(--text-dim); }
+.task-item-loops { font-size: 11px; color: #b45309; background: #fffbeb; padding: 2px 8px; border-radius: 999px; }
+.task-item-tokens { margin-left: auto; font-size: 11px; color: var(--text-mute); }
+.task-item-chevron { color: var(--text-mute); }
+
+.task-expanded { padding: 4px 0 14px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Resumo de ensino (destaque no topo) */
+.task-summary { background: #f7f9ff; border: 1px solid #e0e8ff; border-radius: 10px; padding: 12px 14px; }
+.task-summary-head { display: flex; align-items: center; gap: 10px; }
+.task-summary-label { font-weight: 700; font-size: 13px; }
+.task-summary-meta { font-size: 11px; color: var(--text-mute); }
+.task-summary-btn { margin-left: auto; border: 1px solid var(--border-soft); background: #fff; border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--text); }
+.task-summary-btn:hover { border-color: var(--accent); color: var(--accent); }
+.task-summary-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.task-summary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.task-summary-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-mute); }
+.task-summary-warn { margin: 8px 0 0; font-size: 12px; color: #b45309; }
+.task-summary-text { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+
+/* Detalhes técnicos (recolhido) */
+.task-details-summary { cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-mute); padding: 4px 0; }
+.task-details-body { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
+.task-block { background: #fafbfc; border: 1px solid var(--border-soft); border-radius: 8px; padding: 8px 10px; }
+.task-block-label { margin: 0 0 6px; font-size: 11px; font-weight: 700; color: var(--text-dim); }
+.task-summaries, .task-files, .task-findings, .task-tests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.task-summary-item { display: flex; gap: 8px; align-items: baseline; }
+.task-dispatch-tag { font-size: 11px; color: var(--text-mute); white-space: nowrap; }
+.task-files li { color: #374151; font-size: 12px; }
+.finding-item { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.finding-severity { font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.finding-error .finding-severity { color: #b91c1c; background: #fef2f2; }
+.finding-warning .finding-severity { color: #b45309; background: #fffbeb; }
+.finding-info .finding-severity { color: #1d4ed8; background: #eff6ff; }
+.finding-loc { font-size: 11px; color: var(--text-mute); }
+.finding-text { color: var(--text); }
+.test-item { display: flex; gap: 8px; align-items: baseline; }
+.test-pass .test-status { color: #15803d; }
+.test-fail .test-status { color: #b91c1c; }
+.test-unknown .test-status { color: var(--text-mute); }
+.test-detail { color: var(--text-mute); font-size: 11px; }
+.task-loops-history { display: flex; flex-direction: column; gap: 6px; }
+.task-loop-group { display: flex; gap: 10px; align-items: baseline; }
+.task-loop-num { font-size: 11px; color: var(--text-mute); white-space: nowrap; }
+.task-loop-dispatches { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.task-loop-dispatch { display: flex; gap: 6px; font-size: 11px; align-items: baseline; }
+.loop-status { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #f3f4f6; color: #374151; }
+.task-empty-dispatches { font-size: 12px; color: var(--text-mute); }

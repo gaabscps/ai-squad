@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TaskItem } from "./TaskItem";
 import { makeTask, makeDispatch } from "../test-utils";
 import type { DispatchFinding, DispatchTestEvidence } from "../../../src/store/types";
+
+vi.mock("../state/useTaskSummary", () => ({
+  useTaskSummary: () => ({ state: "empty", text: "", generatedAt: null, error: null, generate: vi.fn(), regenerate: vi.fn() }),
+}));
 
 function makeFinding(over: Partial<DispatchFinding> = {}): DispatchFinding {
   return {
@@ -29,23 +33,23 @@ function makeTestEvidence(over: Partial<DispatchTestEvidence> = {}): DispatchTes
 describe("AC-015: linha colapsada por padrão", () => {
   it("exibe o id e o estado da tarefa sem expandir", () => {
     const task = makeTask({ id: "T-005", state: "done" });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.getByText("T-005")).toBeInTheDocument();
     expect(screen.getByText(/conclu/i)).toBeInTheDocument();
   });
 
   it("não exibe o indicador ↻ loops quando loops ≤ 1", () => {
-    render(<TaskItem task={makeTask({ loops: 1 })} />);
+    render(<TaskItem task={makeTask({ loops: 1 })} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.queryByText(/↻/)).toBeNull();
   });
 
   it("não exibe o indicador ↻ loops quando loops é 0", () => {
-    render(<TaskItem task={makeTask({ loops: 0 })} />);
+    render(<TaskItem task={makeTask({ loops: 0 })} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.queryByText(/↻/)).toBeNull();
   });
 
   it("exibe ↻ N loops quando loops > 1", () => {
-    render(<TaskItem task={makeTask({ loops: 3 })} />);
+    render(<TaskItem task={makeTask({ loops: 3 })} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.getByText(/↻.*3/)).toBeInTheDocument();
   });
 
@@ -53,13 +57,13 @@ describe("AC-015: linha colapsada por padrão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ tokens: 1000 }), makeDispatch({ tokens: 500 })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.getByText(/2K.*tok|tok.*2K/)).toBeInTheDocument();
   });
 
   it("omite o total de tokens (best-effort) quando todos os dispatches têm tokens null", () => {
     const task = makeTask({ dispatches: [makeDispatch({ tokens: null })] });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.queryByText(/tok/i)).toBeNull();
   });
 
@@ -67,7 +71,7 @@ describe("AC-015: linha colapsada por padrão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ summary: "resumo secreto" })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.queryByText("resumo secreto")).toBeNull();
   });
 });
@@ -79,7 +83,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ summary: "implementei X" })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("implementei X")).toBeInTheDocument();
   });
@@ -88,7 +92,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ summary: "implementei X" })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     const btn = screen.getByRole("button");
     await userEvent.click(btn);
     expect(screen.getByText("implementei X")).toBeInTheDocument();
@@ -100,7 +104,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ filesChanged: ["src/a.ts", "src/b.ts"] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("src/a.ts")).toBeInTheDocument();
     expect(screen.getByText("src/b.ts")).toBeInTheDocument();
@@ -110,7 +114,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ findings: [makeFinding()] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText(/Findings de review/i)).toBeInTheDocument();
   });
@@ -119,7 +123,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ testEvidence: [makeTestEvidence({ command: "npx vitest run src/foo.test.ts" })] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText(/npx vitest run src\/foo.test.ts/)).toBeInTheDocument();
   });
@@ -131,7 +135,7 @@ describe("AC-016 / AC-018: toggle de expansão", () => {
         makeDispatch({ role: "reviewer", loop: 1 }),
       ],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText(/Histórico de loops/i)).toBeInTheDocument();
     expect(screen.getByText(/dev/i)).toBeInTheDocument();
@@ -151,7 +155,7 @@ describe("AC-017: todos os findings renderizados", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ findings })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("finding um")).toBeInTheDocument();
     expect(screen.getByText("finding dois")).toBeInTheDocument();
@@ -166,7 +170,7 @@ describe("AC-017: todos os findings renderizados", () => {
         }),
       ],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText(/error/i)).toBeInTheDocument();
     expect(screen.getByText(/src\/x\.ts:7/)).toBeInTheDocument();
@@ -180,7 +184,7 @@ describe("AC-017: todos os findings renderizados", () => {
         makeDispatch({ role: "reviewer", loop: 2, findings: [makeFinding({ text: "finding do loop 2" })] }),
       ],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("finding do loop 1")).toBeInTheDocument();
     expect(screen.getByText("finding do loop 2")).toBeInTheDocument();
@@ -192,7 +196,7 @@ describe("AC-017: todos os findings renderizados", () => {
         makeDispatch({ findings: [makeFinding({ file: null, line: null, text: "sem localização" })] }),
       ],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("sem localização")).toBeInTheDocument();
   });
@@ -203,29 +207,30 @@ describe("AC-017: todos os findings renderizados", () => {
 describe("AC-019: empty-state — tarefa sem dispatches", () => {
   it("tarefa sem dispatches preserva a linha colapsada (id, estado)", () => {
     const task = makeTask({ id: "T-003", state: "pending", dispatches: [] });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.getByText("T-003")).toBeInTheDocument();
     expect(screen.getByText(/pendente/i)).toBeInTheDocument();
   });
 
   it("tarefa sem dispatches pode expandir sem quebrar", async () => {
-    const task = makeTask({ dispatches: [] });
-    render(<TaskItem task={task} />);
-    await userEvent.click(screen.getByRole("button"));
+    const task = makeTask({ id: "T-001", dispatches: [] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    const header = screen.getByRole("button", { name: /T-001/ });
+    await userEvent.click(header);
     // sem erro — componente continua montado
-    expect(screen.getByRole("button")).toBeInTheDocument();
+    expect(header).toBeInTheDocument();
   });
 
   it("expandida com dispatches vazios mostra aviso discreto", async () => {
     const task = makeTask({ dispatches: [] });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText(/sem dispatches registrados/i)).toBeInTheDocument();
   });
 
   it("tarefa sem dispatches não some do DOM após clicar", async () => {
     const task = makeTask({ id: "T-004", dispatches: [] });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.getByText("T-004")).toBeInTheDocument();
   });
@@ -238,16 +243,17 @@ describe("AC-020: blocos vazios omitidos", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ summary: null })],
     });
-    render(<TaskItem task={task} />);
-    await userEvent.click(screen.getByRole("button"));
-    expect(screen.queryByText(/O que foi feito/i)).toBeNull();
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001/ }));
+    const details = screen.getByText(/Detalhes t[ée]cnicos/i).closest("details")!;
+    expect(within(details).queryByText(/O que foi feito/i)).toBeNull();
   });
 
   it("omite 'Arquivos mudados' quando filesChanged é vazio em todos os dispatches", async () => {
     const task = makeTask({
       dispatches: [makeDispatch({ filesChanged: [] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.queryByText(/Arquivos mudados/i)).toBeNull();
   });
@@ -256,7 +262,7 @@ describe("AC-020: blocos vazios omitidos", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ findings: [] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.queryByText(/Findings de review/i)).toBeNull();
   });
@@ -265,7 +271,7 @@ describe("AC-020: blocos vazios omitidos", () => {
     const task = makeTask({
       dispatches: [makeDispatch({ testEvidence: [] })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     expect(screen.queryByText(/Testes/i)).toBeNull();
   });
@@ -277,19 +283,39 @@ describe("AC-020: blocos vazios omitidos", () => {
         makeDispatch({ summary: "feito na segunda passada" }),
       ],
     });
-    render(<TaskItem task={task} />);
-    await userEvent.click(screen.getByRole("button"));
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001/ }));
     expect(screen.getByText("feito na segunda passada")).toBeInTheDocument();
-    expect(screen.getByText(/O que foi feito/i)).toBeInTheDocument();
+    const details = screen.getByText(/Detalhes t[ée]cnicos/i).closest("details")!;
+    expect(within(details).getByText(/O que foi feito/i)).toBeInTheDocument();
   });
 
   it("exibe 'Histórico de loops' mesmo quando um dispatch não tem summary", async () => {
     const task = makeTask({
       dispatches: [makeDispatch({ role: "dev", loop: 1, summary: null })],
     });
-    render(<TaskItem task={task} />);
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
     await userEvent.click(screen.getByRole("button"));
     // Histórico de loops sempre presente quando há dispatches
     expect(screen.getByText(/Histórico de loops/i)).toBeInTheDocument();
+  });
+});
+
+// ─── Resumo IA + Detalhes técnicos ───────────────────────────────────────────
+
+describe("Resumo IA + Detalhes técnicos", () => {
+  it("expandido mostra o botão 'gerar resumo' e o grupo 'Detalhes técnicos'", async () => {
+    const task = makeTask({ dispatches: [makeDispatch({ summary: "fez X" })] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    expect(screen.getByRole("button", { name: /gerar resumo/i })).toBeInTheDocument();
+    expect(screen.getByText(/Detalhes t[ée]cnicos/i)).toBeInTheDocument();
+  });
+
+  it("desabilita 'gerar resumo' quando a task não tem dispatches", async () => {
+    render(<TaskItem task={makeTask({ id: "T-001", dispatches: [] })} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    expect(screen.getByRole("button", { name: /gerar resumo/i })).toBeDisabled();
+    expect(screen.getByText(/sem dados para resumir/i)).toBeInTheDocument();
   });
 });

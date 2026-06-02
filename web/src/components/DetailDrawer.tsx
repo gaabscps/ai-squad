@@ -22,7 +22,7 @@ export function DetailDrawer({
 }) {
   if (!item) return null;
 
-  const { spec, projectName, projectPath } = item;
+  const { spec, projectId, projectName, projectPath } = item;
   const reason = attentionReason(spec);
   const t = spec.cost.tokens;
 
@@ -65,7 +65,7 @@ export function DetailDrawer({
             <li className="drawer-tasks-empty">sem tarefas registradas</li>
           )}
           {spec.tasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
+            <TaskItem key={task.id} task={task} projectId={projectId} specId={spec.id} />
           ))}
         </ul>
 
