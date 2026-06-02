@@ -17,7 +17,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 import pricing  # noqa: E402
 import transcript_cost  # noqa: E402
-from hook_runtime import resolve_project_root  # noqa: E402
+from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
 
 
 def _slugify_project(repo_root) -> str:
@@ -44,17 +44,6 @@ def _glob_subagent_transcript(repo_root, agent_id):
         f"~/.claude/projects/{slug}/*/subagents/agent-{agent_id}.jsonl")
     hits = glob.glob(pattern)
     return max(hits, key=os.path.getmtime) if hits else None
-
-
-def _find_active_session_dir(repo_root: Path):
-    """Newest .agent-session/<ID>/ that has a session.yml. Best-effort."""
-    base = repo_root / ".agent-session"
-    if not base.is_dir():
-        return None
-    candidates = [d for d in base.iterdir() if (d / "session.yml").exists()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda d: d.stat().st_mtime)
 
 
 def capture(agent_id, transcript_path, session_dir, prices):
@@ -89,7 +78,7 @@ def main():
     agent_id = payload.get("agent_id") or "unknown"
     transcript_path = payload.get("agent_transcript_path")
     repo_root = resolve_project_root(payload)
-    session_dir = _find_active_session_dir(Path(repo_root))
+    session_dir = find_active_session(Path(repo_root))
     if session_dir is None:
         return 0
     # Fallback: if payload lacks the path, glob the newest subagent transcript

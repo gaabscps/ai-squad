@@ -36,7 +36,7 @@ _SHARED_LIB = _HOOKS_DIR.parent.parent.parent / "shared" / "lib"
 if str(_SHARED_LIB) not in sys.path:
     sys.path.append(str(_SHARED_LIB))
 
-from hook_runtime import detect_active_subagent, resolve_project_root
+from hook_runtime import detect_active_subagent, find_active_session, resolve_project_root
 
 # canonical_statuses lives in shared/lib/ and reads dispatch-manifest.schema.json at
 # import time via a SOURCE-tree-relative path (Path(__file__).parents[2]/shared/schemas/).
@@ -245,16 +245,6 @@ def extract_dispatch_id(transcript_path: Path) -> str | None:
     except OSError:
         return None
     return None
-
-
-def find_active_session(project_dir: Path) -> Path | None:
-    sessions_root = project_dir / ".agent-session"
-    if not sessions_root.is_dir():
-        return None
-    candidates = [p for p in sessions_root.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 _USAGE_EXEMPT_ROLES = {"pm-orchestrator"}

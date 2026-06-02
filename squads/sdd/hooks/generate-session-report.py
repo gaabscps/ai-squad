@@ -15,7 +15,7 @@ if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
 import session_report  # noqa: E402
-from hook_runtime import resolve_project_root  # noqa: E402
+from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
 
 
 def _git_diff_provider(repo_root):
@@ -48,21 +48,13 @@ def generate(session_dir, diff_provider):
     return 0
 
 
-def _find_active_session_dir(repo_root: Path):
-    base = repo_root / ".agent-session"
-    if not base.is_dir():
-        return None
-    cands = [d for d in base.iterdir() if (d / "session.yml").exists()]
-    return max(cands, key=lambda d: d.stat().st_mtime) if cands else None
-
-
 def main():
     try:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
     repo_root = Path(resolve_project_root(payload))
-    session_dir = _find_active_session_dir(repo_root)
+    session_dir = find_active_session(repo_root)
     if session_dir is None:
         return 0
     return generate(session_dir, _git_diff_provider(repo_root))

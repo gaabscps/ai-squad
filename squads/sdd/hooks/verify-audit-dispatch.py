@@ -22,18 +22,12 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from hook_runtime import detect_active_skill, resolve_project_root, should_run_audit_manifest_verify
-
-
-def find_active_session(project_dir: Path) -> Path | None:
-    """Return the most recently modified .agent-session/<task_id>/ dir, or None."""
-    sessions_root = project_dir / ".agent-session"
-    if not sessions_root.is_dir():
-        return None
-    candidates = [p for p in sessions_root.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+from hook_runtime import (
+    detect_active_skill,
+    find_active_session,
+    resolve_project_root,
+    should_run_audit_manifest_verify,
+)
 
 
 def audit_passed(manifest_path: Path) -> tuple[bool, str]:

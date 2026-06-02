@@ -29,6 +29,28 @@ def resolve_project_root(payload: Mapping[str, Any] | None) -> Path:
     return Path(os.getcwd()).resolve()
 
 
+def find_active_session(project_dir: Path) -> Path | None:
+    """Most-recently-modified Session dir under <project_dir>/.agent-session/.
+
+    Single source of truth for "which Session is active" across every hook
+    (cost capture, baseline, register-impl, the verify-* gates). A legitimate
+    Session dir always carries a session.yml (written when the Session is
+    created), so candidates are filtered to those that have one: this ignores
+    stray/partial sibling dirs and keeps the newest real Session by mtime. The
+    dir name (spec_id FEAT-NNN for SDD, task_id DISC-NNN for Discovery) is
+    irrelevant to selection — only session.yml presence + mtime decide.
+
+    Returns None when .agent-session is absent or holds no session.yml-bearing dir.
+    """
+    base = Path(project_dir) / ".agent-session"
+    if not base.is_dir():
+        return None
+    candidates = [d for d in base.iterdir() if (d / "session.yml").exists()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda d: d.stat().st_mtime)
+
+
 def tool_input_dict(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     if not payload:
         return {}

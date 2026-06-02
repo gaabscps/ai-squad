@@ -16,7 +16,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 import pricing  # noqa: E402
 import transcript_cost  # noqa: E402
-from hook_runtime import resolve_project_root  # noqa: E402
+from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
 
 
 def capture(session_id, transcript_path, session_dir, pipeline_started_at, prices):
@@ -53,14 +53,6 @@ def _read_pipeline_start(session_dir: Path):
     return None
 
 
-def _find_active_session_dir(repo_root: Path):
-    base = repo_root / ".agent-session"
-    if not base.is_dir():
-        return None
-    cands = [d for d in base.iterdir() if (d / "session.yml").exists()]
-    return max(cands, key=lambda d: d.stat().st_mtime) if cands else None
-
-
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -71,7 +63,7 @@ def main():
     if not transcript_path:
         return 0
     repo_root = Path(resolve_project_root(payload))
-    session_dir = _find_active_session_dir(repo_root)
+    session_dir = find_active_session(repo_root)
     if session_dir is None:
         return 0
     return capture(session_id, transcript_path, session_dir,

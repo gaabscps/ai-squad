@@ -655,6 +655,10 @@ class TestStopHookFailClosed(unittest.TestCase):
         self.project = self.tmp / "proj"
         self.session = self.project / ".agent-session" / "FEAT-011"
         (self.session / "outputs").mkdir(parents=True)
+        # A real Session always carries a session.yml; find_active_session filters
+        # candidates by its presence, so the fixture must mirror production.
+        (self.session / "session.yml").write_text(
+            "current_phase: implementation\n", encoding="utf-8")
 
     def _transcript(self, role: str, dispatch_id: str) -> Path:
         p = self.tmp / "transcript.jsonl"

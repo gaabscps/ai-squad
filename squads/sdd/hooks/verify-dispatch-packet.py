@@ -28,7 +28,7 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from hook_runtime import resolve_project_root, tool_input_dict
+from hook_runtime import find_active_session, resolve_project_root, tool_input_dict
 
 # Phase 4 dispatch roles that owe an Output Packet (mirrors verify-output-packet.py).
 _PHASE_4_SUBAGENTS = frozenset({
@@ -57,18 +57,6 @@ def _load_validate_packet():
 
 
 _VALIDATE_PACKET = _load_validate_packet()
-
-
-def _find_active_session(project_dir: Path) -> Path | None:
-    """Most-recently-modified .agent-session/<spec_id>/ dir (mirrors
-    verify-output-packet.find_active_session)."""
-    sessions_root = project_dir / ".agent-session"
-    if not sessions_root.is_dir():
-        return None
-    candidates = [p for p in sessions_root.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def _emit_context(message: str) -> int:
@@ -107,7 +95,7 @@ def main() -> int:
     dispatch_id = m.group(1)
 
     project_dir = resolve_project_root(payload)
-    session_dir = _find_active_session(project_dir)
+    session_dir = find_active_session(project_dir)
     if session_dir is None:
         return 0  # no session to check against — silent
 

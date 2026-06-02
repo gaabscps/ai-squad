@@ -32,17 +32,11 @@ if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
 import audit_baseline  # noqa: E402
-from hook_runtime import detect_active_skill, resolve_project_root  # noqa: E402
-
-
-def find_active_session(project_dir):
-    """Newest .agent-session/<ID>/ that has a session.yml. Reliable here because
-    the orchestrator just wrote its own session.yml, so it is the freshest."""
-    base = Path(project_dir) / ".agent-session"
-    if not base.is_dir():
-        return None
-    cands = [p for p in base.iterdir() if (p / "session.yml").exists()]
-    return max(cands, key=lambda p: p.stat().st_mtime) if cands else None
+from hook_runtime import (  # noqa: E402
+    detect_active_skill,
+    find_active_session,
+    resolve_project_root,
+)
 
 
 def main() -> int:
