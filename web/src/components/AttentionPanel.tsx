@@ -20,9 +20,15 @@ export function AttentionPanel({ projectId, specId, client }: { projectId: strin
 
   const copyHandoff = async () => {
     if (!d.handoff) return;
-    await navigator.clipboard.writeText(d.handoff);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(d.handoff);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard indisponível (sem foco / permissão / contexto não-seguro):
+      // falha silenciosa — o prompt segue visível pra cópia manual.
+      setCopied(false);
+    }
   };
 
   return (
