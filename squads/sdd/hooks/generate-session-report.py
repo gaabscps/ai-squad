@@ -15,6 +15,7 @@ if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
 import session_report  # noqa: E402
+import cost_report  # noqa: E402
 from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
 
 
@@ -43,6 +44,7 @@ def generate(session_dir, diff_provider):
         tmp = out.with_suffix(".html.tmp")
         tmp.write_text(html, encoding="utf-8")
         tmp.replace(out)  # atomic
+        cost_report.write_cost_report_json(session_dir)  # SSOT cost artifact for observers
     except Exception as e:  # fail-open
         print(f"generate-session-report: {e}", file=sys.stderr)
     return 0
