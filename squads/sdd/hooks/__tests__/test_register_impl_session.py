@@ -78,12 +78,12 @@ def test_main_skips_when_not_orchestrator(tmp_path, monkeypatch):
     assert "implementation_sessions" not in (sd / "session.yml").read_text()
 
 
-def test_main_skips_without_manifest(tmp_path, monkeypatch):
-    # An orchestrator session that dispatched no Phase 4 pipeline has nothing
-    # to scope — don't pollute session.yml.
+def test_main_registers_without_manifest(tmp_path, monkeypatch):
+    # At PreToolUse(Task) the dispatch IS the signal a pipeline is running —
+    # the manifest may not exist on the first dispatch. Register anyway.
     sd = tmp_path / ".agent-session" / "FEAT-001"
     sd.mkdir(parents=True)
     (sd / "session.yml").write_text("id: FEAT-001\n")
     _wire(monkeypatch, "orchestrator", tmp_path)
     assert ris.main() == 0
-    assert "implementation_sessions" not in (sd / "session.yml").read_text()
+    assert '- "AAA"' in (sd / "session.yml").read_text()
