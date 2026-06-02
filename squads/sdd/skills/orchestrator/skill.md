@@ -26,6 +26,12 @@ hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py"'
           timeout: 5
+  PostToolUse:
+    - matcher: "Task"
+      hooks:
+        - type: command
+          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py"'
+          timeout: 10
 ---
 
 # Orchestrator — Phase 4 (Implementation)
@@ -56,7 +62,7 @@ repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || 
 hooks_dir="$repo_root/.claude/hooks"
 # Positional params ($@) keep iteration shell-agnostic (a bare `for f in $required`
 # word-splits in bash but not zsh).
-set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py
+set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py manifest_append.py
 missing=""
 for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
