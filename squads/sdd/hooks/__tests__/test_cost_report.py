@@ -525,6 +525,28 @@ def test_write_cost_report_json_guards_when_no_costs(tmp_path):
     assert not (session_dir / "cost-report.json").exists()
 
 
+import subprocess
+import sys
+
+
+def test_cli_writes_cost_report_json(tmp_path):
+    base = tmp_path
+    session_dir = base / "FEAT-009"
+    _make_costs(session_dir)
+    cli = Path(__file__).resolve().parents[1] / "cost-report.py"
+
+    result = subprocess.run(
+        [sys.executable, str(cli), "FEAT-009", str(base)],
+        capture_output=True, text=True, timeout=15,
+    )
+
+    assert result.returncode == 0
+    written = json.loads((session_dir / "cost-report.json").read_text(encoding="utf-8"))
+    assert written["spec_id"] == "FEAT-009"
+    assert "generated_at" in written
+    assert "Cost report" in result.stdout  # markdown table still printed
+
+
 def test_cost_report_schema_is_valid_and_declares_required_keys():
     schema_path = (Path(__file__).resolve().parents[4]
                    / "shared" / "schemas" / "cost-report.schema.json")
