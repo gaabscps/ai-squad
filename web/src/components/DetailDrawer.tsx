@@ -6,13 +6,7 @@ import { StatusBadge } from "./StatusBadge";
 import { Timeline } from "./Timeline";
 import { TaskItem } from "./TaskItem";
 import { AttentionPanel } from "./AttentionPanel";
-
-/**
- * Painel lateral que abre ao clicar num card/linha — onde mora a "investigação".
- * Reúne motivo (quando em atenção), fases, tarefas colapsáveis ricas (via TaskItem),
- * custo destrinchado por tipo de token, e a timeline + links dos .md (reusa <Timeline>).
- * item null = fechado. Tudo leitura.
- */
+import { SpecJobIndicator } from "./SpecJobIndicator";
 
 export function DetailDrawer({
   item,
@@ -41,6 +35,7 @@ export function DetailDrawer({
             {projectName} · {spec.squad.toUpperCase()}
           </span>
           <StatusBadge spec={spec} />
+          <SpecJobIndicator projectId={projectId} specId={spec.id} />
           <button
             type="button"
             className="drawer-close"

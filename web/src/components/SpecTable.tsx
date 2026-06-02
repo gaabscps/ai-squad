@@ -1,13 +1,8 @@
 import { useState } from "react";
 import type { SpecWithProject } from "../lib/kanban";
 import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
+import { SpecJobIndicator } from "./SpecJobIndicator";
 
-/**
- * 2ª visão (toggle "Tabela"): uma linha por spec, ordenável, pra COMPARAR custo/
- * progresso — o gesto que o kanban não serve bem. Ordenação é estado local; o
- * clique numa linha abre o mesmo drawer via onSelect. Custo em $ é sempre o
- * agregado da spec (não há $ por tarefa — ver design §6).
- */
 type SortKey = "project" | "id" | "status" | "phase" | "cost" | "activity";
 
 function valueFor(item: SpecWithProject, key: SortKey): string | number {
@@ -96,7 +91,10 @@ export function SpecTable({
               {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
             </td>
             <td>{fmtRelativeTime(it.spec.lastActivityAt)}</td>
-            <td>{it.spec.title}</td>
+            <td>
+              {it.spec.title}
+              <SpecJobIndicator projectId={it.projectId} specId={it.spec.id} />
+            </td>
           </tr>
         ))}
       </tbody>

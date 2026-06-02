@@ -1,18 +1,93 @@
+import { useState, useEffect, type ReactNode } from "react";
 import { ProjectsProvider } from "./state/projects";
 import { useLiveProjects } from "./state/useLiveProjects";
-import { Board } from "./components/Board";
+import { Board, type SelectedSpec } from "./components/Board";
+import {
+  DiagnosisJobsProvider,
+  useDiagnosisJobs,
+} from "./state/diagnosisJobs";
+import type { AttentionClient } from "./state/attentionClient";
+import type { Project } from "../../src/store/types";
 
-// Componente interno: vive DENTRO do Provider, então o hook acha o dispatch do
-// Context. O toggleHide do hook (envia hide/unhide pelo WS) desce pro Board.
-function BoardLive() {
+function BoardLive({
+  selected,
+  onSelect,
+  onClose,
+}: {
+  selected: SelectedSpec | null;
+  onSelect: (spec: SelectedSpec) => void;
+  onClose: () => void;
+}) {
   const { toggleHide } = useLiveProjects();
-  return <Board onHide={toggleHide} />;
+  return (
+    <Board
+      onHide={toggleHide}
+      selected={selected}
+      onSelect={onSelect}
+      onClose={onClose}
+    />
+  );
 }
 
-export function App() {
+export interface AppProvidersProps {
+  children: ReactNode;
+  diagnosisClient?: AttentionClient;
+  initial?: Project[];
+}
+
+export function AppProviders({ children, diagnosisClient, initial }: AppProvidersProps) {
   return (
-    <ProjectsProvider>
-      <BoardLive />
+    <ProjectsProvider initial={initial}>
+      <DiagnosisJobsProvider client={diagnosisClient}>
+        {children}
+      </DiagnosisJobsProvider>
     </ProjectsProvider>
+  );
+}
+
+interface AppProps {
+  diagnosisClient?: AttentionClient;
+}
+
+export function App({ diagnosisClient }: AppProps = {}) {
+  return (
+    <AppProviders diagnosisClient={diagnosisClient}>
+      <AppInner />
+    </AppProviders>
+  );
+}
+
+function AppInner() {
+  const [selected, setSelected] = useState<SelectedSpec | null>(null);
+  const { markSeen, getJob } = useDiagnosisJobs();
+
+  useEffect(() => {
+    if (selected) {
+      markSeen(selected.projectId, selected.specId);
+    }
+  }, [selected, markSeen]);
+
+  const job = selected ? getJob(selected.projectId, selected.specId) : undefined;
+
+  // When a job completes while the drawer is already open, `selected` doesn't
+  // change — so the effect above won't fire. This second effect watches the
+  // job state directly and marks it seen the moment it reaches a terminal state.
+  useEffect(() => {
+    if (
+      selected &&
+      job &&
+      (job.state === "ready" || job.state === "error") &&
+      !job.seen
+    ) {
+      markSeen(selected.projectId, selected.specId);
+    }
+  }, [selected, job, markSeen]);
+
+  return (
+    <BoardLive
+      selected={selected}
+      onSelect={setSelected}
+      onClose={() => setSelected(null)}
+    />
   );
 }

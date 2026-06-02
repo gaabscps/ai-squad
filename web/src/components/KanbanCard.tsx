@@ -1,14 +1,8 @@
 import type { SpecWithProject } from "../lib/kanban";
 import { columnForSpec, attentionReason } from "../lib/kanban";
 import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
+import { SpecJobIndicator } from "./SpecJobIndicator";
 
-/**
- * Card compacto do kanban. O conteúdo adapta-se à coluna: em "atenção" mostra o
- * MOTIVO (bloqueio/escalada/auditoria); nas colunas de progresso (planejamento,
- * planejado, andamento) mostra a fase atual. O rodapé sempre traz custo + última
- * atividade. A borda esquerda (cor por status) e a tag de squad são CSS
- * (data-status / data-squad). Só leitura; clicar abre o drawer via onSelect.
- */
 export function KanbanCard({
   item,
   onSelect,
@@ -39,6 +33,8 @@ export function KanbanCard({
       {(col === "planning" || col === "planned" || col === "running") && spec.phase && (
         <div className="kcard-phase">{spec.phase}</div>
       )}
+
+      <SpecJobIndicator projectId={item.projectId} specId={spec.id} />
 
       <div className="kcard-meta">
         <span className="kcard-cost">
