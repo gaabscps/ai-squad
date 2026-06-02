@@ -34,7 +34,7 @@ Referenced from `skill.md` step 9. Emit the handoff message to console AND save 
   ## Pipeline integrity audit FAILED — handoff refused
 
   <opening line, selected by blocker_kind:>
-  - bypass_detected:   The dispatch manifest does not reconcile with actual execution — the orchestrator likely bypassed Subagent dispatch and did the work directly (or fabricated outputs).
+  - bypass_detected:   The dispatch manifest does not reconcile with actual execution — the orchestrator likely bypassed Subagent dispatch and did the work directly (or fabricated outputs). (If the only findings were `orchestrator_edited_source` and a human was present, the Layer 2 authorization in skill.md step 8 ran first; this refusal means it was unavailable — PM-autonomous — or the human denied the change.)
   - schema_violation:  The pipeline ran and the work may be correct, but one or more Output Packets are malformed (missing required fields). This is an artifact-format defect, not a bypass.
   - pipeline_stage_skipped: A required pipeline stage did not run for one or more tasks.
   - audit_inconclusive / other: The audit gate could not confirm pipeline integrity (see findings).
