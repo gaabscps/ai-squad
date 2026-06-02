@@ -130,7 +130,7 @@ def main() -> int:
             }
             print(json.dumps(decision))
             return 0
-        if len(parts) == 2 and parts[1] == BASELINE_FILENAME:
+        if len(parts) >= 2 and parts[-1] == BASELINE_FILENAME:
             # The audit baseline is the Root of Trust for Check 6 — captured by
             # the deterministic capture-baseline hook. The orchestrator rewriting
             # it could hide source edits from the audit (Spec A attestation).
