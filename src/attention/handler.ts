@@ -13,7 +13,6 @@ export interface AttentionMsg {
   type: "attention:fetch" | "attention:generate";
   projectId?: unknown;
   specId?: unknown;
-  force?: unknown;
 }
 type Send = (data: string) => void;
 

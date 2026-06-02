@@ -15,7 +15,7 @@ type SocketFactory = () => WebSocket;
 export interface AttentionClient {
   subscribe: (key: string, fn: Handler) => () => void;
   fetch: (projectId: string, specId: string) => void;
-  generate: (projectId: string, specId: string, force?: boolean) => void;
+  generate: (projectId: string, specId: string) => void;
 }
 
 /**
@@ -58,7 +58,7 @@ export function createAttentionClient(makeSocket: SocketFactory): AttentionClien
       return () => { set.delete(fn); if (set.size === 0) subs.delete(key); };
     },
     fetch(projectId, specId) { sendOrQueue({ type: "attention:fetch", projectId, specId }); },
-    generate(projectId, specId, force = false) { sendOrQueue({ type: "attention:generate", projectId, specId, force }); },
+    generate(projectId, specId) { sendOrQueue({ type: "attention:generate", projectId, specId }); },
   };
 }
 

@@ -16,7 +16,7 @@ describe("AttentionPanel", () => {
     const { client } = fakeClient();
     render(<AttentionPanel projectId="p" specId="FEAT-001" client={client} />);
     fireEvent.click(screen.getByRole("button", { name: /o que preciso fazer/i }));
-    expect(client.generate).toHaveBeenCalledWith("p", "FEAT-001", false);
+    expect(client.generate).toHaveBeenCalledWith("p", "FEAT-001");
   });
 
   it("habilita 'copiar prompt' quando o handoff chega e copia pro clipboard", () => {

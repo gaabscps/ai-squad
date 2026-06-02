@@ -63,19 +63,19 @@ export function useAttentionDiagnosis(projectId: string, specId: string, client:
     return off;
   }, [projectId, specId, client]);
 
-  const start = useCallback((force: boolean) => {
+  const start = useCallback(() => {
     textRef.current = "";
     setText("");
     setError(null);
     setCostUsd(null);
     setStreamed(false);
     setState("loading");
-    client.generate(projectId, specId, force);
+    client.generate(projectId, specId);
   }, [projectId, specId, client]);
 
   return {
     state, text, generatedAt, costUsd, streamed, error, handoff,
-    generate: () => start(false),
-    regenerate: () => start(true),
+    generate: start,
+    regenerate: start,
   };
 }
