@@ -180,7 +180,7 @@ def build_cost_report(session_dir):
     costs = session_dir / "costs"
     planning = orchestration = implementation = 0.0
     subagents = 0
-    excluded = 0
+    excluded_records = []  # (parent_session, cost_obj) for each out-of-scope agent
     unpriced = set()
     # Read-scoping anchors (Gap A): an authoritative allow-list from session.yml
     # if present, else the set of session ids that actually wrote a session-*.json
@@ -269,15 +269,24 @@ def build_cost_report(session_dir):
                 _absorb((d.get("planning") or {}).get("by_model"), "planning")
                 _absorb((d.get("orchestration") or {}).get("by_model"), "orchestration")
             elif scope == "implementation":
-                if not _agent_in_scope(_parent_session(d.get("transcript_path")),
-                                       allowed_sessions, present_sessions):
-                    excluded += 1
+                parent = _parent_session(d.get("transcript_path"))
+                if not _agent_in_scope(parent, allowed_sessions, present_sessions):
+                    excluded_records.append((parent, d))
                     continue
                 ic, iu = _phase_cost(d)
                 implementation += ic
                 unpriced |= iu
                 subagents += 1
                 _absorb(d.get("by_model"), "implementation")
+    # Sanity floor (Spec B): if scoping kept 0 subagents but excluded some, the
+    # allow-list/fallback is broken (e.g. the report ran before the orchestrator
+    # session's provenance was written), NOT contamination — contamination always
+    # leaves some legit agents standing. Never present $0 as valid here.
+    recovered = 0
+    scoping_suspect = False
+    if subagents == 0 and excluded_records:
+        scoping_suspect = True  # recovery is added in a later task
+    excluded = len(excluded_records)
     total = round(planning + orchestration + implementation, 6)
     tokens_by_type = _empty_typemap()
     cost_by_type = {t: 0.0 for t in _TOKEN_TYPES}
@@ -297,6 +306,13 @@ def build_cost_report(session_dir):
         # (foreign session/project contamination), ignored on read. Surfaced —
         # never silently dropped.
         "excluded_subagents": excluded,
+        # Implementation subagents recovered after the sanity floor tripped
+        # (Spec B); 0 in the normal path.
+        "recovered_subagents": recovered,
+        # True when scoping kept 0 subagents but excluded some AND recovery was
+        # not safe — the implementation cost is NOT trustworthy. Consumers must
+        # not treat the total as final when this is set.
+        "scoping_suspect": scoping_suspect,
         "unpriced_models": sorted(unpriced),
         # `complete` means "we actually measured something AND everything we
         # measured was priced". Zero captures (empty costs/) is NOT complete —
@@ -313,6 +329,7 @@ def build_cost_report(session_dir):
 
 
 def render_markdown(rep, task_id):
+    impl_cell = "unknown" if rep.get("scoping_suspect") else f"${rep['implementation_cost_usd']:.4f}"
     lines = [
         f"## Cost report — {task_id}",
         "",
@@ -320,11 +337,20 @@ def render_markdown(rep, task_id):
         "|---|---|---|",
         f"| Planning (spec/design/tasks) | ${rep['planning_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['planning']['total'])} |",
         f"| Orchestration (Phase 4 driver) | ${rep['orchestration_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['orchestration']['total'])} |",
-        f"| Implementation ({rep['subagent_count']} subagents) | ${rep['implementation_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['implementation']['total'])} |",
+        f"| Implementation ({rep['subagent_count']} subagents) | {impl_cell} | {fmt_tokens(rep['tokens']['by_phase']['implementation']['total'])} |",
         f"| **Total** | **${rep['total_cost_usd']:.4f}** | **{fmt_tokens(rep['tokens']['total'])}** |",
     ]
     if not rep["complete"]:
         lines += ["", f"> WARNING: Unpriced models (cost incomplete): {', '.join(rep['unpriced_models'])}"]
+    if rep.get("scoping_suspect"):
+        lines += ["", "> **WARNING — SCOPING BROKEN:** kept 0 implementation subagents "
+                      f"but excluded {rep['excluded_subagents']} cost file(s) present on disk. "
+                      "The implementation cost is NOT trustworthy — do not treat this total "
+                      "as final. See the Spec B design doc."]
+    if rep.get("recovered_subagents"):
+        lines += ["", f"> NOTE: Recovered {rep['recovered_subagents']} implementation "
+                      "subagent(s) after the scoping sanity floor tripped "
+                      "(dominant cluster + manifest witness)."]
     if rep.get("excluded_subagents"):
         lines += ["", f"> NOTE: Ignored {rep['excluded_subagents']} out-of-scope agent "
                       "cost file(s) (foreign session/project contamination)."]

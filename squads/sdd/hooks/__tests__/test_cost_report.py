@@ -360,3 +360,33 @@ def test_read_scoping_keeps_agents_without_transcript_in_fallback(tmp_path):
     rep = cr.build_cost_report(tmp_path)
     assert rep["subagent_count"] == 1
     assert rep["excluded_subagents"] == 0
+
+
+# --- Spec B: scoping resilience -------------------------------------------------
+
+def test_scoping_suspect_when_all_excluded_and_no_manifest(tmp_path):
+    # The FEAT-001 shape: an allow-list/present-set that matches nothing, so
+    # every implementation agent is excluded and 0 are kept. With NO manifest to
+    # witness a real run, the report must NOT present $0 as valid — it flags
+    # scoping_suspect and stays incomplete.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    (costs / "agent-b.json").write_text(_agent("b", "REAL", 3.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 0
+    assert rep["excluded_subagents"] == 2
+    assert rep["scoping_suspect"] is True
+    assert rep["complete"] is False
+
+
+def test_markdown_warns_and_hides_zero_when_scoping_suspect(tmp_path):
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    rep = cr.build_cost_report(tmp_path)
+    md = cr.render_markdown(rep, "FEAT-001")
+    assert "SCOPING" in md.upper()           # a loud warning line exists
+    assert "unknown" in md.lower()           # implementation cell is not a bare $0.0000
