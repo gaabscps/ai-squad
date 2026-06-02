@@ -37,6 +37,8 @@ A task enters the escalation cascade when any of these conditions holds for that
 
 Other unexpected events (malformed Output Packet, tool timeout, infrastructure error) become **synthetic blockers**: the orchestrator generates an Output Packet with `status: blocked` and dispatches the cascade for that task.
 
+> **Exception:** `missing_output_packet` from `packet_retry_max` exhaustion is marked `blocked` terminal **WITHOUT** a blocker-specialist cascade — the Output Packet never persisted, so there is no artifact to analyze; recovery is `--restart` + human review.
+
 ## The cascade — fixed order, per-task
 
 For each task that hits a trigger:
@@ -137,6 +139,7 @@ task_states:
     review_loops: 3
     qa_loops: 0
     blocker_calls: 2
+    packet_retries: 0
     last_dispatch_id: "blocker-specialist-7c2e1a"
     blocker_summary: "Spec FEAT-042/AC-003 contradicts Plan section 'Data model'"
   T-002:
@@ -144,12 +147,14 @@ task_states:
     review_loops: 1
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "qa-9f4d2b"
   T-003:
     state: "running"
     review_loops: 0
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "dev-3a8c1d"
 ```
 

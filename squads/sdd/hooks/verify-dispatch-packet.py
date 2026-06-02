@@ -16,6 +16,8 @@ missing is the artifact. The terminal safety net remains the audit gate (step 8)
 
 Pure stdlib. Python 3.8+.
 """
+from __future__ import annotations
+
 import importlib.util as _ilu
 import json
 import re
@@ -85,9 +87,10 @@ def main() -> int:
     except (json.JSONDecodeError, ValueError):
         return 0  # malformed — fail silent (never block a Task)
 
-    # The claude-hooks.json matcher already scopes this to Task; this guard is
-    # belt-and-suspenders if the hook is ever wired more broadly. None is allowed
-    # so payloads that omit tool_name (e.g. tests) still reach the subagent_type gate.
+    # The hook registrations (claude-hooks.json + skill.md frontmatter) already scope
+    # this to Task; this guard is belt-and-suspenders if the hook is ever wired more
+    # broadly. None is allowed so payloads that omit tool_name (e.g. tests) still
+    # reach the subagent_type gate.
     if payload.get("tool_name") not in (None, "Task"):
         return 0
     tool_input = tool_input_dict(payload)

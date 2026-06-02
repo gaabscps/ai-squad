@@ -31,6 +31,7 @@ task_states:
     review_loops: 1
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "qa-T-001-jkl012"
     last_diff_hash: "abc1234"
     last_findings_hash: "def5678"
@@ -42,6 +43,7 @@ task_states:
     review_loops: 0
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "qa-T-002-mno345"
     last_diff_hash: "abc1235"
     last_findings_hash: "def5679"
@@ -53,6 +55,7 @@ budget_defaults:
   review_loops_max: 3
   qa_loops_max: 2
   blocker_calls_max: 2
+  packet_retry_max: 2
 
 escalation_metrics:
   total_tasks: 2

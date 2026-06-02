@@ -2,7 +2,7 @@
 
 Referenced from `skill.md` step 1b. The manifest is the **mechanical audit trail** the audit-agent reconciles in step 8 (Outbox + GitHub required-checks pattern). It is JSON, not YAML — hook scripts parse it with Python stdlib `json` (no yaml dependency).
 
-Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write it atomically (tmp + rename) before any `Task` dispatch, and on every append.
+Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write the INITIAL manifest before any `Task` dispatch; every subsequent append goes through `manifest_append.py` (atomic tmp + rename, handled by the CLI — never hand-edited).
 
 ## Initial structure (write before any dispatch)
 
