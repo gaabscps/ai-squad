@@ -360,3 +360,120 @@ def test_read_scoping_keeps_agents_without_transcript_in_fallback(tmp_path):
     rep = cr.build_cost_report(tmp_path)
     assert rep["subagent_count"] == 1
     assert rep["excluded_subagents"] == 0
+
+
+# --- Spec B: scoping resilience -------------------------------------------------
+
+def test_scoping_suspect_when_all_excluded_and_no_manifest(tmp_path):
+    # The FEAT-001 shape: an allow-list/present-set that matches nothing, so
+    # every implementation agent is excluded and 0 are kept. With NO manifest to
+    # witness a real run, the report must NOT present $0 as valid — it flags
+    # scoping_suspect and stays incomplete.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    (costs / "agent-b.json").write_text(_agent("b", "REAL", 3.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 0
+    assert rep["excluded_subagents"] == 2
+    assert rep["scoping_suspect"] is True
+    assert rep["complete"] is False
+
+
+def test_markdown_warns_and_hides_zero_when_scoping_suspect(tmp_path):
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    rep = cr.build_cost_report(tmp_path)
+    md = cr.render_markdown(rep, "FEAT-001")
+    assert "SCOPING" in md.upper()           # a loud warning line exists
+    assert "unknown" in md.lower()           # implementation cell is not a bare $0.0000
+
+
+def _manifest(n):
+    return json.dumps({"schema_version": 1, "spec_id": "FEAT-001",
+                       "actual_dispatches": [{"dispatch_id": f"d{i}"} for i in range(n)]})
+
+
+def test_recovers_dominant_cluster_with_manifest_witness(tmp_path):
+    # FEAT-001 shape: allow-list matches nothing → all excluded, 0 kept. A
+    # manifest witnesses 3 real dispatches and the excluded agents share ONE
+    # dominant parent → safe to recover that cluster.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    (tmp_path / "dispatch-manifest.json").write_text(_manifest(3))
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    (costs / "agent-b.json").write_text(_agent("b", "REAL", 3.0))
+    (costs / "agent-c.json").write_text(_agent("c", "REAL", 1.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["scoping_suspect"] is False
+    assert rep["recovered_subagents"] == 3
+    assert rep["subagent_count"] == 3
+    assert rep["implementation_cost_usd"] == 6.0
+    assert rep["excluded_subagents"] == 0
+
+
+def test_fails_loud_when_excluded_count_dwarfs_manifest(tmp_path):
+    # A huge pile relative to what the run declared (the 2804-vs-64 shape) is
+    # contamination, not this run — do NOT recover; stay scoping_suspect.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    (tmp_path / "dispatch-manifest.json").write_text(_manifest(1))  # M=1
+    costs = tmp_path / "costs"; costs.mkdir()
+    for i in range(6):  # N=6 > 2*M
+        (costs / f"agent-{i}.json").write_text(_agent(str(i), "REAL", 1.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["scoping_suspect"] is True
+    assert rep["recovered_subagents"] == 0
+    assert rep["subagent_count"] == 0
+
+
+def test_fails_loud_when_no_dominant_cluster(tmp_path):
+    # Excluded agents spread across many parents with no clear dominant (<50%)
+    # look like heterogeneous contamination → ambiguous → fail loud.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    (tmp_path / "dispatch-manifest.json").write_text(_manifest(4))
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "P1", 1.0))
+    (costs / "agent-b.json").write_text(_agent("b", "P2", 1.0))
+    (costs / "agent-c.json").write_text(_agent("c", "P3", 1.0))
+    (costs / "agent-d.json").write_text(_agent("d", "P4", 1.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["scoping_suspect"] is True
+    assert rep["recovered_subagents"] == 0
+
+
+def test_fails_loud_when_manifest_lacks_actual_dispatches(tmp_path):
+    # A manifest present but without an actual_dispatches list is no witness
+    # (M=0) → no recovery, stay scoping_suspect. Guards the empty-dict branch.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    (tmp_path / "dispatch-manifest.json").write_text("{}")
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(_agent("a", "REAL", 2.0))
+    (costs / "agent-b.json").write_text(_agent("b", "REAL", 3.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["scoping_suspect"] is True
+    assert rep["recovered_subagents"] == 0
+    assert rep["subagent_count"] == 0
+
+
+def test_gap_a_minority_contamination_still_excluded(tmp_path):
+    # Recovery must NOT reopen GAP A: when some legit agents ARE kept (count>0),
+    # the floor never trips, so minority foreign contamination stays excluded.
+    (tmp_path / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "AAA"\n')
+    (tmp_path / "dispatch-manifest.json").write_text(_manifest(1))
+    costs = tmp_path / "costs"; costs.mkdir()
+    (costs / "agent-mine.json").write_text(_agent("mine", "AAA", 2.0))
+    (costs / "agent-foreign.json").write_text(_agent("foreign", "BBB", 99.0))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["subagent_count"] == 1
+    assert rep["implementation_cost_usd"] == 2.0
+    assert rep["excluded_subagents"] == 1
+    assert rep["scoping_suspect"] is False
+    assert rep["recovered_subagents"] == 0

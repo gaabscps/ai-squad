@@ -199,7 +199,7 @@ The audit verdict is **binding and terminal.** On `blocked`/`escalate` the orche
   print("backfilled:", cost_report.backfill_missing(session_dir, tps, pricing.load_prices()))
   PY
   ```
-  Then emit the report: `python3 .claude/hooks/cost-report.py <spec_id>` (writes `cost-report.json`, prints the planning/orchestration/implementation table). Include the one-line total in the handoff; if the audit raised `cost_capture_incomplete` OR the report's `complete` is false, flag the gap explicitly — never present an incomplete total as final.
+  Then emit the report: `python3 .claude/hooks/cost-report.py <spec_id>` (writes `cost-report.json`, prints the planning/orchestration/implementation table). Include the one-line total in the handoff; if the audit raised `cost_capture_incomplete`, OR the report's `complete` is false, OR the report's `scoping_suspect` is true, flag the gap explicitly and do NOT present the total (or the implementation figure) as final — when `scoping_suspect` is true the implementation cost was excluded wholesale and is untrustworthy.
 - Emit the handoff message (shapes + skeletons in [`handoff.md`](handoff.md)); also save to `.agent-session/<spec_id>/handoff.md`.
 
 ## Output

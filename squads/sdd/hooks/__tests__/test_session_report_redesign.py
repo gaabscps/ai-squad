@@ -128,6 +128,28 @@ def test_dashboard_has_verdict_and_svg(tmp_path):
     assert "<svg" in html
 
 
+def test_dashboard_flags_scoping_suspect(tmp_path):
+    # Spec B: when scoping excluded every subagent (broken allow-list, no
+    # manifest to recover) the HTML must NOT show implementation $0.00 as valid —
+    # it shows "unknown" and a loud scoping-broken warning (mirrors the markdown).
+    sd = tmp_path / ".agent-session" / "FEAT-001"
+    sd.mkdir(parents=True)
+    (sd / "session.yml").write_text(
+        'id: FEAT-001\nimplementation_sessions:\n  - "WRONG"\n')
+    costs = sd / "costs"; costs.mkdir()
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "agent_id": "a", "total_cost_usd": 9.0,
+        "transcript_path": "/u/.claude/projects/-rep/REAL/subagents/agent-a.jsonl",
+        "unpriced_models": []}))
+    _packet(sd, "d-T-001-dev-l1", task_id="T-001", role="dev", status="done",
+            summary="x", files_changed=["A.java"])
+    html = session_report.build_html_report(sd, diff_provider=lambda f: "")
+    assert html is not None
+    assert "scoping broken" in html.lower()
+    assert "implementation unknown" in html.lower()
+    assert "implementation $0.00" not in html.lower()
+
+
 def test_narrative_present_per_task(tmp_path):
     html = _build(tmp_path)
     assert "narrative" in html

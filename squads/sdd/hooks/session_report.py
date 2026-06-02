@@ -245,6 +245,11 @@ def _dashboard(rep, task_verdicts, open_count, ac_count):
     open_lbl = f"{open_count} open finding" if open_count == 1 else f"{open_count} open findings"
     cost_warn = ("" if rep["complete"]
                  else "<div class='legend warn'>⚠ cost incomplete</div>")
+    if rep.get("scoping_suspect"):
+        cost_warn = ("<div class='legend warn'>⚠ scoping broken — implementation "
+                     "cost untrustworthy</div>")
+    impl_amt = ("unknown" if rep.get("scoping_suspect")
+                else f"${rep['implementation_cost_usd']:.2f}")
     return (
         "<section class='dash'>"
         f"<div class='kpi'><div class='lbl'>Verdict</div>"
@@ -258,7 +263,7 @@ def _dashboard(rep, task_verdicts, open_count, ac_count):
         f"{_cost_bar(rep)}"
         f"<div class='legend'>🔵 planning ${rep['planning_cost_usd']:.2f} · "
         f"🔷 orchestration ${rep['orchestration_cost_usd']:.2f} · "
-        f"🟢 implementation ${rep['implementation_cost_usd']:.2f} ({rep['subagent_count']} subagents)</div>"
+        f"🟢 implementation {impl_amt} ({rep['subagent_count']} subagents)</div>"
         f"{cost_warn}</div>"
         f"<div class='kpi'><div class='lbl'>Findings · AC coverage</div>"
         f"<div class='big'>{open_count} <span class='unit'>open</span></div>"

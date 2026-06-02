@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""ai-squad Stop hook — register-impl-session.
+"""ai-squad PreToolUse(Task) hook — register-impl-session.
 
-Wired to the orchestrator Skill's frontmatter (Stop). Fires when a session
-running the orchestrator Skill ends, and records that session's own id (taken
-from the hook payload — therefore trustworthy, never an mtime guess) into
+Wired (Claude Code) under PreToolUse with matcher `Task`. Fires on each Task
+dispatch from an orchestrator session and records that session's own id (from
+the hook payload — therefore trustworthy, never an mtime guess) into
 `implementation_sessions:` in the active feature's session.yml.
 
-Why this exists: build_cost_report scopes which subagents belong to a feature
-by their parent session id. Subagents dispatched by the orchestrator live under
-THIS session id, so recording it lets the cost report ignore historical
-contamination (other projects'/sessions' agent files that leaked into costs/)
-on READ — no manual deletion. See cost_report._read_implementation_sessions.
+Why at first-dispatch, not at Stop: build_cost_report scopes which subagents
+belong to a feature by their parent session id, and the cost report is emitted
+at handoff time — BEFORE the session ends. Registering at Stop wrote this
+provenance too late (the report had already run and excluded every subagent —
+the FEAT-001 "$0 implementation" bug). PreToolUse(Task) fires before the first
+dispatch, so the allow-list exists before the report. See
+cost_report._read_implementation_sessions.
 
-Authoritative-write rationale: this hook is declared on the orchestrator Skill,
-so it fires ONLY from an orchestrator session. Unlike the global, mtime-based
-capture-session-cost hook (which guesses the active feature), the session id
-here is the real dispatcher of the feature's subagents.
+Skill-scope gated to `orchestrator` (the only authoritative source of the
+implementation session id) and idempotent + accumulative: each orchestrator
+session that dispatches registers its own id once; a --resume run adds the
+resumed session too, so no dispatching session is ever orphaned.
 
-Idempotent + fail-open: never blocks the orchestrator's stop. Pure stdlib.
+Fail-open: never blocks the dispatch. Pure stdlib.
 """
 import json
 import re
@@ -74,7 +76,7 @@ def main() -> int:
     except Exception:
         return 0
     # Skill-scope gate: only an orchestrator session is an authoritative source
-    # of the implementation session id. Any other session's Stop is ignored.
+    # of the implementation session id. Any other session's dispatch is ignored.
     if detect_active_skill(payload) != "orchestrator":
         return 0
     session_id = payload.get("session_id")
@@ -83,13 +85,9 @@ def main() -> int:
     session_dir = find_active_session(resolve_project_root(payload))
     if session_dir is None:
         return 0
-    # Only register when a Phase 4 pipeline actually ran (manifest present) —
-    # an orchestrator session that dispatched nothing has no subagents to scope.
-    if not (session_dir / "dispatch-manifest.json").exists():
-        return 0
     try:
         register_session(session_dir / "session.yml", session_id)
-    except Exception as e:  # fail-open — never block the orchestrator's stop
+    except Exception as e:  # fail-open — never block the dispatch
         print(f"register-impl-session: {e}", file=sys.stderr)
     return 0
 
