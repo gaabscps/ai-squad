@@ -28,6 +28,41 @@ def test_dirty_paths_lists_modified_and_untracked(tmp_path):
     assert got == ["new.txt", "tracked.txt"]        # sorted
 
 
+def test_dirty_paths_lists_untracked_files_in_new_dir(tmp_path):
+    # `git status --porcelain` collapses an entirely-untracked DIR to "src/";
+    # --untracked-files=all expands it to each file, so reconciliation against
+    # file-level dev-packet `files_changed[]` works.
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "t@t")
+    _git(tmp_path, "config", "user.name", "t")
+    (tmp_path / "seed.txt").write_text("s\n")
+    _git(tmp_path, "add", "seed.txt")
+    _git(tmp_path, "commit", "-m", "init")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.ts").write_text("x\n")
+    (tmp_path / "src" / "b.ts").write_text("y\n")
+    got = ab.dirty_paths(tmp_path)
+    assert got == ["src/a.ts", "src/b.ts"]          # file-level, not ["src/"]
+
+
+def test_dirty_paths_excludes_agent_session(tmp_path):
+    # .agent-session/ is orchestrator/subagent-managed runtime state — never a
+    # source-ownership concern. Excluded in the helper so Check 6 (Haiku) never
+    # has to re-filter it.
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "t@t")
+    _git(tmp_path, "config", "user.name", "t")
+    (tmp_path / "seed.txt").write_text("s\n")
+    _git(tmp_path, "add", "seed.txt")
+    _git(tmp_path, "commit", "-m", "init")
+    sess = tmp_path / ".agent-session" / "FEAT-001"
+    sess.mkdir(parents=True)
+    (sess / "session.yml").write_text("id: FEAT-001\n")
+    (tmp_path / "src.ts").write_text("x\n")
+    got = ab.dirty_paths(tmp_path)
+    assert got == ["src.ts"]                        # .agent-session/ churn excluded
+
+
 def test_dirty_paths_empty_outside_git(tmp_path):
     # Not a work tree -> best-effort empty, never a crash.
     assert ab.dirty_paths(tmp_path) == []

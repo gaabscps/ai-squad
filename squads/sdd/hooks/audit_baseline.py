@@ -26,15 +26,24 @@ BASELINE_FILENAME = "audit-baseline.json"
 def dirty_paths(project_dir) -> list:
     """Repo-relative paths currently dirty in the working tree.
 
-    Uses `git status --porcelain` — the unified notion of "dirty" shared by the
-    baseline snapshot and Check 6 (the legacy Check 6 used `git diff --name-only
-    HEAD`, which ignored untracked files; porcelain covers both, so the
-    subtraction is exact). Returns a sorted list. Any git failure (not a work
-    tree, git missing) yields [] — callers treat that as best-effort, never crash.
+    Uses `git status --porcelain --untracked-files=all` — the unified notion of
+    "dirty" shared by the baseline snapshot and Check 6 (the legacy Check 6 used
+    `git diff --name-only HEAD`, which ignored untracked files; porcelain covers
+    both, so the subtraction is exact). `--untracked-files=all` is required: plain
+    porcelain collapses an entirely-untracked directory to "dir/", which would
+    never line up with the file-level paths in a dev packet's `files_changed[]`.
+
+    Excludes `.agent-session/` — orchestrator/subagent-managed runtime state,
+    never a source-ownership concern. Filtering it here keeps the mechanical
+    exclusion out of the audit-agent LLM (Check 6 never has to re-filter).
+
+    Returns a sorted list. Any git failure (not a work tree, git missing) yields
+    [] — callers treat that as best-effort, never crash.
     """
     try:
         out = subprocess.run(
-            ["git", "-C", str(project_dir), "status", "--porcelain"],
+            ["git", "-C", str(project_dir), "status", "--porcelain",
+             "--untracked-files=all"],
             capture_output=True, text=True, timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
@@ -48,6 +57,8 @@ def dirty_paths(project_dir) -> list:
         path = line[3:]                       # strip the 2-char XY status + space
         if " -> " in path:                    # renamed: "ORIG -> NEW"; keep NEW
             path = path.split(" -> ", 1)[1]
+        if path == ".agent-session" or path.startswith(".agent-session/"):
+            continue                          # orchestrator-managed; not ownership
         paths.add(path)
     return sorted(paths)
 
