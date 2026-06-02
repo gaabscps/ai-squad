@@ -479,6 +479,52 @@ def test_gap_a_minority_contamination_still_excluded(tmp_path):
     assert rep["recovered_subagents"] == 0
 
 
+def _make_costs(session_dir):
+    costs = session_dir / "costs"
+    costs.mkdir(parents=True)
+    (costs / "session-s1.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {"total_cost_usd": 4.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 1.0, "unpriced_models": []},
+    }))
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 2.0, "agent_id": "a", "unpriced_models": []}))
+
+
+def test_write_cost_report_json_writes_file_with_metadata(tmp_path):
+    session_dir = tmp_path / "FEAT-001"
+    _make_costs(session_dir)
+
+    rep = cr.write_cost_report_json(session_dir)
+
+    out = session_dir / "cost-report.json"
+    assert out.is_file()
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["spec_id"] == "FEAT-001"
+    assert written["generated_at"].endswith("+00:00")  # ISO 8601 UTC
+    assert written["total_cost_usd"] == rep["total_cost_usd"]
+    assert "scoping_suspect" in written
+
+
+def test_write_cost_report_json_is_atomic_no_tmp_left(tmp_path):
+    session_dir = tmp_path / "FEAT-002"
+    _make_costs(session_dir)
+
+    cr.write_cost_report_json(session_dir)
+
+    assert not (session_dir / "cost-report.json.tmp").exists()
+
+
+def test_write_cost_report_json_guards_when_no_costs(tmp_path):
+    session_dir = tmp_path / "FEAT-003"
+    session_dir.mkdir()
+
+    result = cr.write_cost_report_json(session_dir)
+
+    assert result is None
+    assert not (session_dir / "cost-report.json").exists()
+
+
 def test_cost_report_schema_is_valid_and_declares_required_keys():
     schema_path = (Path(__file__).resolve().parents[4]
                    / "shared" / "schemas" / "cost-report.schema.json")

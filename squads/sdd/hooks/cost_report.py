@@ -1,5 +1,6 @@
 """Aggregate per-agent + session cost files into one report. Pure stdlib."""
 import json
+from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path
@@ -376,6 +377,28 @@ def build_cost_report(session_dir):
             "by_type": {t: round(cost_by_type[t], 6) for t in _TOKEN_TYPES},
         },
     }
+
+
+def write_cost_report_json(session_dir):
+    """Build the scoped cost report and persist it atomically as
+    <session_dir>/cost-report.json — the single source of truth for observers.
+
+    Returns the report dict, or None when no cost data exists (no costs/ dir),
+    mirroring build_html_report's guard so the JSON and report.html appear or
+    are absent together. Adds spec_id + generated_at as emission metadata
+    without touching the cost numbers or scoping logic.
+    """
+    session_dir = Path(session_dir)
+    if not (session_dir / "costs").is_dir():
+        return None
+    rep = build_cost_report(session_dir)
+    rep["spec_id"] = session_dir.name
+    rep["generated_at"] = datetime.now(timezone.utc).isoformat()
+    out = session_dir / "cost-report.json"
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(rep, indent=2), encoding="utf-8")
+    tmp.replace(out)  # atomic
+    return rep
 
 
 def render_markdown(rep, task_id):
