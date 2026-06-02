@@ -37,6 +37,8 @@ A task enters the escalation cascade when any of these conditions holds for that
 
 Other unexpected events (malformed Output Packet, tool timeout, infrastructure error) become **synthetic blockers**: the orchestrator generates an Output Packet with `status: blocked` and dispatches the cascade for that task.
 
+> **Exception:** `missing_output_packet` from `packet_retry_max` exhaustion is marked `blocked` terminal **WITHOUT** a blocker-specialist cascade — the Output Packet never persisted, so there is no artifact to analyze; recovery is `--restart` + human review.
+
 ## The cascade — fixed order, per-task
 
 For each task that hits a trigger:
@@ -114,6 +116,7 @@ These live per-task in `session.yml`. They are independent across tasks.
 | `review_loops_max` | **3** | Each `dev → reviewers → dev` round | Reflexion (Shinn et al., NeurIPS 2023) — canonical `max_trials=3` |
 | `qa_loops_max` | **2** | Each `qa → dev` round (when qa fails and orchestrator loops back) | Conservative — qa is broader scope than review; cheaper to escalate sooner |
 | `blocker_calls_max` | **2** | Each `blocker-specialist` dispatch for the same task | Anthropic Claude Code's "3 denials → human" pattern — 2 chances for the specialist before human |
+| `packet_retry_max` | **2** | Each re-dispatch when the same role's Output Packet did not persist or was invalid (infra failure, not code difficulty); distinct from review/qa loop caps; exceeded → task blocked terminally (`missing_output_packet`) | Conservative infra-failure budget — 2 retries covers transient platform anomalies without masking persistent failures |
 
 **Total worst-case dispatches of `dev` per task:** 1 (initial) + 3 (review loops) + 2 (qa loops) = **6 dispatches max per task**. Comfortable for Max 5x.
 
@@ -136,6 +139,7 @@ task_states:
     review_loops: 3
     qa_loops: 0
     blocker_calls: 2
+    packet_retries: 0
     last_dispatch_id: "blocker-specialist-7c2e1a"
     blocker_summary: "Spec FEAT-042/AC-003 contradicts Plan section 'Data model'"
   T-002:
@@ -143,12 +147,14 @@ task_states:
     review_loops: 1
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "qa-9f4d2b"
   T-003:
     state: "running"
     review_loops: 0
     qa_loops: 0
     blocker_calls: 0
+    packet_retries: 0
     last_dispatch_id: "dev-3a8c1d"
 ```
 

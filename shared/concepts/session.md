@@ -207,6 +207,7 @@ task_states:
     review_loops: 3
     qa_loops: 0
     blocker_calls: 2
+    packet_retries: 0                                # re-dispatches due to missing/invalid Output Packet (cap: packet_retry_max=2); separate from review_loops/qa_loops — infra failure, not code difficulty; exceeded → task blocked (missing_output_packet); preserved on --resume
     last_dispatch_id: "blocker-specialist-7c2e1a"
     last_diff_hash: ""                             # progress detection: files_changed + line ranges
     last_findings_hash: ""                         # progress detection: findings count

@@ -26,6 +26,12 @@ hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/register-impl-session.py"'
           timeout: 5
+  PostToolUse:
+    - matcher: "Task"
+      hooks:
+        - type: command
+          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py"'
+          timeout: 10
 ---
 
 # Orchestrator — Phase 4 (Implementation)
@@ -56,7 +62,7 @@ repo_root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || 
 hooks_dir="$repo_root/.claude/hooks"
 # Positional params ($@) keep iteration shell-agnostic (a bare `for f in $required`
 # word-splits in bash but not zsh).
-set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py
+set -- verify-audit-dispatch.py guard-session-scope.py block-git-write.py verify-tier-calibration.py verify-output-packet.py verify-reviewer-write-path.py manifest_append.py
 missing=""
 for f in "$@"; do
   [ -f "$hooks_dir/$f" ] || missing="$missing $f"
@@ -112,11 +118,11 @@ This is the **only** case in which the orchestrator may add a phase to `planned_
 2a. Read `session.yml.pipeline_mode` (default `standard`; valid: `lite` | `standard`). It governs two clamps in this skill: the **fan-out cap** (step 3 — `lite` = sequential, `standard` = 5) and the **tier ceiling** (model/effort — `lite` clamps every task to T2 max; `standard` honors the declared tier). Per-task skip-reviewers markers are honored in both modes.
 2b. Read `session.yml.output_locale` (default `en`). Copied verbatim into every Work Packet's stable block and used to write `handoff.md` (step 9). Enums/identifiers stay canonical regardless. See [`shared/concepts/output-locale.md`](../../../shared/concepts/output-locale.md).
 3. **Preflight: validate `ac_scope` and `Tier:` on every task.** Before any dispatch, iterate every `T-XXX` in `tasks.md`. Abort if any task is missing `ac_scope` (`"Task <T-XXX> in tasks.md missing required ac_scope field"`) or `Tier:` (`"Task <T-XXX> in tasks.md missing required Tier field — required by orchestrator model/effort calibration"`). `ac_scope` is needed to populate `acScope` in `expected_pipeline[]` (reviewers/qa scope their work by it); `Tier` drives model/effort selection (step 3). Silently defaulting either defeats downstream calibration.
-4. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, loops=0, hashes=null) — fresh start only; `--resume` preserves existing entries.
+4. Initialize `task_states` map in `session.yml` with one entry per `T-XXX` (state=`pending`, review_loops=0, qa_loops=0, blocker_calls=0, packet_retries=0, hashes=null) — fresh start only; `--resume` preserves existing entries (including `packet_retries`).
 5. Set `pipeline_started_at` (or leave intact on `--resume`).
 
 ### 1b. Write the dispatch manifest (Outbox + GitHub required-checks pattern)
-Before any `Task` dispatch, atomically write `.agent-session/<spec_id>/dispatch-manifest.json`, then append to it after every dispatch. Full schema, field rules, and `--resume` behavior: [`dispatch-manifest.md`](dispatch-manifest.md). Manifest-first, dispatch-second — it is the audit trail step 8 reconciles.
+Before any `Task` dispatch, write `.agent-session/<spec_id>/dispatch-manifest.json` with its initial structure (`expected_pipeline` + empty `actual_dispatches`). After every dispatch, append the dispatch entry by piping it to `manifest_append.py` — NEVER hand-edit the manifest JSON (by-hand edits corrupted it in FEAT-001). Full schema, the CLI call, field rules, and `--resume` behavior: [`dispatch-manifest.md`](dispatch-manifest.md). Manifest-first, dispatch-second — it is the audit trail step 8 reconciles.
 
 ### 2. Build the per-task pipeline graph
 For each `T-XXX`: compute edges from `Depends on:` constraints; mark `[P]` tasks eligible for parallel dispatch within their phase (subject to predecessors being `done`). Independent tasks form the **ready queue**; dependent tasks wait for predecessors.
@@ -130,6 +136,7 @@ While the ready queue is non-empty OR any task is in-flight:
 - Take up to N dispatches (N = 5 standard / 1 lite) from the ready queue. Build each Work Packet per [`dispatch-contract.md`](dispatch-contract.md), and select `model`/`effort` per [`model-effort-calibration.md`](model-effort-calibration.md). **Pass the Task tool's `model` parameter** — omitting it runs the subagent on the orchestrator's model and `verify-tier-calibration.py` blocks the dispatch.
 - **Issue all N `Task` calls in a single assistant turn.** Never dispatch one, wait, then the next.
 - Tasks beyond the cap wait in the FIFO queue; it refills only after the in-flight batch returns.
+- **Packet-integrity check (C-1):** after the batch returns, the `PostToolUse(Task)` hook (`verify-dispatch-packet.py`) emits `additionalContext` for any dispatch whose Output Packet did not persist or is invalid. For each such `dispatch_id`, run the packet-retry handling in step 4 BEFORE merging state — a missing packet means there is no state to merge yet.
 - When the batch returns: for each Output Packet run step 4 (state merge), step 5 (progress check), step 6 (cascade if needed). Then re-evaluate the ready queue and issue the next batch in one turn.
 
 ### 4. Per-task state machine (orchestrator-managed, atomic write)
@@ -141,6 +148,13 @@ Each task: `pending` → `running` → (`done` | `blocked` | `pending_human` | `
 - Any cap hit OR `status: blocked` from any Subagent → cascade to `blocker-specialist` (cap: `blocker_calls_max=2` per task).
 
 After every Subagent return: atomically update `session.yml.task_states[T-XXX]` (tmp + rename). Sole-writer invariant = no race.
+
+**Packet-retry handling (C-1 — missing/invalid Output Packet).** When `verify-dispatch-packet.py` flags a `dispatch_id` (packet missing or invalid after the Task returned — typically an abrupt subagent death from a platform anomaly):
+1. Increment `task_states[T-XXX].packet_retries` (atomic write). This counter is SEPARATE from `review_loops`/`qa_loops` — a non-delivered artifact is an infra failure, not code difficulty; it must not consume the review budget.
+2. If `packet_retries <= packet_retry_max` (=2): re-dispatch the SAME role for the SAME task with a NEW `dispatch_id` (new loop suffix), append the new dispatch to the manifest via `manifest_append.py`, and dispatch the `Task`. Applies to EVERY role, including `dev` — dev is already re-dispatched in review loops and re-reads current state; any half-applied edit is caught downstream by reviewers/qa/baseline.
+3. If `packet_retries > packet_retry_max`: mark the task `blocked` (terminal) with `blocker_kind: missing_output_packet`. Do NOT cascade to blocker-specialist (the artifact never landed — there is nothing to analyze). The audit gate (step 8) will see it; recovery is `--restart` + human review.
+
+`packet_retries` does NOT count toward `review_loops_max`, `qa_loops_max`, or progress-stall detection.
 
 **Reviewer mandatoriness (FEAT-008 Gap B):** code-reviewer and logic-reviewer are **mandatory** between `dev` and `qa` for every dev-type task. `verify-pipeline-completeness.py` (PreToolUse Task) blocks the `qa` dispatch unless CR + LR have status `done`/`needs_review` in the manifest for that `task_id`. The only exception is an explicit per-task marker in `tasks.md` (e.g. for a one-line/doc-only fix):
 ```markdown
@@ -215,5 +229,6 @@ The audit verdict is **binding and terminal.** On `blocked`/`escalate` the orche
 - Never: re-dispatch `audit-agent` in the same run to flip a `blocked` verdict. One audit per run; terminal. (Re-running over hand-edited packets was the FEAT-010 failure.)
 - Never: emit a "uniform success" or "mixed status" handoff if the audit returned `blocked`/`escalate`. Emit the audit-failure handoff instead.
 - Never: append to `actual_dispatches[]` without a corresponding real `Task` dispatch.
+- Never: hand-edit `dispatch-manifest.json` with Edit/Write. Append only via `manifest_append.py` (atomic). By-hand JSON editing corrupted the manifest in FEAT-001.
 - Always: write the dispatch manifest (step 1b) BEFORE any `Task` dispatch. Manifest-first; dispatch-second.
 - Always: run the audit gate even on uniform-success runs. One cheap haiku dispatch; the protection is non-negotiable.

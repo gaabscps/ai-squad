@@ -96,6 +96,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-dispatch-packet.py\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

@@ -2,7 +2,7 @@
 
 Referenced from `skill.md` step 1b. The manifest is the **mechanical audit trail** the audit-agent reconciles in step 8 (Outbox + GitHub required-checks pattern). It is JSON, not YAML — hook scripts parse it with Python stdlib `json` (no yaml dependency).
 
-Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write it atomically (tmp + rename) before any `Task` dispatch, and on every append.
+Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write the INITIAL manifest before any `Task` dispatch; every subsequent append goes through `manifest_append.py` (atomic tmp + rename, handled by the CLI — never hand-edited).
 
 ## Initial structure (write before any dispatch)
 
@@ -37,6 +37,16 @@ Path: `.agent-session/<spec_id>/dispatch-manifest.json`. Write it atomically (tm
 ```
 
 ## After every `Task` dispatch, append to `actual_dispatches[]`
+
+NEVER hand-edit the manifest JSON. Append the entry by piping it to the atomic
+CLI (it wraps a tmp + rename + sidecar-lock write that cannot corrupt the file):
+
+```sh
+printf '%s' '<dispatch entry JSON>' | python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/manifest_append.py" .agent-session/<spec_id>/dispatch-manifest.json
+```
+
+The entry has the shape below. A non-zero exit means the append failed (e.g.
+manifest missing) — surface it; do not retry by editing the file by hand.
 
 ```json
 {

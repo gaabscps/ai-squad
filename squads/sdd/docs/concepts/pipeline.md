@@ -123,6 +123,7 @@ Counted in `session.yml`'s `task_states[T-XXX]`:
 | `review_loops_max` | **3** | Each `dev → reviewers → dev` round for this task |
 | `qa_loops_max` | **2** | Each `qa → dev` round for this task |
 | `blocker_calls_max` | **2** | Each `blocker-specialist` dispatch for this task |
+| `packet_retry_max` | **2** | Each re-dispatch of the same role when its Output Packet did not persist or was invalid (abrupt subagent death / platform anomaly); separate from review/qa loops; exceeded → task blocked (`missing_output_packet`) |
 
 Defaults backed by industry research (Reflexion `max_trials=3`; Anthropic Claude Code "3 denials → human"). See [`escalation.md`](escalation.md) for sources.
 
