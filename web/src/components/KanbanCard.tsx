@@ -39,6 +39,7 @@ export function KanbanCard({
       <div className="kcard-meta">
         <span className="kcard-cost">
           {fmtTokens(spec.cost.totalTokens)} tok · {fmtUsd(spec.cost.totalCostUsd)}
+          {spec.cost.source === "preliminary" && <span className="cost-preliminary"> · prelim.</span>}
         </span>
         <time className="kcard-time">{fmtRelativeTime(spec.lastActivityAt)}</time>
       </div>

@@ -89,6 +89,9 @@ export function SpecTable({
             <td>{it.spec.phase}</td>
             <td className="mono">
               {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
+              {it.spec.cost.source === "preliminary" && (
+                <span className="cost-preliminary"> · prelim.</span>
+              )}
             </td>
             <td>{fmtRelativeTime(it.spec.lastActivityAt)}</td>
             <td>
