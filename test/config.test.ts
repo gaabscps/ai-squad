@@ -22,7 +22,7 @@ describe("loadConfig", () => {
 
   it("devolve defaults vazios quando o arquivo não existe", () => {
     const c = loadConfig(join(tmpdir(), "nao-existe-aios-xyz.json"));
-    expect(c).toEqual({ roots: [], include: [], hide: [] });
+    expect(c).toEqual({ roots: [], include: [], hide: [], archiveAfterDays: 7 });
   });
 
   it("expande ~ nas roots (Node não faz isso sozinho)", () => {
@@ -33,6 +33,16 @@ describe("loadConfig", () => {
   it("expande ~ no include (análogo às roots)", () => {
     const p = tmpConfig(JSON.stringify({ include: ["~/Other"] }));
     expect(loadConfig(p).include[0]).toBe(join(homedir(), "Other"));
+  });
+
+  it("lê archiveAfterDays quando presente", () => {
+    const p = tmpConfig(JSON.stringify({ archiveAfterDays: 14 }));
+    expect(loadConfig(p).archiveAfterDays).toBe(14);
+  });
+
+  it("default archiveAfterDays = 7 quando ausente", () => {
+    const p = tmpConfig(JSON.stringify({ roots: ["/x"] }));
+    expect(loadConfig(p).archiveAfterDays).toBe(7);
   });
 });
 
@@ -51,5 +61,11 @@ describe("saveHidden", () => {
     saveHidden(p, ["/x/foo"]);
     const reread = JSON.parse(readFileSync(p, "utf-8"));
     expect(reread.include).toEqual(["/y"]); // include não é tocado pelo saveHidden
+  });
+
+  it("preserva archiveAfterDays após o save", () => {
+    const p = tmpConfig(JSON.stringify({ roots: [], include: [], hide: [], archiveAfterDays: 14 }));
+    saveHidden(p, ["/x/foo"]);
+    expect(JSON.parse(readFileSync(p, "utf-8")).archiveAfterDays).toBe(14);
   });
 });

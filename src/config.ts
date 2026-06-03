@@ -6,9 +6,10 @@ export interface AiosConfig {
   roots: string[]; // pastas-raiz pra auto-scan
   include: string[]; // paths avulsos de projeto, fora das roots
   hide: string[]; // names ou paths de projeto a ocultar (persistido)
+  archiveAfterDays: number; // dias após concluir até a feature done sair do board
 }
 
-const DEFAULTS: AiosConfig = { roots: [], include: [], hide: [] };
+const DEFAULTS: AiosConfig = { roots: [], include: [], hide: [], archiveAfterDays: 7 };
 
 /** Expande um ~ inicial para o home do usuário (Node não faz isso sozinho). */
 export function expandTilde(p: string): string {
@@ -30,6 +31,7 @@ export function loadConfig(configPath: string): AiosConfig {
     roots: (raw.roots ?? []).map(expandTilde),
     include: (raw.include ?? []).map(expandTilde),
     hide: raw.hide ?? [],
+    archiveAfterDays: raw.archiveAfterDays ?? 7,
   };
 }
 
@@ -52,6 +54,7 @@ export function saveHidden(configPath: string, hide: string[]): void {
     roots: current.roots ?? [],
     include: current.include ?? [],
     hide,
+    archiveAfterDays: current.archiveAfterDays ?? 7,
   };
   writeFileSync(configPath, JSON.stringify(next, null, 2) + "\n", "utf-8");
 }
