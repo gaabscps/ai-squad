@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 _LIB = Path(__file__).resolve().parent.parent
@@ -523,10 +525,6 @@ def test_write_cost_report_json_guards_when_no_costs(tmp_path):
 
     assert result is None
     assert not (session_dir / "cost-report.json").exists()
-
-
-import subprocess
-import sys
 
 
 def test_cli_writes_cost_report_json(tmp_path):
