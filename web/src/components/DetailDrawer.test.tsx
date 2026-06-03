@@ -76,8 +76,8 @@ describe("DetailDrawer", () => {
         byPhase: { planning: 6.5, orchestration: 1, implementation: 2 },
       }),
     });
-    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    const phases = document.querySelector(".drawer-cost-phases")!;
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const phases = container.querySelector(".drawer-cost-phases")!;
     expect(within(phases as HTMLElement).getByText("planning")).toBeInTheDocument();
     expect(within(phases as HTMLElement).getByText("orchestration")).toBeInTheDocument();
     expect(within(phases as HTMLElement).getByText("implementation")).toBeInTheDocument();
@@ -92,8 +92,8 @@ describe("DetailDrawer", () => {
         byPhase: { planning: 6.5, orchestration: 1, implementation: null },
       }),
     });
-    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    const phases = document.querySelector(".drawer-cost-phases")!;
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const phases = container.querySelector(".drawer-cost-phases")!;
     const implRow = within(phases as HTMLElement).getByText("implementation").closest("div")!;
     expect(implRow).toHaveTextContent("—");
   });
