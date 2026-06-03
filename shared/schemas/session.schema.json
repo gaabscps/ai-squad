@@ -51,6 +51,7 @@
     },
     "budget_defaults": {
       "type": "object",
+      "additionalProperties": false,
       "description": "Loop budget caps for Phase 4, inherited by task_states unless overridden per dispatch.",
       "properties": {
         "review_loops_max": { "type": "integer", "minimum": 0, "description": "Max review loops per task before escalation." },
@@ -60,6 +61,7 @@
     },
     "escalation_metrics": {
       "type": "object",
+      "additionalProperties": false,
       "description": "Aggregate escalation health for this run.",
       "properties": {
         "total_tasks": { "type": "integer", "minimum": 0, "description": "Total tasks in the pipeline." },
