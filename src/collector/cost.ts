@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CostRollup } from "../store/types.js";
+import { readCostReport } from "./cost-report.js";
 
 interface RawModelUsage {
   input_tokens?: number;
@@ -14,30 +15,30 @@ interface RawCostFile {
   unpriced_models?: string[];
 }
 
-function emptyRollup(reportPath: string | null): CostRollup {
-  return {
+interface RawSum {
+  totalCostUsd: number | null;
+  partial: boolean;
+  tokens: { input: number; output: number; cacheRead: number; cacheCreation: number };
+  totalTokens: number;
+  hasData: boolean;
+}
+
+/**
+ * Soma crua dos costs/*.json — o plano B quando não há cost-report.json (ou
+ * quando ele não traz bloco de tokens). NUNCA aplica pricing; só soma números já
+ * gravados. Read-only.
+ */
+function sumRawCosts(costsDir: string): RawSum {
+  const empty: RawSum = {
     totalCostUsd: null,
     partial: false,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
     totalTokens: 0,
-    reportPath,
+    hasData: false,
   };
-}
-
-/**
- * Soma os custos JÁ GRAVADOS nos costs/*.json de uma Session.
- * NUNCA aplica pricing — apenas soma total_cost_usd e tokens já persistidos,
- * exatamente como o report do ai-squad faz. Read-only.
- */
-export function readCostRollup(specDir: string): CostRollup {
-  const reportPath = existsSync(join(specDir, "report.html"))
-    ? join(specDir, "report.html")
-    : null;
-  const costsDir = join(specDir, "costs");
-  if (!existsSync(costsDir)) return emptyRollup(reportPath);
-
+  if (!existsSync(costsDir)) return empty;
   const files = readdirSync(costsDir).filter((f) => f.endsWith(".json"));
-  if (files.length === 0) return emptyRollup(reportPath);
+  if (files.length === 0) return empty;
 
   let totalCostUsd: number | null = null;
   let partial = false;
@@ -51,8 +52,7 @@ export function readCostRollup(specDir: string): CostRollup {
       continue; // arquivo corrompido: ignora, não inventa número
     }
     if (typeof raw.total_cost_usd === "number") totalCostUsd = (totalCostUsd ?? 0) + raw.total_cost_usd;
-    if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0)
-      partial = true;
+    if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0) partial = true;
     for (const usage of Object.values(raw.by_model ?? {})) {
       tokens.input += usage.input_tokens ?? 0;
       tokens.output += usage.output_tokens ?? 0;
@@ -61,7 +61,58 @@ export function readCostRollup(specDir: string): CostRollup {
     }
   }
 
-  const totalTokens =
-    tokens.input + tokens.output + tokens.cacheRead + tokens.cacheCreation;
-  return { totalCostUsd, partial, tokens, totalTokens, reportPath };
+  const totalTokens = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheCreation;
+  return { totalCostUsd, partial, tokens, totalTokens, hasData: true };
+}
+
+/**
+ * Custo de uma Session. Se existe cost-report.json válido (artefato canônico/
+ * escopado da pipeline), ele é a fonte de verdade (source="authoritative"); senão
+ * cai na soma crua dos costs/*.json (source="preliminary") ou vazio. Read-only.
+ */
+export function readCostRollup(specDir: string): CostRollup {
+  const reportPath = existsSync(join(specDir, "report.html"))
+    ? join(specDir, "report.html")
+    : null;
+
+  const report = readCostReport(specDir);
+
+  if (report) {
+    // Usa tokens do report só quando há breakdown E total (caso canônico); se
+    // qualquer um faltar, cai TODO na soma crua, pra breakdown e total virem da
+    // mesma fonte (D2 + I1). report.tokens null = sem bloco; totalTokens null =
+    // bloco presente mas sem `total`.
+    const reportHasTokens = report.tokens !== null && report.totalTokens !== null;
+    const raw = reportHasTokens ? null : sumRawCosts(join(specDir, "costs"));
+    const tokens = reportHasTokens ? report.tokens! : raw!.tokens;
+    const totalTokens = reportHasTokens ? report.totalTokens! : raw!.totalTokens;
+    return {
+      totalCostUsd: report.totalCostUsd,
+      partial: report.partial,
+      tokens,
+      totalTokens,
+      reportPath,
+      source: "authoritative",
+      scopingSuspect: report.scopingSuspect,
+      excludedSubagents: report.excludedSubagents,
+      recoveredSubagents: report.recoveredSubagents,
+      byPhase: report.byPhase,
+      complete: report.complete,
+    };
+  }
+
+  const raw = sumRawCosts(join(specDir, "costs"));
+  return {
+    totalCostUsd: raw.totalCostUsd,
+    partial: raw.partial,
+    tokens: raw.tokens,
+    totalTokens: raw.totalTokens,
+    reportPath,
+    source: raw.hasData ? "preliminary" : "empty",
+    scopingSuspect: false,
+    excludedSubagents: null,
+    recoveredSubagents: null,
+    byPhase: null,
+    complete: null,
+  };
 }
