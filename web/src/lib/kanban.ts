@@ -91,3 +91,18 @@ export function matchesQuery(item: SpecWithProject, query: string): boolean {
   const hay = `${item.spec.id} ${item.spec.title} ${item.projectName}`.toLowerCase();
   return hay.includes(q);
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Feature arquivada = done E com data conhecida E parada há mais que o limite.
+ * `now` entra por parâmetro (testável sem mexer no relógio); o componente passa
+ * Date.now(). Sem data não dá pra medir idade → conservador, NÃO arquiva.
+ * Limite é exclusivo: idade == limite ainda aparece.
+ */
+export function isArchived(spec: Spec, now: number, archiveAfterDays: number): boolean {
+  if (spec.status !== "done") return false;
+  if (spec.lastActivityAt == null) return false;
+  const ageDays = (now - Date.parse(spec.lastActivityAt)) / DAY_MS;
+  return ageDays > archiveAfterDays;
+}

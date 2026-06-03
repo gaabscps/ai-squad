@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   columnForSpec, attentionReason, COLUMN_DEFS,
-  flattenSpecs, bucketByColumn, matchesQuery,
+  flattenSpecs, bucketByColumn, matchesQuery, isArchived,
 } from "./kanban";
 import { makeSpec, makeProject, makeTask } from "../test-utils";
 
@@ -140,4 +140,34 @@ describe("matchesQuery", () => {
   it("casa por título", () => expect(matchesQuery(item, "exportar")).toBe(true));
   it("casa por nome do projeto", () => expect(matchesQuery(item, "vendas")).toBe(true));
   it("não casa quando nada bate", () => expect(matchesQuery(item, "zzz")).toBe(false));
+});
+
+describe("isArchived", () => {
+  // 2026-06-10T00:00:00Z em ms — "agora" fixo pros testes
+  const NOW = Date.parse("2026-06-10T00:00:00Z");
+
+  it("done + idade > limite → arquivada", () => {
+    const spec = makeSpec({ status: "done", lastActivityAt: "2026-06-01T00:00:00Z" }); // 9 dias
+    expect(isArchived(spec, NOW, 7)).toBe(true);
+  });
+
+  it("done + idade < limite → não arquivada", () => {
+    const spec = makeSpec({ status: "done", lastActivityAt: "2026-06-06T00:00:00Z" }); // 4 dias
+    expect(isArchived(spec, NOW, 7)).toBe(false);
+  });
+
+  it("done + lastActivityAt null → não arquivada (idade desconhecida)", () => {
+    const spec = makeSpec({ status: "done", lastActivityAt: null });
+    expect(isArchived(spec, NOW, 7)).toBe(false);
+  });
+
+  it("status ≠ done → nunca arquiva, por mais velha que seja", () => {
+    const spec = makeSpec({ status: "blocked", lastActivityAt: "2020-01-01T00:00:00Z" });
+    expect(isArchived(spec, NOW, 7)).toBe(false);
+  });
+
+  it("borda: idade exatamente no limite NÃO arquiva (> estrito)", () => {
+    const spec = makeSpec({ status: "done", lastActivityAt: "2026-06-03T00:00:00Z" }); // 7 dias exatos
+    expect(isArchived(spec, NOW, 7)).toBe(false);
+  });
 });
