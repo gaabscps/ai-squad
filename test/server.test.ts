@@ -84,6 +84,21 @@ describe("createServer", () => {
     await new Promise<void>((r) => server.close(() => r()));
   });
 
+  it("primeiro frame snapshot inclui archiveAfterDays", async () => {
+    const server = createServer(startedStore(), () => {}, 14);
+    await new Promise<void>((r) => server.listen(0, r));
+    const { port } = server.address() as AddressInfo;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const nextMessage = messageReader(ws);
+    const msg = JSON.parse(await nextMessage());
+    expect(msg.type).toBe("snapshot");
+    expect(msg.archiveAfterDays).toBe(14);
+
+    ws.close();
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
   it("encaminha comando hide ao callback com o id recebido", async () => {
     let resolveHide: (v: { id: string; hidden: boolean }) => void;
     const hidden = new Promise<{ id: string; hidden: boolean }>((res) => {

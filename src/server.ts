@@ -31,7 +31,7 @@ const toggleHide = (id: string, hidden: boolean): void => {
   store.rebuild(); // relê com o novo hide → emite changed → broadcast
 };
 
-const server = createServer(store, toggleHide);
+const server = createServer(store, toggleHide, config.archiveAfterDays);
 // As roots são lidas só aqui, na inicialização: mudá-las em aios.config.json exige reiniciar
 // o servidor (o hide, ao contrário, é relido a cada rebuild via a função passada ao Store).
 const watcher = watchProjects(config.roots, () => store.rebuild());

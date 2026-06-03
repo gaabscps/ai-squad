@@ -29,6 +29,7 @@ function isInside(root: string, target: string): boolean {
 export function createServer(
   store: Store,
   onToggleHide: (id: string, hidden: boolean) => void,
+  archiveAfterDays: number = 7,
 ): Server {
   const app = express();
 
@@ -68,8 +69,10 @@ export function createServer(
   const server = createHttpServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
 
+  // archiveAfterDays é lido uma vez na inicialização — mudar no aios.config.json exige reiniciar
+  // o servidor (igual às roots; ao contrário do hide, que é relido a cada rebuild).
   const snapshotMessage = () =>
-    JSON.stringify({ type: "snapshot", projects: store.getSnapshot() });
+    JSON.stringify({ type: "snapshot", projects: store.getSnapshot(), archiveAfterDays });
 
   wss.on("connection", (socket) => {
     // Envia no próximo tick (não no mesmo tick do 'connection'): garante que o
