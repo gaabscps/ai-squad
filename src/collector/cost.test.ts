@@ -82,4 +82,28 @@ describe("readCostRollup — escolha de fonte", () => {
     expect(r.totalTokens).toBe(10); // total ausente no report ⇒ soma crua, breakdown coerente
     expect(r.tokens).toEqual({ input: 7, output: 3, cacheRead: 0, cacheCreation: 0 });
   });
+
+  it("authoritative sem bloco tokens e sem costs/ ⇒ totalTokens 0 (soma crua vazia)", () => {
+    const d = specDir();
+    writeReport(d, { total_cost_usd: 8, unpriced_models: [] });
+    const r = readCostRollup(d);
+    expect(r.source).toBe("authoritative");
+    expect(r.totalCostUsd).toBe(8);
+    expect(r.totalTokens).toBe(0);
+    expect(r.tokens).toEqual({ input: 0, output: 0, cacheRead: 0, cacheCreation: 0 });
+  });
+
+  it("authoritative com unpriced_models ⇒ partial true", () => {
+    const d = specDir();
+    writeReport(d, { total_cost_usd: 8, unpriced_models: ["some-model"] });
+    expect(readCostRollup(d).partial).toBe(true);
+  });
+
+  it("preliminary com unpriced_models no costs/*.json ⇒ partial true", () => {
+    const d = specDir();
+    writeRaw(d, "agent-1.json", { total_cost_usd: 0.4, unpriced_models: ["x"], by_model: {} });
+    const r = readCostRollup(d);
+    expect(r.source).toBe("preliminary");
+    expect(r.partial).toBe(true);
+  });
 });

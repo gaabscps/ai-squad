@@ -83,6 +83,7 @@ export function readCostRollup(specDir: string): CostRollup {
     // mesma fonte (D2 + I1). report.tokens null = sem bloco; totalTokens null =
     // bloco presente mas sem `total`.
     const reportHasTokens = report.tokens !== null && report.totalTokens !== null;
+    // raw é sempre RawSum quando reportHasTokens=false; por isso os `!` abaixo são seguros
     const raw = reportHasTokens ? null : sumRawCosts(join(specDir, "costs"));
     const tokens = reportHasTokens ? report.tokens! : raw!.tokens;
     const totalTokens = reportHasTokens ? report.totalTokens! : raw!.totalTokens;
