@@ -2,6 +2,7 @@
 *.log
 .agent-session/
 docs/agentops/
+docs/superpowers/
 !packages/agentops/__fixtures__/.agent-session/
 !packages/agentops/__fixtures__/.agent-session/**
 
