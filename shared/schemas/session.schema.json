@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-squad/shared/schemas/session.schema.json",
+  "title": "ai-squad Session",
+  "description": "Canonical contract for the runtime Session state at .agent-session/<spec_id>/session.yml. Single source of truth for the most-consumed runtime artifact (cockpit observers derive status, tasks, timeline and escalation metrics from it). Hand-authored as plain YAML by the Phase Skills (atomic tmp+rename, no PyYAML) and by register-impl-session.py (pure text edit). This schema documents every real field and the discriminated shape of notes; it is NOT enforced at write time. Consumers must validate on read and treat unknown shapes as drift.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_id", "schema_version", "current_phase", "planned_phases"],
+  "properties": {
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name. Legacy sessions used task_id for this field; readers accept task_id as an alias." },
+    "task_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Deprecated alias of spec_id, present only on legacy Sessions. New Sessions write spec_id." },
+    "feature_name": { "type": "string", "description": "Human-readable Spec title; populated by spec-writer at first draft." },
+    "schema_version": { "type": "integer", "const": 1, "description": "Schema version anchor for future migration. Currently 1 (first machine schema)." },
+    "squad": { "type": "string", "enum": ["sdd", "discovery"], "description": "Which squad owns the Session. Absent defaults to sdd." },
+    "spec_ref": { "type": "string", "description": "Path to spec.md." },
+    "plan_ref": { "type": "string", "description": "Path to plan.md; may be absent if Phase 2 not planned." },
+    "tasks_ref": { "type": "string", "description": "Path to tasks.md; may be absent if Phase 3 not planned." },
+    "started_at": { "type": "string", "description": "ISO 8601 creation timestamp." },
+    "last_activity_at": { "type": "string", "description": "ISO 8601; updated on every write." },
+    "completed_at": { "type": "string", "description": "ISO 8601 or empty string; set on done/escalated/paused." },
+    "current_phase": { "type": "string", "enum": ["specify", "plan", "tasks", "implementation", "paused", "done", "escalated"], "description": "Current Session phase. 'paused' is terminal-but-resumable. Consumers detect paused via this field — there is no separate paused_at field." },
+    "current_owner": { "type": "string", "description": "Role with write authority for the current phase." },
+    "output_locale": { "type": "string", "description": "BCP-47 tag; language of human-facing prose. Absent defaults to en." },
+    "pipeline_mode": { "type": "string", "enum": ["standard", "lite"], "description": "Pipeline mode chosen at spec-writer entry." },
+    "auto_approved_by": { "type": "string", "description": "Set to 'pm' by /pm at autonomous-run entry; absent on interactive runs." },
+    "pm_cost_cap_usd": { "type": ["number", "null"], "description": "Optional PM cost cap; null/absent means no cap." },
+    "planned_phases": { "type": "array", "items": { "type": "string", "enum": ["specify", "plan", "tasks", "implementation"] }, "description": "Phases selected to run, in order." },
+    "implementation_sessions": { "type": "array", "items": { "type": "string" }, "description": "Claude Code session ids that dispatched Phase 4 work; appended by register-impl-session.py. Authoritative cost-scoping allow-list." },
+    "pipeline_started_at": { "type": "string", "description": "Phase 4 start; empty until pipeline starts." },
+    "pipeline_completed_at": { "type": "string", "description": "Phase 4 end; empty until complete." },
+    "task_states": {
+      "type": "object",
+      "description": "Per-task state for Phase 4, keyed by task id (T-XXX).",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string", "enum": ["pending", "running", "blocked", "resolved", "done", "pending_human", "failed"] },
+          "review_loops": { "type": "integer", "minimum": 0 },
+          "qa_loops": { "type": "integer", "minimum": 0 },
+          "blocker_calls": { "type": "integer", "minimum": 0 },
+          "packet_retries": { "type": "integer", "minimum": 0, "description": "Re-dispatches due to missing/invalid Output Packet (cap packet_retry_max=2)." },
+          "last_dispatch_id": { "type": "string" },
+          "last_diff_hash": { "type": "string" },
+          "last_findings_hash": { "type": "string" },
+          "last_finding_set_hash": { "type": "string" },
+          "blocker_summary": { "type": "string" },
+          "started_at": { "type": "string" },
+          "completed_at": { "type": "string" }
+        }
+      }
+    },
+    "budget_defaults": {
+      "type": "object",
+      "properties": {
+        "review_loops_max": { "type": "integer", "minimum": 0 },
+        "qa_loops_max": { "type": "integer", "minimum": 0 },
+        "blocker_calls_max": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "escalation_metrics": {
+      "type": "object",
+      "properties": {
+        "total_tasks": { "type": "integer", "minimum": 0 },
+        "done_tasks": { "type": "integer", "minimum": 0 },
+        "pending_human_tasks": { "type": "integer", "minimum": 0 },
+        "escalation_rate": { "type": "number", "minimum": 0 }
+      }
+    },
+    "phase_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phase": { "type": "string" },
+          "started_at": { "type": "string" },
+          "completed_at": { "type": "string" },
+          "artifact_status": { "type": "string" },
+          "skipped": { "type": "boolean" },
+          "skip_reason": { "type": "string" },
+          "approved_by": { "type": "string" },
+          "pipeline_summary": { "type": "string" }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Append-only governance/audit event log. Always a list of typed objects discriminated by kind — never a scalar. Consumed by audit-agent (pm_decision reconciliation, AC-017) and by external observers (timeline).",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "timestamp", "phase", "artifact_path", "gate_applied"],
+            "properties": {
+              "kind": { "const": "pm_decision" },
+              "timestamp": { "type": "string", "description": "ISO 8601, UTC." },
+              "phase": { "type": "string", "enum": ["specify", "plan", "tasks"] },
+              "artifact_path": { "type": "string" },
+              "gate_applied": { "type": "string" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "timestamp", "phase", "artifact_path", "open_questions"],
+            "properties": {
+              "kind": { "const": "pm_escalation" },
+              "timestamp": { "type": "string", "description": "ISO 8601, UTC." },
+              "phase": { "type": "string", "enum": ["specify", "plan", "tasks"] },
+              "artifact_path": { "type": "string" },
+              "open_questions": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "timestamp", "path", "authorized_by", "audit_dispatch_id"],
+            "properties": {
+              "kind": { "const": "audit_override" },
+              "timestamp": { "type": "string", "description": "ISO 8601, UTC." },
+              "path": { "type": "string" },
+              "authorized_by": { "type": "string", "enum": ["human"] },
+              "audit_dispatch_id": { "type": "string" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
