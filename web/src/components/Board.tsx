@@ -45,6 +45,9 @@ export function Board({
   // Separação arquivo × ativo em render-time: depende do relógio, não do disco.
   // 'shown' é o que o componente de listagem recebe; 'selectedItem' ainda usa
   // 'all' pra o drawer poder abrir qualquer spec (inclusive arquivadas).
+  // Sem timer de propósito: o próximo render (snapshot do WS ou interação) já
+  // reavalia a idade; como o limiar é em dias, não vale um setInterval só pra
+  // mover um card no instante exato em que ele cruza o limite.
   const now = Date.now();
   const shown = visible.filter((sp) =>
     view === "archived"
