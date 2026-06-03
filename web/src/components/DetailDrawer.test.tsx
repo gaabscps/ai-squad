@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DetailDrawer } from "./DetailDrawer";
 import { makeSpec, makeProject, makeCost, makeTask, makeDispatch } from "../test-utils";
@@ -67,6 +67,42 @@ describe("DetailDrawer", () => {
     render(<DetailDrawer item={item()} onClose={onClose} />);
     await userEvent.click(screen.getByRole("button", { name: /fechar/i }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("authoritative: mostra breakdown por fase", () => {
+    const spec = makeSpec({
+      cost: makeCost({
+        source: "authoritative",
+        byPhase: { planning: 6.5, orchestration: 1, implementation: 2 },
+      }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const phases = document.querySelector(".drawer-cost-phases")!;
+    expect(within(phases as HTMLElement).getByText("planning")).toBeInTheDocument();
+    expect(within(phases as HTMLElement).getByText("orchestration")).toBeInTheDocument();
+    expect(within(phases as HTMLElement).getByText("implementation")).toBeInTheDocument();
+    expect(screen.getByText("US$ 6.50")).toBeInTheDocument();
+  });
+
+  it("scopingSuspect: implementation aparece como —", () => {
+    const spec = makeSpec({
+      cost: makeCost({
+        source: "authoritative",
+        scopingSuspect: true,
+        byPhase: { planning: 6.5, orchestration: 1, implementation: null },
+      }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const phases = document.querySelector(".drawer-cost-phases")!;
+    const implRow = within(phases as HTMLElement).getByText("implementation").closest("div")!;
+    expect(implRow).toHaveTextContent("—");
+  });
+
+  it("preliminary: mostra badge 'preliminar' e nenhum breakdown por fase", () => {
+    const spec = makeSpec({ cost: makeCost({ source: "preliminary", byPhase: null }) });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("preliminar")).toBeInTheDocument();
+    expect(screen.queryByText("planning")).toBeNull();
   });
 });
 

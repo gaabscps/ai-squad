@@ -76,6 +76,11 @@ export function DetailDrawer({
             {fmtTokens(spec.cost.totalTokens)} tokens
           </span>
           {spec.cost.partial && <span className="cost-partial">$ parcial</span>}
+          {spec.cost.source === "preliminary" && (
+            <span className="cost-preliminary" title="soma crua dos costs/*.json — cost-report.json ainda não publicado">
+              preliminar
+            </span>
+          )}
           {spec.cost.reportPath && (
             <a
               className="drawer-cost-report"
@@ -105,6 +110,23 @@ export function DetailDrawer({
             <dd>{fmtTokens(t.cacheCreation)}</dd>
           </div>
         </dl>
+
+        {spec.cost.source === "authoritative" && spec.cost.byPhase && (
+          <dl className="drawer-cost-phases mono">
+            <div>
+              <dt>planning</dt>
+              <dd>{fmtUsd(spec.cost.byPhase.planning)}</dd>
+            </div>
+            <div>
+              <dt>orchestration</dt>
+              <dd>{fmtUsd(spec.cost.byPhase.orchestration)}</dd>
+            </div>
+            <div>
+              <dt>implementation</dt>
+              <dd>{fmtUsd(spec.cost.byPhase.implementation)}</dd>
+            </div>
+          </dl>
+        )}
 
         <h4 className="drawer-section">Linha do tempo</h4>
         <Timeline spec={spec} projectPath={projectPath} />
