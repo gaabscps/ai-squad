@@ -1,5 +1,5 @@
 export interface AttentionServerMsg {
-  type: "attention:handoff" | "attention:cached" | "attention:chunk" | "attention:done" | "attention:error";
+  type: "attention:handoff" | "attention:cached" | "attention:chunk" | "attention:done" | "attention:error" | "attention:queued";
   projectId: string;
   specId: string;
   text?: string;
@@ -16,13 +16,10 @@ export interface AttentionClient {
   subscribe: (key: string, fn: Handler) => () => void;
   fetch: (projectId: string, specId: string) => void;
   generate: (projectId: string, specId: string) => void;
+  cancel: (projectId: string, specId: string) => void;
 }
 
-/**
- * Cliente WS de diagnóstico. Conecta sob demanda, mantém fila até o socket abrir,
- * e roteia cada mensagem ao subscriber da chave `projectId|specId`. Fábrica de
- * socket injetável pra teste.
- */
+/** Fábrica de socket injetável pra teste. */
 export function createAttentionClient(makeSocket: SocketFactory): AttentionClient {
   const subs = new Map<string, Set<Handler>>();
   let socket: WebSocket | null = null;
@@ -59,6 +56,7 @@ export function createAttentionClient(makeSocket: SocketFactory): AttentionClien
     },
     fetch(projectId, specId) { sendOrQueue({ type: "attention:fetch", projectId, specId }); },
     generate(projectId, specId) { sendOrQueue({ type: "attention:generate", projectId, specId }); },
+    cancel(projectId, specId) { sendOrQueue({ type: "attention:cancel", projectId, specId }); },
   };
 }
 

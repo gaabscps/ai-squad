@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { attentionClient as defaultClient, type AttentionClient, type AttentionServerMsg } from "./attentionClient";
+import { useDiagnosisJobs } from "./diagnosisJobs";
 
 export type DiagnosisState = "empty" | "loading" | "streaming" | "ready" | "stale" | "error";
 
@@ -16,20 +17,35 @@ export interface AttentionDiagnosis {
   regenerate: () => void;
 }
 
+interface CachedResult {
+  text: string;
+  generatedAt: string | null;
+  costUsd: number | null;
+  stale: boolean;
+}
+
+function jobStateToDiagnosisState(jobState: string): DiagnosisState {
+  if (jobState === "queued" || jobState === "generating") return "loading";
+  if (jobState === "streaming") return "streaming";
+  if (jobState === "ready") return "ready";
+  if (jobState === "error") return "error";
+  if (jobState === "cancelled") return "empty";
+  return "empty";
+}
+
 /**
- * Máquina de estados do diagnóstico de uma spec em atenção. Ao montar, faz `fetch`
- * (lê cache + recebe o handoff). `generate`/`regenerate` chamam o CLI (gasta quota,
- * só por clique). Acumula os chunks de streaming em `text`. Cliente injetável.
+ * Máquina de estados do diagnóstico de uma spec em atenção.
+ * Lê o estado vivo do store global (DiagnosisJobsProvider) como fonte única de verdade;
+ * mantém apenas o cache local (attention:cached) e o handoff (attention:handoff)
+ * que chegam fora do ciclo de geração.
  */
 export function useAttentionDiagnosis(projectId: string, specId: string, client: AttentionClient = defaultClient): AttentionDiagnosis {
-  const [state, setState] = useState<DiagnosisState>("empty");
-  const [text, setText] = useState("");
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [costUsd, setCostUsd] = useState<number | null>(null);
-  const [streamed, setStreamed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { getJob, generate: storeGenerate } = useDiagnosisJobs();
+  const job = getJob(projectId, specId);
+
+  const [cached, setCached] = useState<CachedResult | null>(null);
   const [handoff, setHandoff] = useState("");
-  const textRef = useRef("");
+  const [streamed, setStreamed] = useState(false);
 
   useEffect(() => {
     const key = `${projectId}|${specId}`;
@@ -37,45 +53,67 @@ export function useAttentionDiagnosis(projectId: string, specId: string, client:
       if (m.type === "attention:handoff") {
         setHandoff(m.text ?? "");
       } else if (m.type === "attention:cached") {
-        textRef.current = m.text ?? "";
-        setText(textRef.current);
-        setGeneratedAt(m.generatedAt ?? null);
-        setCostUsd(m.costUsd ?? null);
-        setStreamed(false);
-        setState(m.stale ? "stale" : "ready");
+        setCached({
+          text: m.text ?? "",
+          generatedAt: m.generatedAt ?? null,
+          costUsd: m.costUsd ?? null,
+          stale: m.stale ?? false,
+        });
       } else if (m.type === "attention:chunk") {
-        textRef.current += m.delta ?? "";
-        setText(textRef.current);
         setStreamed(true);
-        setState("streaming");
-      } else if (m.type === "attention:done") {
-        textRef.current = m.text ?? textRef.current;
-        setText(textRef.current);
-        setGeneratedAt(m.generatedAt ?? null);
-        setCostUsd(m.costUsd ?? null);
-        setState("ready");
-      } else if (m.type === "attention:error") {
-        setError(m.message ?? "erro ao gerar");
-        setState("error");
       }
     });
     client.fetch(projectId, specId);
     return off;
   }, [projectId, specId, client]);
 
-  const start = useCallback(() => {
-    textRef.current = "";
-    setText("");
-    setError(null);
-    setCostUsd(null);
+  const effectiveHandoff = job?.handoff ?? handoff;
+
+  const generate = useCallback(() => {
+    setCached(null);
     setStreamed(false);
-    setState("loading");
-    client.generate(projectId, specId);
-  }, [projectId, specId, client]);
+    storeGenerate(projectId, specId);
+  }, [projectId, specId, storeGenerate]);
+
+  if (job && job.state !== "cancelled") {
+    const diagState = jobStateToDiagnosisState(job.state);
+    return {
+      state: diagState,
+      text: job.text,
+      generatedAt: job.generatedAt,
+      costUsd: job.costUsd,
+      // streamed local persiste após streaming→ready para que o caller saiba que o conteúdo veio ao vivo
+      streamed: job.state === "streaming" || (job.state === "ready" && streamed),
+      error: job.error,
+      handoff: effectiveHandoff,
+      generate,
+      regenerate: generate,
+    };
+  }
+
+  if (cached) {
+    return {
+      state: cached.stale ? "stale" : "ready",
+      text: cached.text,
+      generatedAt: cached.generatedAt,
+      costUsd: cached.costUsd,
+      streamed: false,
+      error: null,
+      handoff: effectiveHandoff,
+      generate,
+      regenerate: generate,
+    };
+  }
 
   return {
-    state, text, generatedAt, costUsd, streamed, error, handoff,
-    generate: start,
-    regenerate: start,
+    state: "empty",
+    text: "",
+    generatedAt: null,
+    costUsd: null,
+    streamed: false,
+    error: null,
+    handoff: effectiveHandoff,
+    generate,
+    regenerate: generate,
   };
 }
