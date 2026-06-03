@@ -58,6 +58,27 @@ describe("watchProjects — patterns observados", () => {
     expect(normalized.some((p) => p.includes("outputs/*.json"))).toBe(true);
   });
 
+  it("inclui o glob cost-report.json para cada root informado", async () => {
+    const { watchProjects } = await import("./watcher.js");
+    const handle = watchProjects(["/proj/a", "/proj/b"], vi.fn());
+    await handle.close();
+
+    const patterns: string[] = watchMock.mock.calls[0][0] as string[];
+    const costReportPatterns = patterns.filter((p) =>
+      p.replace(/\\/g, "/").includes("cost-report.json"),
+    );
+    expect(costReportPatterns.length).toBeGreaterThanOrEqual(2);
+
+    for (const root of ["/proj/a", "/proj/b"]) {
+      const normalizedRoot = root.replace(/\\/g, "/");
+      const has = costReportPatterns.some((p) => {
+        const norm = p.replace(/\\/g, "/");
+        return norm.startsWith(normalizedRoot) && norm.includes(".agent-session");
+      });
+      expect(has).toBe(true);
+    }
+  });
+
   it("não observa os .md mesmo que existam na sessão (guard defensivo)", async () => {
     vi.resetModules();
     const { watchProjects } = await import("./watcher.js");

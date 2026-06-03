@@ -40,6 +40,7 @@ export function watchProjects(
     join(r, "*", ".agent-session", "**", "costs", "*.json"),
     join(r, "*", ".agent-session", "**", "*manifest*.json"),
     join(r, "*", ".agent-session", "**", "outputs", "*.json"),
+    join(r, "*", ".agent-session", "**", "cost-report.json"),
   ]);
   const debounced = debounce(onChange, debounceMs);
   const watcher = chokidar.watch(patterns, {
