@@ -65,7 +65,12 @@ The following pseudocode step is inserted into each Phase Skill's "Run procedure
         - notes: append the pm_decision entry below
         - current_phase: advance to the next phase per session.yml.planned_phases
       If session.yml.notes is absent, initialize it as an empty list
-      before appending. This single atomic mutation guarantees that
+      before appending.
+      **notes contract:** `notes` is ALWAYS a YAML list of objects, each with a
+      `kind` discriminator ("pm_decision" | "pm_escalation" | "audit_override")
+      per `shared/schemas/session.schema.json`; NEVER a scalar/string, and never
+      invent fields outside the schema.
+      This single atomic mutation guarantees that
       phase_history, the pm_decision evidence, and current_phase are
       always consistent — there is no partial-write window where one
       exists without the others, which would trigger a false AC-017
