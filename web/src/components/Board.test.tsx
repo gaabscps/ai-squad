@@ -1,16 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Board } from "./Board";
 import { ProjectsProvider } from "../state/projects";
 import { makeProject, makeSpec } from "../test-utils";
 
-function renderBoard(projects: Parameters<typeof makeProject>[0][] = [], onHide = vi.fn()) {
+function renderBoard(
+  projects: Parameters<typeof makeProject>[0][] = [],
+  onHide = vi.fn(),
+  archiveAfterDays = 7,
+) {
   const built = projects.map((p) => makeProject(p));
   return {
     onHide,
     ...render(
-      <ProjectsProvider initial={built}>
+      <ProjectsProvider initial={built} initialArchiveAfterDays={archiveAfterDays}>
         <Board onHide={onHide} />
       </ProjectsProvider>,
     ),
@@ -79,5 +83,41 @@ describe("Board", () => {
     expect(screen.queryByText("FEAT-1")).toBeNull(); // só proj-b
     await userEvent.click(screen.getByLabelText(/mostrar ocultos/i)); // desliga de novo
     expect(screen.getByText("FEAT-1")).toBeInTheDocument(); // filtro resetou, board não ficou vazio
+  });
+});
+
+describe("Board — arquivamento", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-10T00:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // "now" = 2026-06-10; limite = 7 dias
+  // doneVelha: lastActivityAt = 2026-06-01 → 9 dias atrás → arquivada
+  // doneNova:  lastActivityAt = 2026-06-09 → 1 dia atrás → NÃO arquivada
+  const doneVelha = () =>
+    makeSpec({ id: "FEAT-OLD", status: "done", lastActivityAt: "2026-06-01T00:00:00Z" });
+  const doneNova = () =>
+    makeSpec({ id: "FEAT-NEW", status: "done", lastActivityAt: "2026-06-09T00:00:00Z" });
+
+  it("kanban esconde a done velha (arquivada)", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [doneVelha(), doneNova()] }]);
+    expect(screen.queryByText("FEAT-OLD")).toBeNull();
+    expect(screen.getByText("FEAT-NEW")).toBeInTheDocument(); // done nova ainda aparece
+  });
+
+  it("aba Arquivadas mostra só a done velha", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [doneVelha(), doneNova()] }]);
+    // Usa fireEvent pra evitar hang de userEvent com fake timers
+    fireEvent.click(screen.getByRole("button", { name: /arquivadas/i }));
+    expect(screen.getByText("FEAT-OLD")).toBeInTheDocument();
+    expect(screen.queryByText("FEAT-NEW")).toBeNull();
+  });
+
+  it("aba Arquivadas vazia mostra empty state", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [doneNova()] }]);
+    fireEvent.click(screen.getByRole("button", { name: /arquivadas/i }));
+    expect(screen.getByText(/nenhuma feature arquivada/i)).toBeInTheDocument();
   });
 });

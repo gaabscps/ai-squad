@@ -48,14 +48,16 @@ const DispatchCtx = createContext<Dispatch<ProjectsAction>>(() => {});
 export function ProjectsProvider({
   children,
   initial,
+  initialArchiveAfterDays = 7,
 }: {
   children: ReactNode;
   initial?: Project[];
+  initialArchiveAfterDays?: number;
 }) {
   const [state, dispatch] = useReducer(projectsReducer, {
     projects: initial ?? [],
     connected: false,
-    archiveAfterDays: 7,
+    archiveAfterDays: initialArchiveAfterDays,
   });
   return (
     <StateCtx.Provider value={state}>
