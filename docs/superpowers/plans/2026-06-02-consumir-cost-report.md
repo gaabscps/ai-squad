@@ -422,6 +422,20 @@ describe("readCostRollup — escolha de fonte", () => {
     expect(r.totalCostUsd).toBe(8);
     expect(r.totalTokens).toBe(10); // veio do costs/*.json, não do report
   });
+
+  it("authoritative com by_type mas SEM total ⇒ tokens caem na soma crua (I1)", () => {
+    const d = specDir();
+    writeReport(d, {
+      total_cost_usd: 8,
+      unpriced_models: [],
+      tokens: { by_type: { input: 1, output: 2, cache_read: 3, cache_creation: 4 } }, // sem `total`
+    });
+    writeRaw(d, "agent-1.json", { by_model: { m: { input_tokens: 7, output_tokens: 3 } } });
+    const r = readCostRollup(d);
+    expect(r.source).toBe("authoritative");
+    expect(r.totalTokens).toBe(10); // total ausente no report ⇒ soma crua, breakdown coerente
+    expect(r.tokens).toEqual({ input: 7, output: 3, cacheRead: 0, cacheCreation: 0 });
+  });
 });
 ```
 
@@ -515,10 +529,14 @@ export function readCostRollup(specDir: string): CostRollup {
   const report = readCostReport(specDir);
 
   if (report) {
-    // tokens do report quando há bloco; senão fallback na soma crua (D2)
-    const raw = report.tokens ? null : sumRawCosts(join(specDir, "costs"));
-    const tokens = report.tokens ?? raw!.tokens;
-    const totalTokens = report.tokens ? report.totalTokens ?? 0 : raw!.totalTokens;
+    // Usa tokens do report só quando há breakdown E total (caso canônico); se
+    // qualquer um faltar, cai TODO na soma crua, pra breakdown e total virem da
+    // mesma fonte (D2 + I1). report.tokens null = sem bloco; totalTokens null =
+    // bloco presente mas sem `total`.
+    const reportHasTokens = report.tokens !== null && report.totalTokens !== null;
+    const raw = reportHasTokens ? null : sumRawCosts(join(specDir, "costs"));
+    const tokens = reportHasTokens ? report.tokens! : raw!.tokens;
+    const totalTokens = reportHasTokens ? report.totalTokens! : raw!.totalTokens;
     return {
       totalCostUsd: report.totalCostUsd,
       partial: report.partial,
