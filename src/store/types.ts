@@ -36,6 +36,16 @@ export interface Task {
 }
 
 // Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.
+// Quando existe cost-report.json (artefato canônico/escopado da pipeline), ele é a
+// fonte de verdade (source="authoritative"); senão soma crua (source="preliminary").
+export type CostSource = "empty" | "preliminary" | "authoritative";
+
+export interface CostPhaseBreakdown {
+  planning: number | null;
+  orchestration: number | null;
+  implementation: number | null; // null quando scopingSuspect=true (valor não confiável)
+}
+
 export interface CostRollup {
   totalCostUsd: number | null; // soma dos total_cost_usd; null se sem dados
   partial: boolean; // true se algum arquivo tinha unpriced_models não-vazio
@@ -47,6 +57,13 @@ export interface CostRollup {
   };
   totalTokens: number;
   reportPath: string | null; // caminho do report.html, se existir
+  // --- novos (aditivos): preenchidos a partir do cost-report.json quando presente ---
+  source: CostSource;
+  scopingSuspect: boolean; // ausente no arquivo ⇒ false
+  excludedSubagents: number | null;
+  recoveredSubagents: number | null;
+  byPhase: CostPhaseBreakdown | null; // só quando source="authoritative"
+  complete: boolean | null; // campo `complete` do cost-report; null em preliminary/empty
 }
 
 export interface TimelineEntry {
