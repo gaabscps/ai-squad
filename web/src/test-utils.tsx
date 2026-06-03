@@ -21,6 +21,12 @@ export function makeCost(over: Partial<CostRollup> = {}): CostRollup {
     tokens: { input: 100, output: 50, cacheRead: 1000, cacheCreation: 200 },
     totalTokens: 1350,
     reportPath: null,
+    source: "preliminary",
+    scopingSuspect: false,
+    excludedSubagents: null,
+    recoveredSubagents: null,
+    byPhase: null,
+    complete: null,
     ...over,
   };
 }
