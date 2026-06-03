@@ -33,4 +33,10 @@ describe("TopBar", () => {
     await userEvent.click(screen.getByRole("button", { name: /tabela/i }));
     expect(props.onView).toHaveBeenCalledWith("table");
   });
+
+  it("clicar em Arquivadas chama onView('archived')", async () => {
+    const props = setup({ view: "kanban" });
+    await userEvent.click(screen.getByRole("button", { name: /arquivadas/i }));
+    expect(props.onView).toHaveBeenCalledWith("archived");
+  });
 });

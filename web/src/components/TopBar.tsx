@@ -3,7 +3,7 @@
  * + busca (controlada pelo Board) + toggle Kanban|Tabela. Não tem estado próprio;
  * tudo sobe via callbacks pro Board, que é o dono do estado de UI.
  */
-export type ViewMode = "kanban" | "table";
+export type ViewMode = "kanban" | "table" | "archived";
 
 export function TopBar({
   connected,
@@ -48,6 +48,13 @@ export function TopBar({
           onClick={() => onView("table")}
         >
           Tabela
+        </button>
+        <button
+          type="button"
+          className={view === "archived" ? "on" : ""}
+          onClick={() => onView("archived")}
+        >
+          Arquivadas
         </button>
       </div>
     </header>
