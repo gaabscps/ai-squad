@@ -25,6 +25,7 @@ interface RawCostReport {
   orchestration_cost_usd?: number;
   implementation_cost_usd?: number;
   total_cost_usd?: number;
+  subagent_count?: number; // presente no arquivo; não exposto — sem uso no aiOS ainda
   excluded_subagents?: number;
   recovered_subagents?: number;
   scoping_suspect?: boolean;
@@ -57,6 +58,7 @@ export function readCostReport(specDir: string): CostReport | null {
 
   const scopingSuspect = raw.scoping_suspect ?? false;
 
+  // sem bloco tokens (ou sem by_type) ⇒ tokens null; o coordenador resolve com soma crua
   const tk = raw.tokens?.by_type;
   const tokens = tk
     ? {
@@ -76,7 +78,9 @@ export function readCostReport(specDir: string): CostReport | null {
       implementation: scopingSuspect ? null : num(raw.implementation_cost_usd),
     },
     tokens,
-    totalTokens: tokens ? num(raw.tokens?.total) ?? 0 : null,
+    // total ausente dentro de um bloco tokens presente ⇒ null (desconhecido), não 0
+    // (0 afirmaria "zero tokens"; o coordenador cai na soma crua quando null)
+    totalTokens: tokens ? num(raw.tokens?.total) : null,
     partial: Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0,
     scopingSuspect,
     excludedSubagents: num(raw.excluded_subagents),

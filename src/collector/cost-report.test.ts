@@ -94,4 +94,15 @@ describe("readCostReport — casos de borda", () => {
     expect(r.byPhase.implementation).toBeNull();
     expect(r.byPhase.planning).toBe(5);
   });
+
+  it("bloco tokens presente mas sem total ⇒ totalTokens null (não 0)", () => {
+    const noTotal = JSON.stringify({
+      total_cost_usd: 3,
+      unpriced_models: [],
+      tokens: { by_type: { input: 10, output: 5, cache_read: 0, cache_creation: 0 } },
+    });
+    const r = readCostReport(specDirWith(noTotal))!;
+    expect(r.tokens).toEqual({ input: 10, output: 5, cacheRead: 0, cacheCreation: 0 });
+    expect(r.totalTokens).toBeNull();
+  });
 });
