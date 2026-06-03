@@ -7,7 +7,7 @@ function makeSpec(over: Partial<Spec> = {}): Spec {
     id: "FEAT-001", squad: "sdd", title: "Login", phase: "implementation",
     plannedPhases: ["specify", "plan", "tasks", "implementation"],
     status: "blocked", tasks: [], health: { pendingHuman: 0, escalationRate: 0, auditException: false },
-    lastActivityAt: null, timeline: [], cost: { totalCostUsd: null, partial: false, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, totalTokens: 0, reportPath: null },
+    lastActivityAt: null, timeline: [], cost: { totalCostUsd: null, partial: false, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, totalTokens: 0, reportPath: null, source: "empty", scopingSuspect: false, excludedSubagents: null, recoveredSubagents: null, byPhase: null, complete: null },
     ...over,
   };
 }

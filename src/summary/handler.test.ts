@@ -12,7 +12,7 @@ function proj(): Project {
     specs: [{
       id: "FEAT-001", squad: "sdd", title: "Coletor", phase: "implementation", plannedPhases: [],
       status: "running", health: { pendingHuman: 0, escalationRate: 0, auditException: false },
-      lastActivityAt: null, timeline: [], cost: { totalCostUsd: null, partial: false, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, totalTokens: 0, reportPath: null },
+      lastActivityAt: null, timeline: [], cost: { totalCostUsd: null, partial: false, tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, totalTokens: 0, reportPath: null, source: "empty", scopingSuspect: false, excludedSubagents: null, recoveredSubagents: null, byPhase: null, complete: null },
       tasks: [{ id: "T-001", state: "done", loops: 1, dispatches: [{ role: "dev", loop: 1, status: "done", summary: "fez X", filesChanged: [], findings: [], testEvidence: [], tokens: null }] }],
     }],
   };
