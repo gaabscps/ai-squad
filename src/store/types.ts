@@ -60,6 +60,8 @@ export interface CostRollup {
   // --- novos (aditivos): preenchidos a partir do cost-report.json quando presente ---
   source: CostSource;
   scopingSuspect: boolean; // ausente no arquivo ⇒ false
+  // excludedSubagents/recoveredSubagents/complete: carregados do cost-report mas
+  // ainda NÃO exibidos na UI (completude do modelo; o design só pede breakdown+badge).
   excludedSubagents: number | null;
   recoveredSubagents: number | null;
   byPhase: CostPhaseBreakdown | null; // só quando source="authoritative"
