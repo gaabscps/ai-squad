@@ -51,34 +51,38 @@
     },
     "budget_defaults": {
       "type": "object",
+      "description": "Loop budget caps for Phase 4, inherited by task_states unless overridden per dispatch.",
       "properties": {
-        "review_loops_max": { "type": "integer", "minimum": 0 },
-        "qa_loops_max": { "type": "integer", "minimum": 0 },
-        "blocker_calls_max": { "type": "integer", "minimum": 0 }
+        "review_loops_max": { "type": "integer", "minimum": 0, "description": "Max review loops per task before escalation." },
+        "qa_loops_max": { "type": "integer", "minimum": 0, "description": "Max QA loops per task before escalation." },
+        "blocker_calls_max": { "type": "integer", "minimum": 0, "description": "Max blocker-specialist calls per task before escalation." }
       }
     },
     "escalation_metrics": {
       "type": "object",
+      "description": "Aggregate escalation health for this run.",
       "properties": {
-        "total_tasks": { "type": "integer", "minimum": 0 },
-        "done_tasks": { "type": "integer", "minimum": 0 },
-        "pending_human_tasks": { "type": "integer", "minimum": 0 },
-        "escalation_rate": { "type": "number", "minimum": 0 }
+        "total_tasks": { "type": "integer", "minimum": 0, "description": "Total tasks in the pipeline." },
+        "done_tasks": { "type": "integer", "minimum": 0, "description": "Tasks that reached done." },
+        "pending_human_tasks": { "type": "integer", "minimum": 0, "description": "Tasks parked in pending_human (escalated to the human)." },
+        "escalation_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "pending_human_tasks / total_tasks, as a fraction in [0,1] (healthy ~0.10-0.15)." }
       }
     },
     "phase_history": {
       "type": "array",
+      "description": "One entry per phase, appended as phases complete or are skipped.",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
-          "phase": { "type": "string" },
-          "started_at": { "type": "string" },
-          "completed_at": { "type": "string" },
-          "artifact_status": { "type": "string" },
-          "skipped": { "type": "boolean" },
-          "skip_reason": { "type": "string" },
-          "approved_by": { "type": "string" },
-          "pipeline_summary": { "type": "string" }
+          "phase": { "type": "string", "description": "Phase name (specify | plan | tasks | implementation)." },
+          "started_at": { "type": "string", "description": "ISO 8601; empty if skipped." },
+          "completed_at": { "type": "string", "description": "ISO 8601; empty if running or skipped." },
+          "artifact_status": { "type": "string", "description": "Status of the phase artifact, e.g. approved." },
+          "skipped": { "type": "boolean", "description": "True when the phase was not in planned_phases." },
+          "skip_reason": { "type": "string", "description": "Why the phase was skipped." },
+          "approved_by": { "type": "string", "description": "Who approved the artifact (e.g. pm for autonomous runs)." },
+          "pipeline_summary": { "type": "string", "description": "Phase 4 only: short summary of the pipeline outcome." }
         }
       }
     },

@@ -109,3 +109,9 @@ def test_well_formed_notes_list_is_accepted():
 def test_required_core_fields_present():
     s = _schema()
     assert {"spec_id", "schema_version", "current_phase", "planned_phases"} <= set(s["required"])
+
+
+def test_pipeline_mode_and_squad_enums_are_valid():
+    s = _schema()
+    assert set(s["properties"]["pipeline_mode"]["enum"]) == {"standard", "lite"}
+    assert set(s["properties"]["squad"]["enum"]) == {"sdd", "discovery"}
