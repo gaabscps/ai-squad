@@ -168,6 +168,11 @@ Skipped Phases are visible in the final handoff so the human (and any future rev
 
 ## Complete schema
 
+> **Canonical source:** the machine contract for `session.yml` is
+> [`shared/schemas/session.schema.json`](../schemas/session.schema.json). The
+> YAML block below is an illustrative companion, kept in sync with that schema.
+> When the two disagree, the JSON Schema wins.
+
 ```yaml
 # Identification
 spec_id: "FEAT-042"                             # required, must match folder name; sequential FEAT-NNN scoped per project. (Legacy sessions used `task_id` for this field — readers accept both; see shared/concepts/identity.md.)
@@ -188,6 +193,9 @@ completed_at: ""                                 # set on Phase 4 done OR escala
 current_phase: "implementation"                  # specify | plan | tasks | implementation | paused | done | escalated
 current_owner: "orchestrator"                    # which Role currently has write authority
 output_locale: "pt-BR"                           # BCP-47 tag; language of all human-facing prose the Roles emit (summary, findings, blockers, notes, evidence.reason, handoff.md). Set by spec-writer (Phase 1), confirmed with the human. Absent on legacy Sessions → readers default to "en". Enums/identifiers stay canonical. See shared/concepts/output-locale.md.
+pipeline_mode: "standard"                        # standard | lite (set at spec-writer entry)
+auto_approved_by: "pm"                            # present only on /pm autonomous runs; absent interactively
+pm_cost_cap_usd: null                             # optional PM cost cap; null = no cap
 
 # Planned phases (set at /spec-writer entry; consumed by every subsequent Skill)
 planned_phases:
@@ -195,6 +203,10 @@ planned_phases:
   - "plan"
   - "tasks"
   - "implementation"
+
+# Implementation session ids (appended by register-impl-session.py; cost-scoping allow-list)
+implementation_sessions:
+  - "<claude-code-session-id>"
 
 # Phase 4 only — Pipeline state
 pipeline_started_at: ""
@@ -252,7 +264,28 @@ phase_history:
     completed_at: ""                             # Pipeline still running OR escalated
     pipeline_summary: ""
     skipped: false
+
+# Governance / audit event log (kind-discriminated; see shared/schemas/session.schema.json)
+notes:
+  - kind: pm_decision
+    timestamp: "2026-05-02T11:00:00Z"
+    phase: "specify"
+    artifact_path: ".agent-session/FEAT-042/spec.md"
+    gate_applied: "auto_approved_by=pm"
 ```
+
+### `notes` — governance/audit event log
+
+`notes` is ALWAYS a list of typed objects, each discriminated by `kind`
+(never a scalar). Three kinds, per `shared/schemas/session.schema.json`:
+
+- `pm_decision`   — `{ kind, timestamp, phase, artifact_path, gate_applied }`
+- `pm_escalation` — `{ kind, timestamp, phase, artifact_path, open_questions[] }`
+- `audit_override`— `{ kind, timestamp, path, authorized_by, audit_dispatch_id }`
+
+The `audit-agent` reconciles `pm_decision` entries against
+`phase_history.<phase>.approved_by == "pm"` (AC-017). Consumers branch on `kind`
+to render a timeline.
 
 ## Schema versioning
 
