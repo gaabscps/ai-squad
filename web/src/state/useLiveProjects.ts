@@ -36,7 +36,11 @@ export function useLiveProjects(): {
         try {
           const msg = JSON.parse(ev.data);
           if (msg?.type === "snapshot" && Array.isArray(msg.projects)) {
-            dispatchRef.current({ type: "snapshot", projects: msg.projects });
+            dispatchRef.current({
+              type: "snapshot",
+              projects: msg.projects,
+              archiveAfterDays: msg.archiveAfterDays,
+            });
           }
         } catch {
           /* frame inválido: ignora */

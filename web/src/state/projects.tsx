@@ -10,10 +10,11 @@ import type { Project } from "../../../src/store/types";
 export interface ProjectsState {
   projects: Project[];
   connected: boolean;
+  archiveAfterDays: number;
 }
 
 export type ProjectsAction =
-  | { type: "snapshot"; projects: Project[] }
+  | { type: "snapshot"; projects: Project[]; archiveAfterDays?: number }
   | { type: "connected"; connected: boolean };
 
 /**
@@ -27,7 +28,11 @@ export function projectsReducer(
 ): ProjectsState {
   switch (action.type) {
     case "snapshot":
-      return { ...state, projects: action.projects };
+      return {
+        ...state,
+        projects: action.projects,
+        archiveAfterDays: action.archiveAfterDays ?? state.archiveAfterDays,
+      };
     case "connected":
       return { ...state, connected: action.connected };
     default:
@@ -35,7 +40,7 @@ export function projectsReducer(
   }
 }
 
-const INITIAL: ProjectsState = { projects: [], connected: false };
+const INITIAL: ProjectsState = { projects: [], connected: false, archiveAfterDays: 7 };
 
 const StateCtx = createContext<ProjectsState>(INITIAL);
 const DispatchCtx = createContext<Dispatch<ProjectsAction>>(() => {});
@@ -50,6 +55,7 @@ export function ProjectsProvider({
   const [state, dispatch] = useReducer(projectsReducer, {
     projects: initial ?? [],
     connected: false,
+    archiveAfterDays: 7,
   });
   return (
     <StateCtx.Provider value={state}>
