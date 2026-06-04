@@ -36,9 +36,11 @@ export interface Task {
 }
 
 // Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.
-// Quando existe cost-report.json (artefato canônico/escopado da pipeline), ele é a
-// fonte de verdade (source="authoritative"); senão soma crua (source="preliminary").
-export type CostSource = "empty" | "preliminary" | "authoritative";
+// Hierarquia de fonte: "report" = report.html parseado (fonte canônica);
+// "unreliable" = report.html presente mas ilegível/não-parseável;
+// "partial" = soma crua dos costs/*.json (sem report.html); "empty" = sem dados.
+// cost-report.json não é consultado.
+export type CostSource = "empty" | "partial" | "unreliable" | "report";
 
 export interface CostPhaseBreakdown {
   planning: number | null;
@@ -57,15 +59,14 @@ export interface CostRollup {
   };
   totalTokens: number;
   reportPath: string | null; // caminho do report.html, se existir
-  // --- novos (aditivos): preenchidos a partir do cost-report.json quando presente ---
   source: CostSource;
   scopingSuspect: boolean; // ausente no arquivo ⇒ false
-  // excludedSubagents/recoveredSubagents/complete: carregados do cost-report mas
+  // excludedSubagents/recoveredSubagents/complete: extraídos do report.html parseado;
   // ainda NÃO exibidos na UI (completude do modelo; o design só pede breakdown+badge).
   excludedSubagents: number | null;
   recoveredSubagents: number | null;
-  byPhase: CostPhaseBreakdown | null; // só quando source="authoritative"
-  complete: boolean | null; // campo `complete` do cost-report; null em preliminary/empty
+  byPhase: CostPhaseBreakdown | null; // preenchido quando source="report"; null em unreliable/partial/empty
+  complete: boolean | null; // null quando source != "report"
 }
 
 export interface TimelineEntry {

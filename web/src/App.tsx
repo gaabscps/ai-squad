@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { ProjectsProvider } from "./state/projects";
 import { useLiveProjects } from "./state/useLiveProjects";
 import { Board, type SelectedSpec } from "./components/Board";
+import { FolderManager } from "./components/FolderManager";
 import {
   DiagnosisJobsProvider,
   useDiagnosisJobs,
@@ -13,10 +14,12 @@ function BoardLive({
   selected,
   onSelect,
   onClose,
+  onOpenFolderManager,
 }: {
   selected: SelectedSpec | null;
   onSelect: (spec: SelectedSpec) => void;
   onClose: () => void;
+  onOpenFolderManager?: () => void;
 }) {
   const { toggleHide } = useLiveProjects();
   return (
@@ -25,6 +28,7 @@ function BoardLive({
       selected={selected}
       onSelect={onSelect}
       onClose={onClose}
+      onOpenFolderManager={onOpenFolderManager}
     />
   );
 }
@@ -59,6 +63,7 @@ export function App({ diagnosisClient }: AppProps = {}) {
 
 function AppInner() {
   const [selected, setSelected] = useState<SelectedSpec | null>(null);
+  const [folderManagerOpen, setFolderManagerOpen] = useState(false);
   const { markSeen, getJob } = useDiagnosisJobs();
 
   useEffect(() => {
@@ -84,10 +89,17 @@ function AppInner() {
   }, [selected, job, markSeen]);
 
   return (
-    <BoardLive
-      selected={selected}
-      onSelect={setSelected}
-      onClose={() => setSelected(null)}
-    />
+    <>
+      <BoardLive
+        selected={selected}
+        onSelect={setSelected}
+        onClose={() => setSelected(null)}
+        onOpenFolderManager={() => setFolderManagerOpen(true)}
+      />
+      <FolderManager
+        open={folderManagerOpen}
+        onClose={() => setFolderManagerOpen(false)}
+      />
+    </>
   );
 }

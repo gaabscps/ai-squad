@@ -65,7 +65,7 @@ function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: 
   );
 }
 
-/** Os 5 blocos crus, agora dentro de cards, recolhidos por padrão num <details>. */
+/** Detalhes de dispatches agrupados em `<details>`, recolhidos por padrão. */
 function TechDetails({ dispatches }: { dispatches: Dispatch[] }) {
   if (dispatches.length === 0) {
     return <p className="task-empty-dispatches">sem dispatches registrados</p>;
@@ -153,7 +153,7 @@ export function TaskItem({ task, projectId, specId }: { task: Task; projectId: s
         <span className="mono task-item-id">{task.id}</span>
         <span className="task-item-state">{STATE_LABEL[task.state] ?? task.state}</span>
         {task.loops > 1 && <span className="task-item-loops">↻ {task.loops} loops</span>}
-        {totalTokens != null && <span className="task-item-tokens">{fmtTokens(totalTokens)} tok</span>}
+        <span className="task-item-tokens">{totalTokens != null ? `${fmtTokens(totalTokens)} tok` : "—"}</span>
         <span className="task-item-chevron" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
       </button>
       {expanded && (

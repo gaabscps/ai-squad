@@ -25,23 +25,35 @@ export interface WatchHandle {
 
 /**
  * Observa só os arquivos que afetam o board — session.yml, costs/*.json,
- * manifests e outputs/*.json (packets de dispatch) — e NÃO os .md (mudam na
- * escrita interativa e não mexem em status/custo: design §4). Chama onChange
- * (debounced) a cada mudança.
- * Glob anchorado em "*\/.agent-session" pra não varrer a árvore inteira. Read-only.
+ * manifests, outputs/*.json (packets de dispatch), report.html e cost-report.json —
+ * e NÃO os .md (mudam na escrita interativa e não mexem em status/custo: design §4).
+ * Chama onChange (debounced) a cada mudança.
+ * Glob anchorado em "*\/.agent-session" pra não varrer a árvore inteira.
  */
 export function watchProjects(
   roots: string[],
+  include: string[],
   onChange: () => void,
   debounceMs = 200,
 ): WatchHandle {
-  const patterns = roots.flatMap((r) => [
-    join(r, "*", ".agent-session", "**", "session.yml"),
-    join(r, "*", ".agent-session", "**", "costs", "*.json"),
-    join(r, "*", ".agent-session", "**", "*manifest*.json"),
-    join(r, "*", ".agent-session", "**", "outputs", "*.json"),
-    join(r, "*", ".agent-session", "**", "cost-report.json"),
-  ]);
+  const patterns = [
+    ...roots.flatMap((r) => [
+      join(r, "*", ".agent-session", "**", "session.yml"),
+      join(r, "*", ".agent-session", "**", "costs", "*.json"),
+      join(r, "*", ".agent-session", "**", "*manifest*.json"),
+      join(r, "*", ".agent-session", "**", "outputs", "*.json"),
+      join(r, "*", ".agent-session", "**", "report.html"),
+      join(r, "*", ".agent-session", "**", "cost-report.json"),
+    ]),
+    ...include.flatMap((inc) => [
+      join(inc, ".agent-session", "**", "session.yml"),
+      join(inc, ".agent-session", "**", "costs", "*.json"),
+      join(inc, ".agent-session", "**", "*manifest*.json"),
+      join(inc, ".agent-session", "**", "outputs", "*.json"),
+      join(inc, ".agent-session", "**", "report.html"),
+      join(inc, ".agent-session", "**", "cost-report.json"),
+    ]),
+  ];
   const debounced = debounce(onChange, debounceMs);
   const watcher = chokidar.watch(patterns, {
     ignoreInitial: true, // não dispara pelos arquivos que já existiam ao subir

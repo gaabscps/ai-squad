@@ -2,11 +2,13 @@ import type { SpecWithProject } from "../lib/kanban";
 import { attentionReason, columnForSpec } from "../lib/kanban";
 import { fmtTokens, fmtUsd } from "../format";
 import { PhaseBar } from "./PhaseBar";
+import { PhaseJourney } from "./PhaseJourney";
 import { StatusBadge } from "./StatusBadge";
 import { Timeline } from "./Timeline";
 import { TaskItem } from "./TaskItem";
 import { AttentionPanel } from "./AttentionPanel";
 import { SpecJobIndicator } from "./SpecJobIndicator";
+import { buildStory } from "../lib/buildStory";
 
 export function DetailDrawer({
   item,
@@ -20,6 +22,7 @@ export function DetailDrawer({
   const { spec, projectId, projectName, projectPath } = item;
   const reason = attentionReason(spec);
   const t = spec.cost.tokens;
+  const story = buildStory(spec);
 
   return (
     <div className="drawer-overlay" onClick={onClose}>
@@ -48,6 +51,8 @@ export function DetailDrawer({
 
         <h2 className="drawer-title">{spec.title}</h2>
 
+        <p className="drawer-story" data-testid="drawer-story">{story}</p>
+
         {reason && (
           <div className={`drawer-why why-${reason.kind}`}>{reason.label}</div>
         )}
@@ -59,10 +64,24 @@ export function DetailDrawer({
         <h4 className="drawer-section">Fases</h4>
         <PhaseBar spec={spec} />
 
+        <h4 className="drawer-section">Jornada de custo</h4>
+        <PhaseJourney cost={spec.cost} />
+
+        {spec.cost.reportPath && (
+          <a
+            className="drawer-cost-report"
+            href={`/file?path=${encodeURIComponent(spec.cost.reportPath)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            report.html →
+          </a>
+        )}
+
         <h4 className="drawer-section">Tarefas</h4>
         <ul className="drawer-tasks">
           {spec.tasks.length === 0 && (
-            <li className="drawer-tasks-empty">sem tarefas registradas</li>
+            <li className="drawer-tasks-empty">nenhuma tarefa ainda</li>
           )}
           {spec.tasks.map((task) => (
             <TaskItem key={task.id} task={task} projectId={projectId} specId={spec.id} />
@@ -76,20 +95,10 @@ export function DetailDrawer({
             {fmtTokens(spec.cost.totalTokens)} tokens
           </span>
           {spec.cost.partial && <span className="cost-partial">$ parcial</span>}
-          {spec.cost.source === "preliminary" && (
+          {spec.cost.source === "partial" && (
             <span className="cost-preliminary" title="soma crua dos costs/*.json — cost-report.json ainda não publicado">
               preliminar
             </span>
-          )}
-          {spec.cost.reportPath && (
-            <a
-              className="drawer-cost-report"
-              href={`/file?path=${encodeURIComponent(spec.cost.reportPath)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              report.html →
-            </a>
           )}
         </div>
         <dl className="drawer-cost-breakdown mono">
@@ -111,7 +120,7 @@ export function DetailDrawer({
           </div>
         </dl>
 
-        {spec.cost.source === "authoritative" && spec.cost.byPhase && (
+        {spec.cost.source === "report" && spec.cost.byPhase && (
           <dl className="drawer-cost-phases mono">
             <div>
               <dt>planning</dt>

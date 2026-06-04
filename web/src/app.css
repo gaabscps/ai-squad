@@ -356,3 +356,175 @@ a:hover { text-decoration: underline; }
   background: #fef2f2;
   border: 1px solid #fecaca;
 }
+
+/* ---- FolderManager modal ---- */
+.fm-overlay {
+  position: fixed; inset: 0; background: rgba(16, 24, 40, 0.32);
+  display: flex; align-items: center; justify-content: center; z-index: 40;
+}
+.fm-modal {
+  width: min(560px, 96vw); max-height: 82vh; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lift); overflow: hidden;
+}
+.fm-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fm-title { margin: 0; font-size: 15px; font-weight: 700; }
+.fm-close {
+  margin-left: auto; border: 0; background: transparent;
+  color: var(--text-mute); font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 4px;
+}
+.fm-close:hover { color: var(--text); }
+
+/* Seções */
+.fm-section { display: flex; flex-direction: column; flex-shrink: 0; }
+.fm-section + .fm-section { border-top: 1px solid var(--border); }
+.fm-section-title {
+  margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-mute);
+  padding: 10px 16px 6px; flex-shrink: 0;
+}
+
+/* Seção "Repos adicionados" */
+.fm-include-list { list-style: none; margin: 0; padding: 0 0 8px; }
+.fm-include-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 16px; border-bottom: 1px solid var(--border-soft);
+}
+.fm-include-item:last-child { border-bottom: 0; }
+.fm-include-path {
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fm-btn-remove {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 9px;
+  border: 1px solid #fca5a5; border-radius: 6px;
+  background: #fff; color: #b91c1c; cursor: pointer;
+}
+.fm-btn-remove:hover:not(:disabled) { background: #fef2f2; }
+.fm-btn-remove:disabled { opacity: 0.45; cursor: not-allowed; }
+.fm-empty-repos { margin: 0; padding: 10px 16px 12px; font-size: 13px; color: var(--text-mute); }
+
+/* Seção "Adicionar novo" — scrollável */
+.fm-section-nav { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.fm-breadcrumb { padding: 8px 16px 6px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
+.fm-path { font-family: var(--mono); font-size: 12px; color: var(--text-dim); word-break: break-all; }
+.fm-controls {
+  display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+}
+.fm-btn {
+  font-size: 12px; font-weight: 600; padding: 5px 12px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); color: var(--text); cursor: pointer;
+}
+.fm-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.fm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.fm-btn-add { margin-left: auto; background: var(--accent); color: #fff; border-color: var(--accent); }
+.fm-btn-add:hover:not(:disabled) { filter: brightness(0.93); color: #fff; }
+.fm-error { margin: 0; padding: 7px 16px; font-size: 13px; color: #b91c1c; background: #fef2f2; border-bottom: 1px solid #fecaca; flex-shrink: 0; }
+.fm-feedback { margin: 0; padding: 7px 16px; font-size: 13px; color: #15803d; background: #f0fdf4; border-bottom: 1px solid #bbf7d0; flex-shrink: 0; }
+.fm-dir-list { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; flex: 1; }
+.fm-dir-item { border-bottom: 1px solid var(--border-soft); }
+.fm-dir-item:last-child { border-bottom: 0; }
+.fm-dir-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 16px; border: 0; background: transparent;
+  font-size: 13px; color: var(--text); cursor: pointer; text-align: left;
+}
+.fm-dir-btn:hover { background: var(--surface-soft); }
+.fm-sdd-badge {
+  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  color: #1d4ed8; background: #eff4ff; border: 1px solid #bfdbfe; margin-left: auto;
+}
+.fm-empty { padding: 24px 16px; font-size: 13px; color: var(--text-mute); text-align: center; }
+.fm-loading { padding: 24px 16px; font-size: 13px; color: var(--text-mute); text-align: center; }
+
+/* ── KanbanCard – meta row (tasks + cost) ─────────────────────────────── */
+.kcard-tasks { color: var(--text-dim); }
+.kcard-cost { margin-left: 10px; color: var(--text-dim); }
+.cost-empty { color: var(--text-mute); }
+.cost-unreliable { color: var(--blocked); font-size: 10px; }
+
+/* ── Cost Phase Bar (barra proporcional no card) ──────────────────────── */
+.cost-phase-bar {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: flex; height: 4px; border-radius: 2px; overflow: hidden; gap: 1px;
+}
+.cost-phase { border-radius: 1px; min-width: 2px; transition: opacity 0.15s; }
+.cost-phase-planning     { background: #818cf8; }  /* indigo  */
+.cost-phase-orchestration { background: #f59e0b; }  /* âmbar   */
+.cost-phase-implementation { background: #34d399; } /* esmeralda */
+.cost-phase:hover { opacity: 0.75; }
+
+/* ── Drawer story (frase buildStory) ─────────────────────────────────── */
+.drawer-story {
+  margin: 0 0 14px;
+  font-size: 13px; line-height: 1.55; color: var(--text-dim);
+}
+
+/* ── Phase Journey (jornada de custo por fase no drawer) ─────────────── */
+.phase-journey { margin: 0 0 6px; }
+
+.phase-journey-empty {
+  font-size: 13px; color: var(--text-mute); padding: 4px 0;
+}
+
+.phase-journey-badge {
+  display: inline-block; margin-bottom: 8px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 9px; border-radius: 999px;
+}
+.phase-journey-partial {
+  color: var(--paused);
+  background: color-mix(in srgb, var(--paused) 16%, transparent);
+}
+.phase-journey-unreliable {
+  color: var(--blocked);
+  background: color-mix(in srgb, var(--blocked) 14%, transparent);
+}
+.phase-journey-no-phases {
+  color: var(--text-mute); background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
+.phase-journey-list {
+  list-style: none; margin: 0 0 6px; padding: 0;
+  display: flex; flex-direction: column;
+}
+.phase-journey-row {
+  display: flex; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.phase-journey-row:last-child { border-bottom: none; }
+.phase-journey-name {
+  text-transform: capitalize; color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px;
+}
+.phase-journey-name::before {
+  content: ''; display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border);
+}
+.phase-journey-row:nth-child(1) .phase-journey-name::before { background: #818cf8; }
+.phase-journey-row:nth-child(2) .phase-journey-name::before { background: #f59e0b; }
+.phase-journey-row:nth-child(3) .phase-journey-name::before { background: #34d399; }
+
+.phase-journey-cost {
+  margin-left: auto; font-family: var(--mono); font-size: 12px;
+  color: var(--text);
+}
+
+.phase-journey-total {
+  display: flex; align-items: center;
+  padding-top: 7px; margin-top: 2px;
+  border-top: 1px solid var(--border);
+  font-size: 13px; font-weight: 700;
+}
+.phase-journey-total-label { color: var(--text-dim); }
+.phase-journey-total-value {
+  margin-left: auto; font-family: var(--mono); color: var(--text);
+}

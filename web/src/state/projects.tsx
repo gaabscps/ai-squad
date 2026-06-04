@@ -11,16 +11,17 @@ export interface ProjectsState {
   projects: Project[];
   connected: boolean;
   archiveAfterDays: number;
+  include: string[];
 }
 
 export type ProjectsAction =
-  | { type: "snapshot"; projects: Project[]; archiveAfterDays?: number }
+  | { type: "snapshot"; projects: Project[]; archiveAfterDays?: number; include?: string[] }
   | { type: "connected"; connected: boolean };
 
 /**
  * O WS empurra o Project[] INTEIRO a cada mudança; por isso 'snapshot' só troca
  * o array (sem merge). 'connected' reflete o estado da conexão (pra UI mostrar
- * "ao vivo" / "reconectando"). Reducer puro — fácil de testar isolado.
+ * "ao vivo" / "reconectando").
  */
 export function projectsReducer(
   state: ProjectsState,
@@ -32,6 +33,7 @@ export function projectsReducer(
         ...state,
         projects: action.projects,
         archiveAfterDays: action.archiveAfterDays ?? state.archiveAfterDays,
+        include: action.include ?? state.include,
       };
     case "connected":
       return { ...state, connected: action.connected };
@@ -40,7 +42,7 @@ export function projectsReducer(
   }
 }
 
-const INITIAL: ProjectsState = { projects: [], connected: false, archiveAfterDays: 7 };
+const INITIAL: ProjectsState = { projects: [], connected: false, archiveAfterDays: 7, include: [] };
 
 const StateCtx = createContext<ProjectsState>(INITIAL);
 const DispatchCtx = createContext<Dispatch<ProjectsAction>>(() => {});
@@ -49,15 +51,18 @@ export function ProjectsProvider({
   children,
   initial,
   initialArchiveAfterDays = 7,
+  initialInclude = [],
 }: {
   children: ReactNode;
   initial?: Project[];
   initialArchiveAfterDays?: number;
+  initialInclude?: string[];
 }) {
   const [state, dispatch] = useReducer(projectsReducer, {
     projects: initial ?? [],
     connected: false,
     archiveAfterDays: initialArchiveAfterDays,
+    include: initialInclude,
   });
   return (
     <StateCtx.Provider value={state}>

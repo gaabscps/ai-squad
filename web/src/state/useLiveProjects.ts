@@ -5,7 +5,7 @@ import { useProjectsDispatch } from "./projects";
  * Conecta ao WS /ws (caminho relativo), despacha cada snapshot, marca connected,
  * e reconecta com backoff (1s,2s,4s… teto 10s) quando cai — ex.: você reinicia o
  * `npm run serve` e o board volta sozinho, sem F5. Devolve toggleHide pra o board
- * mandar hide/unhide pelo mesmo socket. Sem lib, coerente com o estado sem-lib.
+ * mandar hide/unhide pelo mesmo socket.
  */
 export function useLiveProjects(): {
   toggleHide: (id: string, hidden: boolean) => void;
@@ -40,6 +40,7 @@ export function useLiveProjects(): {
               type: "snapshot",
               projects: msg.projects,
               archiveAfterDays: msg.archiveAfterDays,
+              include: msg.include,
             });
           }
         } catch {

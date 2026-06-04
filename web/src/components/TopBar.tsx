@@ -1,7 +1,6 @@
 /**
- * Barra superior: marca + pílula de conexão (ao vivo / reconectando, vindo do WS)
- * + busca (controlada pelo Board) + toggle Kanban|Tabela. Não tem estado próprio;
- * tudo sobe via callbacks pro Board, que é o dono do estado de UI.
+ * Barra superior: marca + pílula de conexão + busca + toggle Kanban|Tabela|Arquivadas
+ * + botão Pastas. Sem estado próprio; recebe tudo via props/callbacks.
  */
 export type ViewMode = "kanban" | "table" | "archived";
 
@@ -11,12 +10,14 @@ export function TopBar({
   onQuery,
   view,
   onView,
+  onOpenFolderManager,
 }: {
   connected: boolean;
   query: string;
   onQuery: (q: string) => void;
   view: ViewMode;
   onView: (v: ViewMode) => void;
+  onOpenFolderManager?: () => void;
 }) {
   return (
     <header className="topbar">
@@ -34,6 +35,13 @@ export function TopBar({
         value={query}
         onChange={(e) => onQuery(e.target.value)}
       />
+      <button
+        type="button"
+        className="topbar-folders-btn"
+        onClick={() => onOpenFolderManager?.()}
+      >
+        Pastas
+      </button>
       <div className="seg" role="group" aria-label="visão">
         <button
           type="button"

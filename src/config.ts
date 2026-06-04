@@ -4,12 +4,40 @@ import { join } from "node:path";
 
 export interface AiosConfig {
   roots: string[]; // pastas-raiz pra auto-scan
-  include: string[]; // paths avulsos de projeto, fora das roots
+  include?: string[]; // paths avulsos de projeto, fora das roots
   hide: string[]; // names ou paths de projeto a ocultar (persistido)
   archiveAfterDays: number; // dias após concluir até a feature done sair do board
 }
 
 const DEFAULTS: AiosConfig = { roots: [], include: [], hide: [], archiveAfterDays: 7 };
+
+/**
+ * Lê o config atual, faz merge dos campos fornecidos e persiste.
+ * Tolerante: se o arquivo existir mas não puder ser lido/parseado, retorna
+ * { persisted: false } sem tentar gravar (evita sobrescrever com defaults).
+ * Erros de escrita também são capturados e retornam { persisted: false }.
+ */
+export async function saveConfigFields(
+  fields: Partial<AiosConfig>,
+  configPath: string,
+): Promise<{ persisted: boolean }> {
+  let current: Partial<AiosConfig> = {};
+  if (existsSync(configPath)) {
+    try {
+      current = JSON.parse(readFileSync(configPath, "utf-8"));
+    } catch {
+      console.warn("[aiOS] saveConfigFields: não foi possível ler o config; gravação cancelada para preservar o estado.");
+      return { persisted: false };
+    }
+  }
+  try {
+    writeFileSync(configPath, JSON.stringify({ ...DEFAULTS, ...current, ...fields }, null, 2) + "\n", "utf-8");
+    return { persisted: true };
+  } catch (err) {
+    console.warn("[aiOS] saveConfigFields: falha ao gravar config —", (err as Error).message);
+    return { persisted: false };
+  }
+}
 
 /** Expande um ~ inicial para o home do usuário (Node não faz isso sozinho). */
 export function expandTilde(p: string): string {
@@ -35,26 +63,7 @@ export function loadConfig(configPath: string): AiosConfig {
   };
 }
 
-/**
- * Reescreve só o hide[] preservando roots/include. ÚNICA escrita do aiOS —
- * e no PRÓPRIO repo do aiOS (aios.config.json), nunca nos .agent-session/ alheios.
- */
-export function saveHidden(configPath: string, hide: string[]): void {
-  // Preserva roots/include crus (com ~ literal) de propósito: manter o arquivo
-  // legível como o usuário escreveu. Contraste com loadConfig, que expande o ~.
-  let current: Partial<AiosConfig> = {};
-  if (existsSync(configPath)) {
-    try {
-      current = JSON.parse(readFileSync(configPath, "utf-8"));
-    } catch {
-      current = {}; // config corrompida: reescreve com roots/include vazios
-    }
-  }
-  const next: AiosConfig = {
-    roots: current.roots ?? [],
-    include: current.include ?? [],
-    hide,
-    archiveAfterDays: current.archiveAfterDays ?? 7,
-  };
-  writeFileSync(configPath, JSON.stringify(next, null, 2) + "\n", "utf-8");
+/** Reescreve só o hide[] preservando os demais campos. */
+export async function saveHidden(configPath: string, hide: string[]): Promise<void> {
+  await saveConfigFields({ hide }, configPath);
 }

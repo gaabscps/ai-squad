@@ -2,10 +2,12 @@ import express from "express";
 import { createServer as createHttpServer, type Server } from "node:http";
 import { existsSync, statSync } from "node:fs";
 import { resolve, relative, isAbsolute, join } from "node:path";
+import { homedir } from "node:os";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Store } from "../store/store.js";
 import { makeSummaryHandler } from "../summary/handler.js";
 import { makeDiagnosisHandler } from "../attention/handler.js";
+import { listDirs } from "../collector/browse.js";
 
 // pasta do build do Vite (npm run build → dist/web); em dev pode não existir.
 const FRONT_DIR = join(process.cwd(), "dist", "web");
@@ -16,22 +18,19 @@ function isInside(root: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/**
- * Monta o servidor HTTP + WebSocket sobre um Store pronto.
- * - GET /api/projects: snapshot atual (contrato HTTP; primeiro load via curl/debug).
- * - GET /file?path=<abs>: serve report.html/.md READ-ONLY, só se o path estiver
- *   dentro de um project.path conhecido (anti path-traversal). Cumpre o §6.
- * - WS em /ws: empurra { type: "snapshot", projects } ao conectar e a cada
- *   'changed' do Store; recebe { type: "hide"|"unhide", id } e delega a onToggleHide.
- * - resto: serve o build do Vite (dist/web) com fallback de SPA pro index.html.
- * Devolve o http.Server SEM dar listen — quem chama escolhe a porta.
- */
+/** Devolve o http.Server SEM dar listen — separa criação de binding de porta. */
 export function createServer(
   store: Store,
   onToggleHide: (id: string, hidden: boolean) => void,
   archiveAfterDays: number = 7,
+  getInclude: () => string[] = () => [],
+  addInclude: (path: string) => Promise<{ persisted: boolean; alreadyExisted: boolean }> = () =>
+    Promise.resolve({ persisted: false, alreadyExisted: false }),
+  removeInclude: (path: string) => Promise<{ persisted: boolean }> = () =>
+    Promise.resolve({ persisted: false }),
 ): Server {
   const app = express();
+  app.use(express.json());
 
   app.get("/api/projects", (_req, res) => {
     res.json(store.getSnapshot());
@@ -58,9 +57,54 @@ export function createServer(
     res.sendFile(target);
   });
 
-  // build do Vite (estático) + fallback de SPA. Em dev (sem build) cai no else.
+  app.get("/api/browse", async (req, res) => {
+    const rawPath = req.query.path;
+    if (typeof rawPath !== "string") {
+      res.status(400).json({ error: "parâmetro path obrigatório" });
+      return;
+    }
+    const resolvedPath = rawPath.trim() === "" ? homedir() : rawPath.trim();
+    try {
+      const dirs = await listDirs(resolvedPath, homedir());
+      res.json({ dirs, resolvedPath });
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "OUTSIDE_HOME") return res.status(403).json({ error: "path fora do home do usuário" });
+      return res.status(400).json({ error: code === "NOT_A_DIR" ? "path não existe ou não é diretório" : "erro ao listar diretório" });
+    }
+  });
+
+  app.post("/api/include", async (req, res) => {
+    const { path } = req.body as { path?: unknown };
+    if (typeof path !== "string" || path.trim() === "") {
+      res.status(400).json({ error: "campo path obrigatório" });
+      return;
+    }
+    try {
+      const result = await addInclude(path);
+      res.status(result.alreadyExisted ? 200 : 201).json({ persisted: result.persisted });
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "OUTSIDE_HOME") {
+        res.status(403).json({ error: "path fora do home do usuário" });
+        return;
+      }
+      res.status(400).json({ error: code === "NO_AGENT_SESSION" ? "diretório não contém .agent-session/" : "path inválido ou inexistente" });
+    }
+  });
+
+  app.delete("/api/include", async (req, res) => {
+    const { path } = req.body as { path?: unknown };
+    if (typeof path !== "string" || path.trim() === "") {
+      res.status(400).json({ error: "campo path obrigatório" });
+      return;
+    }
+    const result = await removeInclude(path);
+    res.status(200).json({ persisted: result.persisted });
+  });
+
   app.use(express.static(FRONT_DIR));
-  app.get("*", (_req, res, next) => {
+  app.get("*", (_req, res, _next) => {
     const index = join(FRONT_DIR, "index.html");
     if (existsSync(index)) res.sendFile(index);
     else res.type("text").send("ai-squad-os server up (front não buildado — rode npm run build, ou use o Vite em dev)");
@@ -72,7 +116,7 @@ export function createServer(
   // archiveAfterDays é lido uma vez na inicialização — mudar no aios.config.json exige reiniciar
   // o servidor (igual às roots; ao contrário do hide, que é relido a cada rebuild).
   const snapshotMessage = () =>
-    JSON.stringify({ type: "snapshot", projects: store.getSnapshot(), archiveAfterDays });
+    JSON.stringify({ type: "snapshot", projects: store.getSnapshot(), archiveAfterDays, include: getInclude() });
 
   wss.on("connection", (socket) => {
     // Envia no próximo tick (não no mesmo tick do 'connection'): garante que o
@@ -106,7 +150,6 @@ export function createServer(
     });
   });
 
-  // o Store é a fonte; quando ele muda, todo cliente conectado recebe o novo snapshot.
   const onChanged = (): void => {
     const data = snapshotMessage();
     for (const client of wss.clients) {

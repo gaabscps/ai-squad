@@ -21,11 +21,13 @@ export function Board({
   selected: selectedProp,
   onSelect: onSelectProp,
   onClose: onCloseProp,
+  onOpenFolderManager,
 }: {
   onHide: (id: string, hidden: boolean) => void;
   selected?: SelectedSpec | null;
   onSelect?: (spec: SelectedSpec) => void;
   onClose?: () => void;
+  onOpenFolderManager?: () => void;
 }) {
   const { projects, connected, archiveAfterDays } = useProjects();
   const [view, setView] = useState<ViewMode>("kanban");
@@ -92,7 +94,7 @@ export function Board({
 
   return (
     <div className="app-shell">
-      <TopBar connected={connected} query={query} onQuery={setQuery} view={view} onView={setView} />
+      <TopBar connected={connected} query={query} onQuery={setQuery} view={view} onView={setView} onOpenFolderManager={onOpenFolderManager} />
       <ProjectFilter
         projects={projects}
         filter={filter}

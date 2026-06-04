@@ -38,16 +38,6 @@ describe("AC-015: linha colapsada por padrão", () => {
     expect(screen.getByText(/conclu/i)).toBeInTheDocument();
   });
 
-  it("não exibe o indicador ↻ loops quando loops ≤ 1", () => {
-    render(<TaskItem task={makeTask({ loops: 1 })} projectId="proj-1" specId="FEAT-001" />);
-    expect(screen.queryByText(/↻/)).toBeNull();
-  });
-
-  it("não exibe o indicador ↻ loops quando loops é 0", () => {
-    render(<TaskItem task={makeTask({ loops: 0 })} projectId="proj-1" specId="FEAT-001" />);
-    expect(screen.queryByText(/↻/)).toBeNull();
-  });
-
   it("exibe ↻ N loops quando loops > 1", () => {
     render(<TaskItem task={makeTask({ loops: 3 })} projectId="proj-1" specId="FEAT-001" />);
     expect(screen.getByText(/↻.*3/)).toBeInTheDocument();
@@ -298,6 +288,101 @@ describe("AC-020: blocos vazios omitidos", () => {
     await userEvent.click(screen.getByRole("button"));
     // Histórico de loops sempre presente quando há dispatches
     expect(screen.getByText(/Histórico de loops/i)).toBeInTheDocument();
+  });
+});
+
+// ─── AC-016: estado, retrabalho e tokens visíveis na linha colapsada ─────────
+
+describe("AC-016: estado, retrabalho e tokens sempre visíveis na linha", () => {
+  it("exibe o rótulo legível do estado 'pending'", () => {
+    render(<TaskItem task={makeTask({ state: "pending" })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("pendente")).toBeInTheDocument();
+  });
+
+  it("exibe o rótulo legível do estado 'running'", () => {
+    render(<TaskItem task={makeTask({ state: "running" })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("rodando")).toBeInTheDocument();
+  });
+
+  it("exibe o rótulo legível do estado 'done'", () => {
+    render(<TaskItem task={makeTask({ state: "done" })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("concluída")).toBeInTheDocument();
+  });
+
+  it("exibe o rótulo legível do estado 'blocked'", () => {
+    render(<TaskItem task={makeTask({ state: "blocked" })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("bloqueada")).toBeInTheDocument();
+  });
+
+  it("mostra o indicador de retrabalho quando loops > 1", () => {
+    render(<TaskItem task={makeTask({ loops: 2 })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText(/↻.*2/)).toBeInTheDocument();
+  });
+
+  it("não mostra o indicador de retrabalho quando loops === 1", () => {
+    render(<TaskItem task={makeTask({ loops: 1 })} projectId="p" specId="FEAT-001" />);
+    expect(screen.queryByText(/↻/)).toBeNull();
+  });
+
+  it("não mostra o indicador de retrabalho quando loops === 0", () => {
+    render(<TaskItem task={makeTask({ loops: 0 })} projectId="p" specId="FEAT-001" />);
+    expect(screen.queryByText(/↻/)).toBeNull();
+  });
+
+  it("exibe os tokens formatados quando há dispatches com tokens numéricos", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: 5000 })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("5K tok")).toBeInTheDocument();
+  });
+
+  it("exibe '—' para tokens quando todos os dispatches têm tokens null (AC-016 + AC-018)", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: null })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("exibe '—' para tokens quando a task não tem nenhum dispatch", () => {
+    render(<TaskItem task={makeTask({ dispatches: [] })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+});
+
+// ─── AC-018: tokens null → "—", nunca zero ───────────────────────────────────
+
+describe("AC-018: tokens null exibe '—', nunca zero", () => {
+  it("exibe '—' e não '0' nem '0 tok' quando taskTotalTokens é null", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: null }), makeDispatch({ tokens: null })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText(/\b0\b/)).toBeNull();
+    expect(screen.queryByText(/0 tok/)).toBeNull();
+  });
+
+  it("exibe o valor correto quando tokens é 0 numérico explícito em um dispatch (edge: 0 real vs null)", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: 0 })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    // 0 é um valor real registrado, deve mostrar "0 tok" e não "—"
+    expect(screen.getByText("0 tok")).toBeInTheDocument();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("exibe '—' quando task tem zero dispatches (sem histórico)", () => {
+    render(<TaskItem task={makeTask({ dispatches: [] })} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("exibe a soma correta quando múltiplos dispatches têm tokens numéricos", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: 3000 }), makeDispatch({ tokens: 2000 })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("5K tok")).toBeInTheDocument();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("soma apenas dispatches com tokens não-null (mixed null e numérico)", () => {
+    const task = makeTask({ dispatches: [makeDispatch({ tokens: 1500 }), makeDispatch({ tokens: null })] });
+    render(<TaskItem task={task} projectId="p" specId="FEAT-001" />);
+    expect(screen.getByText("2K tok")).toBeInTheDocument();
+    expect(screen.queryByText("—")).toBeNull();
   });
 });
 

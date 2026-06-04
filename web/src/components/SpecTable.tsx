@@ -89,7 +89,7 @@ export function SpecTable({
             <td>{it.spec.phase}</td>
             <td className="mono">
               {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
-              {it.spec.cost.source === "preliminary" && (
+              {it.spec.cost.source === "partial" && (
                 <span className="cost-preliminary"> · prelim.</span>
               )}
             </td>
