@@ -16,6 +16,8 @@ schema_version: 1                                # forward-compat anchor; not us
 spec_ref: "./.agent-session/FEAT-XXX/spec.md"
 plan_ref: "./.agent-session/FEAT-XXX/plan.md"   # absent if Phase 2 not in planned_phases
 tasks_ref: "./.agent-session/FEAT-XXX/tasks.md" # absent if Phase 3 not in planned_phases
+# delivery_facts_ref: "./.agent-session/FEAT-XXX/delivery-facts.json"   # written by chronicler at pipeline end
+# delivery_report_ref: "./.agent-session/FEAT-XXX/delivery-report.json" # written by chronicler at pipeline end
 
 # Time tracking
 started_at: ""

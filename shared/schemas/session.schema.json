@@ -28,6 +28,8 @@
     "implementation_sessions": { "type": "array", "items": { "type": "string" }, "description": "Claude Code session ids that dispatched Phase 4 work; appended by register-impl-session.py. Authoritative cost-scoping allow-list." },
     "pipeline_started_at": { "type": "string", "description": "Phase 4 start; empty until pipeline starts." },
     "pipeline_completed_at": { "type": "string", "description": "Phase 4 end; empty until complete." },
+    "delivery_facts_ref": { "type": "string", "description": "Path to delivery-facts.json (deterministic extraction) written by the chronicler at pipeline end." },
+    "delivery_report_ref": { "type": "string", "description": "Path to delivery-report.json (the chronicler's parecer). The .md sibling is delivery-report.md." },
     "task_states": {
       "type": "object",
       "description": "Per-task state for Phase 4, keyed by task id (T-XXX).",

@@ -118,3 +118,9 @@ def test_pipeline_mode_and_squad_enums_are_valid():
     s = _schema()
     assert set(s["properties"]["pipeline_mode"]["enum"]) == {"standard", "lite"}
     assert set(s["properties"]["squad"]["enum"]) == {"sdd", "discovery"}
+
+
+def test_delivery_refs_present():
+    s = _schema()
+    props = set(s["properties"])
+    assert {"delivery_report_ref", "delivery_facts_ref"} <= props
