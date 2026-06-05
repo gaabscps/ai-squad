@@ -61,9 +61,10 @@
         "audit-agent",
         "codebase-mapper",
         "risk-analyst",
-        "committer"
+        "committer",
+        "chronicler"
       ],
-      "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch. 'committer' added FEAT-006: auto-commit Subagent dispatched post-Phase-4 handoff."
+      "description": "Subagent that produced this Packet; orchestrator verifies match against dispatch. 'committer' added FEAT-006: auto-commit Subagent dispatched post-Phase-4 handoff. 'chronicler' added: synthesis Subagent that emits the delivery-report at pipeline end."
     },
     "status": {
       "type": "string",
@@ -235,6 +236,23 @@
         "type": "string"
       },
       "description": "dev-only: paths actually edited; orchestrator verifies subset of Work Packet's scope_files"
+    },
+    "decisions": {
+      "type": "array",
+      "description": "dev-only: technical decisions and plan deviations declared during implementation. Source for the delivery-report's 'why' (Q3) and 'deviations from plan' (Q4). Optional; default []. Forbidden on non-dev packets.",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "summary", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "description": "Monotonic per dispatch (DEC-001, DEC-002, ...)." },
+          "kind": { "type": "string", "enum": ["decision", "deviation"], "description": "decision = technical choice between real alternatives with a trade-off; deviation = departed from what plan.md/tasks.md specified." },
+          "summary": { "type": "string", "maxLength": 120, "description": "What was decided/changed (<=120)." },
+          "rationale": { "type": "string", "maxLength": 200, "description": "Why (<=200)." },
+          "ref": { "type": "string", "description": "Evidence pointer: file:line where the decision lives." },
+          "plan_ref": { "type": "string", "description": "Optional: AC id or plan.md section affected/deviated (central for kind=deviation)." }
+        }
+      }
     },
     "ac_coverage": {
       "type": "object",
