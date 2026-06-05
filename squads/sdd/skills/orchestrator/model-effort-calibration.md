@@ -24,11 +24,13 @@ Inlined from [`shared/concepts/effort.md`](../../../shared/concepts/effort.md) �
 | **qa**                 | Any attempt                                | sonnet, medium  | sonnet, medium  | sonnet, medium  | **sonnet, high**  |
 | **blocker-specialist** | Any trigger (cap, stall, conflict)         | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³   | opus, xhigh ³     |
 | **audit-agent**        | Singleton pre-handoff                      | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴ | haiku, medium ⁴   |
+| **chronicler**         | Delivery report post-audit (step 8.5)      | sonnet, high ⁵  | sonnet, high ⁵  | sonnet, high ⁵  | sonnet, high ⁵    |
 
 ¹ Subir tier do `dev` quando há `previous_findings` carregado — contexto mais rico exige modelo mais forte para não repetir o erro do loop anterior.
 ² Última chance em core complex: opus **high** (não medium). Economizar effort aqui é exatamente onde débito técnico entra.
 ³ Blocker é raro e alta aposta — opus xhigh sempre. Custo agregado fica baixo porque dispatch frequency é low.
 ⁴ Audit é reconciliação mecânica de manifesto vs outputs — haiku medium é o ponto certo. Subir desperdiça quota.
+⁵ **chronicler** — `sonnet, high`, tier-independent. Synthesis + long narrative over large context; observational (not causal), so Sonnet over Opus. Runs once per pipeline at step 8.5.
 
 ## Tier definitions (operational)
 
@@ -53,6 +55,7 @@ Tie-break: when in doubt between two tiers, escalate to the higher one.
    - `code-reviewer` / `logic-reviewer` / `qa` → look up by role only (loop-independent)
    - `blocker-specialist` → opus, xhigh (tier-independent)
    - `audit-agent` → haiku, medium (tier-independent)
+   - `chronicler` → sonnet, high (tier-independent)
 3. Look up `(loop_kind, tier)` in the Tier × Loop table → `(model, effort)`.
 4. **Pass `model` as the Task tool's `model` parameter** — this is what actually controls the subagent's run-model. Omitting it bypasses the table entirely.
 5. Write `model`, `effort`, `tier` into the Work Packet YAML (descriptive only — for subagent self-awareness and audit).

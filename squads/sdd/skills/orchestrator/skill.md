@@ -200,6 +200,22 @@ The audit-agent runs 6 reconciliation checks (see [`agents/audit-agent.md`](../.
 
 The audit verdict is **binding and terminal.** On `blocked`/`escalate` the orchestrator MUST NOT: emit a success/mixed handoff; edit any file under `outputs/` to make the audit pass (`guard-session-scope.py` blocks it); or re-dispatch `audit-agent` for a second opinion. The ONLY recovery is human review + `/orchestrator FEAT-NNN --restart`. (Re-running the audit over hand-edited packets was the FEAT-010 failure — 4 runs until it flipped to `done`.)
 
+### 8.5 Delivery report (chronicler — eager, unconditional)
+**Always** dispatch `chronicler` (singleton, no fan-out) after the audit gate — regardless of the audit verdict (`done`, `blocked`, or `escalate`). The report must reflect the real delivery, and a blocked/escalated pipeline needs the honest story most. Append its dispatch to `actual_dispatches[]` with `review_loop: 1`. Work Packet:
+```yaml
+spec_id: FEAT-NNN
+dispatch_id: <uuid>
+session_ref: .agent-session/FEAT-NNN/
+manifest_ref: .agent-session/FEAT-NNN/dispatch-manifest.json
+outputs_dir_ref: .agent-session/FEAT-NNN/outputs/
+spec_ref: .agent-session/FEAT-NNN/spec.md
+plan_ref: .agent-session/FEAT-NNN/plan.md
+tasks_ref: .agent-session/FEAT-NNN/tasks.md
+gate_dispatch_id: <the audit-agent dispatch_id from step 8>
+output_locale: <session output_locale>
+```
+The chronicler writes `delivery-facts.json`, `delivery-report.json`, and `delivery-report.md` under `.agent-session/FEAT-NNN/`, then emits its Output Packet. Record the two report paths in `session.yml` (`delivery_facts_ref`, `delivery_report_ref`). The chronicler is **observational** — its Output Packet NEVER changes the pipeline outcome or the handoff shape; a `blocked` chronicler packet (contract/extractor failure) is surfaced in the handoff as a report-generation failure but does NOT change the audit verdict or block the handoff. Then proceed to step 9.
+
 ### 9. Pipeline-end handoff (only if step 8 passed)
 - Set `current_phase` per outcome (`done` if all tasks done; `escalated` if any pending_human; `paused` if `--resume` aborted mid-flight).
 - **Cost report** (you have write authority; the read-only audit-agent does not). First backfill any missed capture, scoped to THIS session's `subagents/` dir (never a machine-wide `projects/*/*` glob, which inflates the total):
@@ -232,3 +248,4 @@ The audit verdict is **binding and terminal.** On `blocked`/`escalate` the orche
 - Never: hand-edit `dispatch-manifest.json` with Edit/Write. Append only via `manifest_append.py` (atomic). By-hand JSON editing corrupted the manifest in FEAT-001.
 - Always: write the dispatch manifest (step 1b) BEFORE any `Task` dispatch. Manifest-first; dispatch-second.
 - Always: run the audit gate even on uniform-success runs. One cheap haiku dispatch; the protection is non-negotiable.
+- Always: dispatch the `chronicler` (step 8.5) on EVERY terminal pipeline, whatever the audit verdict. The delivery report is eager and unconditional; skipping it on blocked/escalated runs hides exactly the cases that most need the story.
