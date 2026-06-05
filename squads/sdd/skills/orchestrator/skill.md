@@ -209,7 +209,7 @@ session_ref: .agent-session/FEAT-NNN/
 manifest_ref: .agent-session/FEAT-NNN/dispatch-manifest.json
 outputs_dir_ref: .agent-session/FEAT-NNN/outputs/
 spec_ref: .agent-session/FEAT-NNN/spec.md
-plan_ref: .agent-session/FEAT-NNN/plan.md
+plan_ref: .agent-session/FEAT-NNN/plan.md   # omit when 'plan' is not in planned_phases (Plan-skipped session)
 tasks_ref: .agent-session/FEAT-NNN/tasks.md
 gate_dispatch_id: <the audit-agent dispatch_id from step 8>
 output_locale: <session output_locale>

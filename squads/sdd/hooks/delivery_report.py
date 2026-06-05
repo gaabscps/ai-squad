@@ -95,6 +95,25 @@ def _outcome(metrics: dict, gate_status: str) -> str:
     return "mixed"
 
 
+def _build_escalations(units: dict, blocker_info: dict) -> list:
+    """One escalation per work_unit that ended blocked/escalate, enriched with the
+    blocker-specialist's blocker_kind + decision-memo path when available — the
+    richest 'why' source for escalated tasks (Q3/Q9). Omits null memo_ref/blocker_kind
+    so the Facts stay schema-clean (those fields are typed string, not nullable)."""
+    out = []
+    for u in units.values():
+        if u["final_status"] not in ("blocked", "escalate"):
+            continue
+        info = blocker_info.get(u["id"], {})
+        esc = {"unit_id": u["id"], "summary": info.get("summary", "")}
+        if info.get("blocker_kind"):
+            esc["blocker_kind"] = info["blocker_kind"]
+        if info.get("memo_ref"):
+            esc["memo_ref"] = info["memo_ref"]
+        out.append(esc)
+    return out
+
+
 def extract_sdd(session_dir: Path) -> dict:
     """SDD extractor: dispatch-manifest.json + outputs/*.json + session.yml scalars."""
     session_dir = Path(session_dir).resolve()
@@ -125,6 +144,7 @@ def extract_sdd(session_dir: Path) -> dict:
 
     # Group task-scoped dispatches into work_units by task_id.
     units = {}
+    blocker_info = {}  # task_id -> {blocker_kind, memo_ref, summary} from blocker-specialist
     for d in dispatches:
         task_id = d.get("task_id")
         if not task_id or d.get("role") in _PIPELINE_ROLES:
@@ -148,6 +168,17 @@ def extract_sdd(session_dir: Path) -> dict:
             u["loops"]["qa"] += 1
         elif role == "blocker-specialist":
             u["loops"]["blocker"] += 1
+            memo_ref = None
+            for ev in pkt.get("evidence", []) or []:
+                ref = ev.get("ref", "")
+                if ev.get("kind") == "file" and "decisions/" in ref:
+                    memo_ref = ref
+                    break
+            blocker_info[task_id] = {
+                "blocker_kind": pkt.get("blocker_kind"),
+                "memo_ref": memo_ref,
+                "summary": pkt.get("summary", ""),
+            }
         if role == "dev":
             for fc in pkt.get("files_changed", []) or []:
                 if fc not in u["files_changed"]:
@@ -179,10 +210,7 @@ def extract_sdd(session_dir: Path) -> dict:
             "acceptance_criteria": _acceptance_criteria(session_dir),
         },
         "work_units": [units[k] for k in sorted(units)],
-        "escalations": [
-            {"unit_id": u["id"], "blocker_kind": None, "summary": ""}
-            for u in units.values() if u["final_status"] in ("blocked", "escalate")
-        ],
+        "escalations": _build_escalations(units, blocker_info),
         "gate": gate,
         "cost": {"total_usd": None, "complete": False},
         "timeline": {

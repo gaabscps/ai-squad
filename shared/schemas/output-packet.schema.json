@@ -383,7 +383,8 @@
         "audit-agent",
         "codebase-mapper",
         "risk-analyst",
-        "committer"
+        "committer",
+        "chronicler"
       ],
       "description": "Optional hint; orchestrator decides actual routing"
     },

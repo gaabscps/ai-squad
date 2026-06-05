@@ -170,3 +170,28 @@ def test_runs_as_standalone_script(tmp_path):
     )
     assert r.returncode == 0, r.stderr
     assert (sdir / "delivery-facts.json").exists()
+
+
+def test_escalation_enriched_with_blocker_kind_and_memo(tmp_path):
+    sdir = _make_session(tmp_path)
+    mf = sdir / "dispatch-manifest.json"
+    m = json.loads(mf.read_text())
+    m["actual_dispatches"].append(
+        {"dispatch_id": "d-T-001-blocker-l1", "task_id": "T-001",
+         "role": "blocker-specialist", "status": "escalate", "review_loop": 1})
+    mf.write_text(json.dumps(m), encoding="utf-8")
+    blk = {
+        "spec_id": "FEAT-001", "task_id": "T-001", "dispatch_id": "d-T-001-blocker-l1",
+        "role": "blocker-specialist", "status": "escalate", "blocker_kind": "insufficient_data",
+        "summary": "needs human", "usage": None,
+        "evidence": [{"id": "m-1", "kind": "file",
+                      "ref": ".agent-session/FEAT-001/decisions/lock-2026.md"}],
+        "blockers": [{"kind": "insufficient_data", "summary": "spec silent"}],
+    }
+    (sdir / "outputs" / "d-T-001-blocker-l1.json").write_text(json.dumps(blk), encoding="utf-8")
+    facts = delivery_report.build_delivery_facts(str(sdir))
+    esc = [e for e in facts["escalations"] if e["unit_id"] == "T-001"]
+    assert esc, "T-001 should be escalated"
+    assert esc[0]["blocker_kind"] == "insufficient_data"
+    assert esc[0]["memo_ref"].endswith("decisions/lock-2026.md")
+    assert esc[0]["summary"] == "needs human"
