@@ -11,11 +11,12 @@ CLI: python3 delivery_report.py <session_dir>  ->  writes delivery-facts.json
 import sys
 
 # Run as a standalone script, Python puts this file's directory at sys.path[0].
-# shared/lib/ (and a deploy dir that bundles it) holds a warnings.py that shadows
-# the stdlib `warnings` pathlib imports transitively — a circular-import crash on
-# `from pathlib import Path`. This module imports nothing from its siblings, so when
-# pathlib is not yet loaded (the standalone case; under pytest it already is, so this
-# is skipped and the suite's sys.path is untouched) drop the self dir so stdlib wins.
+# If a sibling module ever shadows a stdlib name pathlib imports transitively (e.g. a
+# warnings.py — the case in shared/lib before this file moved to hooks/), then
+# `from pathlib import Path` hits a circular-import crash. This module imports nothing
+# from its siblings, so when pathlib is not yet loaded (the standalone case; under
+# pytest it already is, so this is skipped and the suite's sys.path is untouched) drop
+# the self dir so stdlib always wins. Defensive: hooks/ has no such shadow today.
 if "pathlib" not in sys.modules:
     import os as _os
 
