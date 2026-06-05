@@ -152,3 +152,21 @@ def test_final_status_falls_back_to_manifest_when_packet_missing(tmp_path):
     facts = delivery_report.build_delivery_facts(str(sdir))
     unit = facts["work_units"][0]
     assert unit["final_status"] == "done"
+
+
+def test_runs_as_standalone_script(tmp_path):
+    """The chronicler invokes the extractor as a standalone script. shared/lib's
+    warnings.py shadows stdlib `warnings` (which pathlib imports), so a naive
+    `from pathlib import Path` crashes with a circular import when run that way.
+    Regression guard: run via subprocess (fresh interpreter, pathlib not preloaded).
+    """
+    import subprocess
+
+    sdir = _make_session(tmp_path)
+    script = Path(__file__).resolve().parents[1] / "delivery_report.py"
+    r = subprocess.run(
+        [sys.executable, str(script), str(sdir)],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    assert (sdir / "delivery-facts.json").exists()
