@@ -784,3 +784,51 @@ class TestQaAcScopeMembership(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ===========================================================================
+# decisions[] field: dev-only source for delivery-report; chronicler as Phase 4.
+# ===========================================================================
+
+def test_dev_decisions_valid_shape_passes(tmp_path):
+    packet = {
+        "spec_id": "FEAT-001", "task_id": "T-001", "dispatch_id": "d-T-001-dev-l1",
+        "role": "dev", "status": "done", "summary": "done", "evidence": [], "usage": None,
+        "decisions": [
+            {"id": "DEC-001", "kind": "decision", "summary": "optimistic lock",
+             "rationale": "avoids contention", "ref": "src/x.ts:42", "plan_ref": "AC-003"}
+        ],
+    }
+    p = tmp_path / "d-T-001-dev-l1.json"
+    p.write_text(__import__("json").dumps(packet), encoding="utf-8")
+    ok, reason = _mod.validate_packet(p)
+    assert ok, reason
+
+
+def test_dev_decisions_bad_kind_fails(tmp_path):
+    packet = {
+        "spec_id": "FEAT-001", "task_id": "T-001", "dispatch_id": "d-T-001-dev-l1",
+        "role": "dev", "status": "done", "summary": "done", "evidence": [], "usage": None,
+        "decisions": [{"id": "DEC-001", "kind": "guess", "summary": "x", "rationale": "y"}],
+    }
+    p = tmp_path / "d-T-001-dev-l1.json"
+    p.write_text(__import__("json").dumps(packet), encoding="utf-8")
+    ok, reason = _mod.validate_packet(p)
+    assert not ok and "kind" in reason
+
+
+def test_non_dev_decisions_forbidden(tmp_path):
+    packet = {
+        "spec_id": "FEAT-001", "task_id": "T-001", "dispatch_id": "d-T-001-qa-l1",
+        "role": "qa", "status": "done", "summary": "done", "evidence": [], "usage": None,
+        "ac_coverage": {"FEAT-001/AC-001": ["e-1"]},
+        "decisions": [{"id": "DEC-001", "kind": "decision", "summary": "x", "rationale": "y"}],
+    }
+    p = tmp_path / "d-T-001-qa-l1.json"
+    p.write_text(__import__("json").dumps(packet), encoding="utf-8")
+    ok, reason = _mod.validate_packet(p)
+    assert not ok and "decisions" in reason
+
+
+def test_chronicler_is_phase4_subagent():
+    assert "chronicler" in _mod._PHASE_4_SUBAGENTS

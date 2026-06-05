@@ -71,6 +71,7 @@ _PHASE_4_SUBAGENTS = frozenset({
     "audit-agent",
     "committer",
     "blocker-specialist",
+    "chronicler",
 })
 
 
@@ -353,6 +354,49 @@ def _validate_task_id_field(packet: dict) -> tuple[bool, str]:
     return True, "valid"
 
 
+_DECISION_KINDS = {"decision", "deviation"}
+
+
+def _validate_decisions_field(packet: dict) -> tuple[bool, str]:
+    """dev-only `decisions[]`: source for the delivery-report's why/deviations.
+    Optional on dev (absence is valid). Forbidden on any non-dev role. When present
+    on dev, each item must have id, kind in {decision, deviation}, summary, rationale.
+    """
+    dispatch_id = packet.get("dispatch_id", "<unknown>")
+    role = packet.get("role", "")
+    decisions = packet.get("decisions")
+    if decisions is None:
+        return True, "valid"
+    if role != "dev":
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: '{role}' Output Packet has 'decisions' but the "
+            "field is dev-only — only the dev declares decisions/deviations",
+        )
+    if not isinstance(decisions, list):
+        return (
+            False,
+            f"dispatch_id={dispatch_id}: dev 'decisions' must be an array, "
+            f"got {type(decisions).__name__}",
+        )
+    for i, item in enumerate(decisions):
+        if not isinstance(item, dict):
+            return False, f"dispatch_id={dispatch_id}: dev 'decisions[{i}]' must be an object"
+        for key in ("id", "kind", "summary", "rationale"):
+            if key not in item:
+                return (
+                    False,
+                    f"dispatch_id={dispatch_id}: dev 'decisions[{i}]' missing required key '{key}'",
+                )
+        if item["kind"] not in _DECISION_KINDS:
+            return (
+                False,
+                f"dispatch_id={dispatch_id}: dev 'decisions[{i}].kind' = '{item['kind']}' "
+                f"not in {sorted(_DECISION_KINDS)}",
+            )
+    return True, "valid"
+
+
 def validate_packet(packet_path: Path) -> tuple[bool, str]:
     try:
         packet = json.loads(packet_path.read_text())
@@ -384,6 +428,10 @@ def validate_packet(packet_path: Path) -> tuple[bool, str]:
         return False, reason
     # Identity contract: task-scoped roles must carry task_id (T-XXX).
     ok, reason = _validate_task_id_field(packet)
+    if not ok:
+        return False, reason
+    # dev-only decisions[] (delivery-report source); forbidden on other roles.
+    ok, reason = _validate_decisions_field(packet)
     if not ok:
         return False, reason
     # Discriminated-union role-specific validation (qa, code-reviewer, logic-reviewer).
