@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-squad/shared/schemas/delivery-report.schema.json",
+  "title": "ai-squad Delivery Report",
+  "description": "The chronicler's structured verdict at pipeline end — the 11 product questions answered, each anchored in evidence and tagged with a confidence level (recorded | inferred | not_recorded) so unrecorded facts are never invented. The .md narrative is rendered from this. Read-only by the aiOS cockpit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_id", "squad", "questions", "acceptance_criteria", "verdict", "artifacts"],
+  "properties": {
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$" },
+    "squad": { "type": "string" },
+    "feature_name": { "type": "string" },
+    "output_locale": { "type": "string" },
+    "generated_at": { "type": "string", "description": "ISO 8601 (stamped by the chronicler)." },
+    "questions": {
+      "type": "array",
+      "minItems": 11,
+      "description": "The 11 product questions, in order Q1..Q11.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "key", "answer", "evidence_refs", "confidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^Q\\d{1,2}$" },
+          "key": {
+            "type": "string",
+            "enum": [
+              "what_was_done", "how_it_was_done", "why_this_way", "deviations_from_plan",
+              "acceptance_criteria", "evidence", "impacts", "out_of_scope",
+              "risks_and_pending", "how_to_validate", "final_verdict"
+            ]
+          },
+          "answer": { "type": "string", "description": "Prose in output_locale." },
+          "evidence_refs": { "type": "array", "items": { "type": "string" }, "description": "dispatch_id, file:line, AC id, test command — the sources that sustain the answer." },
+          "confidence": { "type": "string", "enum": ["recorded", "inferred", "not_recorded"], "description": "recorded = anchored in a direct source; inferred = deduced (must say so in prose); not_recorded = no source (admits the gap, never invents)." }
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "description": "Q5, structured: each AC classified against the delivery.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "classification"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "classification": { "type": "string", "enum": ["met", "partially_met", "not_met", "not_validated"] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rationale"],
+      "properties": {
+        "value": { "type": "string", "enum": ["approved", "approved_with_caveats", "needs_changes", "blocked", "needs_human_review"] },
+        "rationale": { "type": "string" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facts_ref", "markdown_ref"],
+      "properties": {
+        "facts_ref": { "type": "string", "description": "Path to delivery-facts.json." },
+        "markdown_ref": { "type": "string", "description": "Path to delivery-report.md." }
+      }
+    }
+  }
+}

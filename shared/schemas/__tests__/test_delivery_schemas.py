@@ -42,3 +42,38 @@ def test_delivery_facts_work_unit_shape():
     wu = s["properties"]["work_units"]["items"]["properties"]
     assert {"id", "final_status", "dispatches", "decisions",
             "findings", "ac_coverage", "files_changed"} <= set(wu)
+
+
+EXPECTED_QUESTION_KEYS = {
+    "what_was_done", "how_it_was_done", "why_this_way", "deviations_from_plan",
+    "acceptance_criteria", "evidence", "impacts", "out_of_scope",
+    "risks_and_pending", "how_to_validate", "final_verdict",
+}
+
+
+def test_delivery_report_schema_well_formed():
+    s = _load("delivery-report.schema.json")
+    assert s["additionalProperties"] is False
+    props = set(s["properties"])
+    assert {"spec_id", "questions", "acceptance_criteria", "verdict", "artifacts"} <= props
+
+
+def test_delivery_report_confidence_enum():
+    s = _load("delivery-report.schema.json")
+    q_item = s["properties"]["questions"]["items"]["properties"]
+    assert set(q_item["confidence"]["enum"]) == {"recorded", "inferred", "not_recorded"}
+    assert set(q_item["key"]["enum"]) == EXPECTED_QUESTION_KEYS
+
+
+def test_delivery_report_ac_classification_enum():
+    s = _load("delivery-report.schema.json")
+    ac = s["properties"]["acceptance_criteria"]["items"]["properties"]
+    assert set(ac["classification"]["enum"]) == {
+        "met", "partially_met", "not_met", "not_validated"}
+
+
+def test_delivery_report_verdict_enum():
+    s = _load("delivery-report.schema.json")
+    v = s["properties"]["verdict"]["properties"]["value"]["enum"]
+    assert set(v) == {"approved", "approved_with_caveats", "needs_changes",
+                      "blocked", "needs_human_review"}
