@@ -68,12 +68,14 @@ def _acceptance_criteria(session_dir: Path) -> list:
 
 
 def _outcome(metrics: dict, gate_status: str) -> str:
-    if gate_status == "blocked" or gate_status == "escalate":
+    if gate_status in ("blocked", "escalate"):
         return "refused"
     total = metrics.get("total_tasks", 0) or 0
     pending = metrics.get("pending_human_tasks", 0) or 0
     if pending == 0:
-        return "success"
+        # Only a clean (done) gate earns "success"; an absent/other gate that did
+        # not pass must not read as a clean delivery — degrade to "mixed".
+        return "success" if gate_status == "done" else "mixed"
     if total and pending >= total / 2:
         return "escalated"
     return "mixed"
@@ -81,6 +83,7 @@ def _outcome(metrics: dict, gate_status: str) -> str:
 
 def extract_sdd(session_dir: Path) -> dict:
     """SDD extractor: dispatch-manifest.json + outputs/*.json + session.yml scalars."""
+    session_dir = Path(session_dir).resolve()
     scalars = _read_session_scalars(session_dir)
     manifest = _load_json(session_dir / "dispatch-manifest.json") or {}
     dispatches = manifest.get("actual_dispatches", []) or []
@@ -143,7 +146,7 @@ def extract_sdd(session_dir: Path) -> dict:
                 u["ac_coverage"][k] = v
         # final_status = worst across dispatches (escalate<blocked<needs_review<done)
         rank = {"escalate": 0, "blocked": 1, "needs_review": 2, "done": 3}
-        cur = pkt.get("status")
+        cur = pkt.get("status") or d.get("status")
         if cur in rank:
             if not u["final_status"] or rank[cur] < rank.get(u["final_status"], 9):
                 u["final_status"] = cur
@@ -202,7 +205,7 @@ def main(argv=None) -> int:
     if not argv:
         print("usage: delivery_report.py <session_dir>", file=sys.stderr)
         return 2
-    session_dir = Path(argv[0])
+    session_dir = Path(argv[0]).resolve()
     facts = build_delivery_facts(str(session_dir))
     out = session_dir / "delivery-facts.json"
     tmp = out.with_suffix(".json.tmp")

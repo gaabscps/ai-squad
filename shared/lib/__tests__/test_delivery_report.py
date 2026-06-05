@@ -86,7 +86,7 @@ def test_outcome_escalated_when_pending_human(tmp_path):
         "  pending_human_tasks: 0", "  pending_human_tasks: 1").replace(
         "  done_tasks: 1", "  done_tasks: 0"), encoding="utf-8")
     facts = delivery_report.build_delivery_facts(str(sdir))
-    assert facts["outcome"] in {"escalated", "mixed"}
+    assert facts["outcome"] == "escalated"
 
 
 def test_outcome_refused_when_gate_blocked(tmp_path):
@@ -120,3 +120,35 @@ def test_unknown_squad_raises(tmp_path):
         assert False, "expected NotImplementedError for unregistered squad"
     except NotImplementedError as exc:
         assert "discovery" in str(exc)
+
+
+def test_outcome_mixed_when_minority_pending(tmp_path):
+    sdir = _make_session(tmp_path)
+    sy = sdir / "session.yml"
+    sy.write_text(sy.read_text().replace(
+        "  total_tasks: 1", "  total_tasks: 4").replace(
+        "  done_tasks: 1", "  done_tasks: 3").replace(
+        "  pending_human_tasks: 0", "  pending_human_tasks: 1"), encoding="utf-8")
+    facts = delivery_report.build_delivery_facts(str(sdir))
+    assert facts["outcome"] == "mixed"
+
+
+def test_outcome_not_success_when_gate_absent(tmp_path):
+    sdir = _make_session(tmp_path)
+    mf = sdir / "dispatch-manifest.json"
+    m = json.loads(mf.read_text())
+    m["actual_dispatches"] = [d for d in m["actual_dispatches"] if d["role"] != "audit-agent"]
+    mf.write_text(json.dumps(m), encoding="utf-8")
+    (sdir / "outputs" / "d-FEAT-001-audit.json").unlink()
+    facts = delivery_report.build_delivery_facts(str(sdir))
+    assert facts["gate"]["status"] == "absent"
+    assert facts["outcome"] == "mixed"
+
+
+def test_final_status_falls_back_to_manifest_when_packet_missing(tmp_path):
+    sdir = _make_session(tmp_path)
+    (sdir / "outputs" / "d-T-001-dev-l1.json").unlink()
+    (sdir / "outputs" / "d-T-001-qa-l1.json").unlink()
+    facts = delivery_report.build_delivery_facts(str(sdir))
+    unit = facts["work_units"][0]
+    assert unit["final_status"] == "done"
