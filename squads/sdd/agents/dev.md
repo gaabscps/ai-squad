@@ -64,6 +64,7 @@ A test that passes without exercising the AC's real behavior is worse than no te
 - `status`: `done` | `needs_review` | `blocked` | `escalate`
 - `evidence[]`: pointers only — `{kind: file, ref: "src/x.ts:42-50"}`, `{kind: command, ref: "pnpm test src/x.test.ts", exit: 0}`
 - `files_changed[]`: list of paths actually edited (must be subset of `scope_files`)
+- `decisions[]`: optional, default `[]`. Technical decisions and plan deviations you made while implementing. This is the ONLY structured source the delivery-report has for "why it was built this way" and "what changed from the plan". Each item: `{id, kind, summary, rationale, ref?, plan_ref?}`.
 - `notes`: optional, ≤80 chars
 
 ## Output Packet write contract
@@ -84,6 +85,7 @@ ALWAYS write the Output Packet with the `Write` tool to **`outputs/<dispatch_id>
   "usage": null
 }
 ```
+- `decisions`: optional; include only when you made a real decision or deviation (see Decisions policy). Omit or `[]` otherwise.
 - `role`: ALWAYS the literal string `"dev"`. Omitting it is a schema violation that the Stop hook blocks.
 - `summary`: ALWAYS a non-empty one-liner. Omitting it is a schema violation.
 - `dispatch_id`: copy verbatim from the Work Packet.
@@ -106,6 +108,25 @@ ALWAYS write the Output Packet with the `Write` tool to **`outputs/<dispatch_id>
 - Never: multi-paragraph docstrings on simple functions. One short line max when justified.
 - Never: leave stale `TODO`s without owner+date+condition.
 - Test for inclusion: if removing the comment wouldn't confuse a future reader, do not write it.
+
+### Decisions policy (the delivery-report's only "why" source)
+Record a `decisions[]` entry ONLY when:
+- **`kind: decision`** — you chose between real alternatives with a trade-off (e.g. optimistic vs pessimistic locking). Not for forced/obvious moves.
+- **`kind: deviation`** — you departed from what `plan.md`/`tasks.md` specified (different file, different approach, skipped a sub-step). Set `plan_ref` to the AC or plan section you deviated from.
+
+Each entry is anchored: `ref` points to `file:line` where the decision lives. `summary` is the what (≤120); `rationale` is the why (≤200). When nothing of the sort happened, emit `decisions: []` — do NOT manufacture entries. This field is high-signal-or-empty; trivial choices are noise that the chronicler would have to filter.
+
+Example:
+```json
+{
+  "id": "DEC-001",
+  "kind": "deviation",
+  "summary": "Validação movida do controller para o middleware",
+  "rationale": "Plan punha no controller; middleware evita duplicar em 3 rotas",
+  "ref": "src/mw/validate.ts:18",
+  "plan_ref": "AC-004"
+}
+```
 
 ## Escalate via blocker-specialist when
 - `ac_scope` is unimplementable as written (Spec ambiguity).
