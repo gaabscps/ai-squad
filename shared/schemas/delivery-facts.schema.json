@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-squad/shared/schemas/delivery-facts.schema.json",
+  "title": "ai-squad Delivery Facts",
+  "description": "Squad-agnostic, deterministically-extracted facts about a finished pipeline run. The extension boundary: each squad ships an extractor (code) that emits THIS shape from its own artifacts (SDD reads session.yml/manifest/outputs; Discovery would read frame/memo/risk verdicts). The chronicler agent consumes it plus the prose to write the delivery-report. Everything is anchored: items carry refs to their source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_id", "squad", "feature_name", "outcome", "intent", "work_units", "gate", "timeline"],
+  "properties": {
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$" },
+    "squad": { "type": "string", "description": "Which extractor produced this (sdd | discovery | council)." },
+    "feature_name": { "type": "string" },
+    "output_locale": { "type": "string", "description": "BCP-47; language the chronicler writes prose in. Absent -> en." },
+    "outcome": { "type": "string", "enum": ["success", "mixed", "escalated", "refused"], "description": "success = all units done + gate clean; mixed = some pending_human, gate clean; escalated = pending_human dominate; refused = gate blocked the handoff." },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acceptance_criteria"],
+      "properties": {
+        "spec_ref": { "type": "string" },
+        "plan_ref": { "type": "string" },
+        "tasks_ref": { "type": "string" },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "work_units": {
+      "type": "array",
+      "description": "Normalized unit of work. SDD: a task (T-XXX). Discovery: an investigated risk.",
+      "items": {
+        "type": "object",
+        "required": ["id", "final_status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "planned_scope": { "type": "array", "items": { "type": "string" } },
+          "final_status": { "type": "string" },
+          "loops": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "review": { "type": "integer", "minimum": 0 },
+              "qa": { "type": "integer", "minimum": 0 },
+              "blocker": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "dispatches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["dispatch_id", "role"],
+              "additionalProperties": true,
+              "properties": {
+                "dispatch_id": { "type": "string" },
+                "role": { "type": "string" },
+                "status": { "type": "string" },
+                "review_loop": { "type": "integer" }
+              }
+            }
+          },
+          "decisions": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "findings": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "ac_coverage": { "type": "object", "additionalProperties": true },
+          "files_changed": { "type": "array", "items": { "type": "string" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["unit_id"],
+        "additionalProperties": true,
+        "properties": {
+          "unit_id": { "type": "string" },
+          "blocker_kind": { "type": "string" },
+          "memo_ref": { "type": "string" },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["role", "status"],
+      "properties": {
+        "role": { "type": "string", "description": "SDD: audit-agent." },
+        "status": { "type": "string" },
+        "blocker_kind": { "type": ["string", "null"] },
+        "findings": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "total_usd": { "type": ["number", "null"] },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "timeline": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "started_at": { "type": "string" },
+        "completed_at": { "type": "string" },
+        "phases": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+      }
+    },
+    "generated_from": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "session_dir": { "type": "string" },
+        "extractor": { "type": "string" }
+      }
+    }
+  }
+}
