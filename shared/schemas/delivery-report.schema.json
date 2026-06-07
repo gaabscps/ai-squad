@@ -2,50 +2,64 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "ai-squad/shared/schemas/delivery-report.schema.json",
   "title": "ai-squad Delivery Report",
-  "description": "The chronicler's structured verdict at pipeline end — the 11 product questions answered, each anchored in evidence and tagged with a confidence level (recorded | inferred | not_recorded) so unrecorded facts are never invented. The .md narrative is rendered from this. Read-only by the aiOS cockpit.",
+  "description": "The chronicler's structured verdict at pipeline end — the 11 product questions answered (as an `answers` map keyed by question key), each anchored in evidence and tagged with a confidence level (recorded | inferred | not_recorded) so unrecorded facts are never invented. Plus per-AC classification and a final verdict. The .md narrative is rendered from this. Read-only by the aiOS cockpit. Top-level additionalProperties is true: the chronicler may carry traceability fields (dispatch_id, gate_dispatch_id, schema_version, generated_at) and consumers ignore what they do not know — but the four required fields and all enums are strict.",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["spec_id", "squad", "questions", "acceptance_criteria", "verdict", "artifacts"],
+  "additionalProperties": true,
+  "required": ["spec_id", "answers", "acceptance_criteria", "verdict"],
+  "$defs": {
+    "answer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["answer", "confidence"],
+      "properties": {
+        "answer": { "type": "string", "description": "Prose in output_locale." },
+        "confidence": { "type": "string", "enum": ["recorded", "inferred", "not_recorded"], "description": "recorded = anchored in a direct source; inferred = deduced (must say so in prose); not_recorded = no source (admits the gap, never invents)." },
+        "evidence_refs": { "type": "array", "items": { "type": "string" }, "description": "dispatch_id, file:line, AC id, test command — the sources that sustain the answer." }
+      }
+    }
+  },
   "properties": {
     "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$" },
-    "squad": { "type": "string" },
+    "squad": { "type": "string", "description": "Optional; consumers may derive it from session.yml." },
     "feature_name": { "type": "string" },
     "output_locale": { "type": "string" },
     "generated_at": { "type": "string", "description": "ISO 8601 (stamped by the chronicler)." },
-    "questions": {
-      "type": "array",
-      "minItems": 11,
-      "description": "The 11 product questions, in order Q1..Q11.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "key", "answer", "evidence_refs", "confidence"],
-        "properties": {
-          "id": { "type": "string", "pattern": "^Q\\d{1,2}$" },
-          "key": {
-            "type": "string",
-            "enum": [
-              "what_was_done", "how_it_was_done", "why_this_way", "deviations_from_plan",
-              "acceptance_criteria", "evidence", "impacts", "out_of_scope",
-              "risks_and_pending", "how_to_validate", "final_verdict"
-            ]
-          },
-          "answer": { "type": "string", "description": "Prose in output_locale." },
-          "evidence_refs": { "type": "array", "items": { "type": "string" }, "description": "dispatch_id, file:line, AC id, test command — the sources that sustain the answer." },
-          "confidence": { "type": "string", "enum": ["recorded", "inferred", "not_recorded"], "description": "recorded = anchored in a direct source; inferred = deduced (must say so in prose); not_recorded = no source (admits the gap, never invents)." }
-        }
+    "schema_version": { "type": "integer" },
+    "dispatch_id": { "type": "string", "description": "Traceability: the chronicler's own dispatch." },
+    "gate_dispatch_id": { "type": "string", "description": "Traceability: the audit-agent dispatch this report ran after." },
+    "answers": {
+      "type": "object",
+      "description": "The 11 product questions, keyed by question key. ALL 11 keys MUST be present (completeness).",
+      "additionalProperties": false,
+      "required": [
+        "what_was_done", "how_it_was_done", "why_this_way", "deviations_from_plan",
+        "acceptance_criteria", "evidence", "impacts", "out_of_scope",
+        "risks_and_pending", "how_to_validate", "final_verdict"
+      ],
+      "properties": {
+        "what_was_done": { "$ref": "#/$defs/answer" },
+        "how_it_was_done": { "$ref": "#/$defs/answer" },
+        "why_this_way": { "$ref": "#/$defs/answer" },
+        "deviations_from_plan": { "$ref": "#/$defs/answer" },
+        "acceptance_criteria": { "$ref": "#/$defs/answer" },
+        "evidence": { "$ref": "#/$defs/answer" },
+        "impacts": { "$ref": "#/$defs/answer" },
+        "out_of_scope": { "$ref": "#/$defs/answer" },
+        "risks_and_pending": { "$ref": "#/$defs/answer" },
+        "how_to_validate": { "$ref": "#/$defs/answer" },
+        "final_verdict": { "$ref": "#/$defs/answer" }
       }
     },
     "acceptance_criteria": {
       "type": "array",
-      "description": "Q5, structured: each AC classified against the delivery.",
+      "description": "Per-AC classification against the delivery (the structured form of Q5).",
       "items": {
         "type": "object",
-        "additionalProperties": false,
+        "additionalProperties": true,
         "required": ["id", "classification"],
         "properties": {
           "id": { "type": "string" },
-          "text": { "type": "string" },
+          "description": { "type": "string" },
           "classification": { "type": "string", "enum": ["met", "partially_met", "not_met", "not_validated"] },
           "evidence_refs": { "type": "array", "items": { "type": "string" } }
         }
@@ -53,20 +67,12 @@
     },
     "verdict": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["value", "rationale"],
       "properties": {
         "value": { "type": "string", "enum": ["approved", "approved_with_caveats", "needs_changes", "blocked", "needs_human_review"] },
-        "rationale": { "type": "string" }
-      }
-    },
-    "artifacts": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["facts_ref", "markdown_ref"],
-      "properties": {
-        "facts_ref": { "type": "string", "description": "Path to delivery-facts.json." },
-        "markdown_ref": { "type": "string", "description": "Path to delivery-report.md." }
+        "rationale": { "type": "string" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

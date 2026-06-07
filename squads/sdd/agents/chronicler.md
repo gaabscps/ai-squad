@@ -11,6 +11,9 @@ hooks:
         - type: command
           command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-output-packet.py"'
           timeout: 5
+        - type: command
+          command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-delivery-report.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/verify-delivery-report.py"'
+          timeout: 5
 ---
 
 # Chronicler
@@ -71,6 +74,42 @@ Any required field missing → `status: blocked, blocker_kind: contract_violatio
 - `needs_changes` — any AC `not_met`, or open error/critical findings, gate done.
 - `blocked` — gate `blocked` (refused handoff).
 - `needs_human_review` — outcome=escalated (pending_human dominate) or you cannot determine the verdict from the Facts.
+
+## delivery-report.json — emit EXACTLY this shape
+
+`answers` is a MAP keyed by the 11 question keys (NOT a `questions` array). All 11 keys MUST be present. A `verify-delivery-report.py` Stop hook validates this file against `shared/schemas/delivery-report.schema.json` and refuses your stop if it is malformed — so match this structure precisely:
+
+```json
+{
+  "schema_version": 1,
+  "spec_id": "FEAT-NNN",
+  "squad": "sdd",
+  "feature_name": "<from session.yml>",
+  "output_locale": "<from Work Packet>",
+  "generated_at": "<ISO 8601 now>",
+  "dispatch_id": "<your own dispatch_id>",
+  "gate_dispatch_id": "<from Work Packet>",
+  "answers": {
+    "what_was_done":        { "answer": "<prose in output_locale>", "confidence": "recorded", "evidence_refs": ["outputs/d-...json", "src/x.ts:42"] },
+    "how_it_was_done":      { "answer": "...", "confidence": "recorded", "evidence_refs": ["..."] },
+    "why_this_way":         { "answer": "...", "confidence": "recorded|inferred|not_recorded", "evidence_refs": ["..."] },
+    "deviations_from_plan": { "answer": "...", "confidence": "recorded|inferred|not_recorded", "evidence_refs": ["..."] },
+    "acceptance_criteria":  { "answer": "<narrative pointer to the acceptance_criteria[] list below>", "confidence": "recorded", "evidence_refs": ["..."] },
+    "evidence":             { "answer": "...", "confidence": "recorded", "evidence_refs": ["..."] },
+    "impacts":              { "answer": "...", "confidence": "recorded|inferred", "evidence_refs": ["..."] },
+    "out_of_scope":         { "answer": "...", "confidence": "recorded|not_recorded", "evidence_refs": ["..."] },
+    "risks_and_pending":    { "answer": "...", "confidence": "recorded|inferred", "evidence_refs": ["..."] },
+    "how_to_validate":      { "answer": "...", "confidence": "recorded", "evidence_refs": ["..."] },
+    "final_verdict":        { "answer": "<restate the verdict for the narrative>", "confidence": "recorded", "evidence_refs": ["..."] }
+  },
+  "acceptance_criteria": [
+    { "id": "AC-001", "description": "<AC text>", "classification": "met", "evidence_refs": ["outputs/d-...qa...json#e-001"] }
+  ],
+  "verdict": { "value": "approved_with_caveats", "rationale": "<one paragraph>", "evidence_refs": ["..."] }
+}
+```
+
+Rules: every `answers.<key>` needs `answer` + `confidence` (`evidence_refs` may be `[]` only when `confidence: not_recorded`). `classification` ∈ met|partially_met|not_met|not_validated. `verdict.value` is the enum from "Verdict rules". Enums stay canonical English; only the prose (`answer`, `rationale`) follows `output_locale`.
 
 ## Output contract (Output Packet)
 - `spec_id`, `dispatch_id`, `role: "chronicler"`, `status` (`done`, or `blocked` on contract/extractor failure), `summary` (≤120, e.g. "Wrote delivery-report: approved_with_caveats; 1 AC not_validated"), `evidence[]` (pointers to the two artifacts + delivery-facts.json + key sources), `usage: null`.

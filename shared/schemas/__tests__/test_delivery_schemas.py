@@ -53,16 +53,25 @@ EXPECTED_QUESTION_KEYS = {
 
 def test_delivery_report_schema_well_formed():
     s = _load("delivery-report.schema.json")
-    assert s["additionalProperties"] is False
-    props = set(s["properties"])
-    assert {"spec_id", "questions", "acceptance_criteria", "verdict", "artifacts"} <= props
+    # Top-level tolerates traceability extras (LLM-authored) but requires the core 4.
+    assert s["additionalProperties"] is True
+    assert set(s["required"]) == {"spec_id", "answers", "acceptance_criteria", "verdict"}
+
+
+def test_delivery_report_answers_keyed_by_11_questions():
+    s = _load("delivery-report.schema.json")
+    answers = s["properties"]["answers"]
+    # answers is a map keyed by the 11 question keys; all must be present.
+    assert answers["additionalProperties"] is False
+    assert set(answers["required"]) == EXPECTED_QUESTION_KEYS
+    assert set(answers["properties"]) == EXPECTED_QUESTION_KEYS
 
 
 def test_delivery_report_confidence_enum():
     s = _load("delivery-report.schema.json")
-    q_item = s["properties"]["questions"]["items"]["properties"]
-    assert set(q_item["confidence"]["enum"]) == {"recorded", "inferred", "not_recorded"}
-    assert set(q_item["key"]["enum"]) == EXPECTED_QUESTION_KEYS
+    ans = s["$defs"]["answer"]["properties"]
+    assert set(ans["confidence"]["enum"]) == {"recorded", "inferred", "not_recorded"}
+    assert set(s["$defs"]["answer"]["required"]) == {"answer", "confidence"}
 
 
 def test_delivery_report_ac_classification_enum():
@@ -77,3 +86,40 @@ def test_delivery_report_verdict_enum():
     v = s["properties"]["verdict"]["properties"]["value"]["enum"]
     assert set(v) == {"approved", "approved_with_caveats", "needs_changes",
                       "blocked", "needs_human_review"}
+
+
+def test_canonical_report_example_validates_against_schema():
+    """A delivery-report in the chronicler's natural shape (answers map +
+    traceability fields) must validate — guards contract drift vs the real agent."""
+    try:
+        import jsonschema
+    except ImportError:
+        import pytest
+        pytest.skip("jsonschema not installed")
+    s = _load("delivery-report.schema.json")
+
+    def ans():
+        return {"answer": "prosa", "confidence": "recorded", "evidence_refs": ["outputs/d-x.json"]}
+
+    report = {
+        "schema_version": 1, "spec_id": "FEAT-011", "squad": "sdd",
+        "feature_name": "x", "output_locale": "pt-BR",
+        "generated_at": "2026-06-07T14:07:00Z",
+        "dispatch_id": "d-chronicler-1", "gate_dispatch_id": "d-audit-2",
+        "answers": {k: ans() for k in EXPECTED_QUESTION_KEYS},
+        "acceptance_criteria": [
+            {"id": "AC-001", "description": "x", "classification": "met",
+             "evidence_refs": ["e1"]}],
+        "verdict": {"value": "approved_with_caveats", "rationale": "x",
+                    "evidence_refs": ["e1"]},
+    }
+    jsonschema.validate(report, s)
+
+    # Missing one of the 11 answer keys must FAIL (completeness is enforced).
+    bad = json.loads(json.dumps(report))
+    del bad["answers"]["impacts"]
+    try:
+        jsonschema.validate(bad, s)
+        assert False, "should reject answers missing a question key"
+    except jsonschema.ValidationError:
+        pass
