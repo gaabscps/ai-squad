@@ -568,24 +568,34 @@ a:hover { text-decoration: underline; }
 .verdict-unknown       { border-color: #9ca3af; background: #f9fafb; }
 
 .delivery-answers { display: flex; flex-direction: column; gap: 0.6rem; }
-/* separador sutil entre as 11 respostas empilhadas (some na última) */
-.delivery-answer { padding-bottom: 0.6rem; border-bottom: 1px solid #f3f4f6; }
-.delivery-answer:last-child { padding-bottom: 0; border-bottom: none; }
-.delivery-answer-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.2rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+
+/* accordion das 11 respostas */
+details.delivery-answer { border-bottom: 1px solid #f0f0f0; }
+details.delivery-answer:last-of-type { border-bottom: none; }
+.delivery-answer-summary {
+  display: flex; align-items: center; gap: 0.5rem;
+  cursor: pointer; list-style: none;
+  padding: 0.45rem 0; font-size: 0.85rem; font-weight: 600;
 }
-.delivery-answer-text {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: #1f2937;
-  white-space: pre-wrap;
+.delivery-answer-summary::-webkit-details-marker { display: none; }
+.delivery-answer-summary::before { content: "▸"; color: #9ca3af; font-size: 0.7rem; }
+details.delivery-answer[open] > .delivery-answer-summary::before { content: "▾"; }
+.delivery-answer-title { flex: 1; }
+.delivery-answer-summary .delivery-conf { flex: none; }
+.delivery-answer .delivery-answer-text { margin: 0 0 0.6rem 1.1rem; }
+.delivery-answer .delivery-evidence { margin-left: 1.1rem; }
+
+/* seção colapsável dos ACs */
+details.delivery-acs-wrap { margin-top: 0.25rem; }
+.delivery-acs-summary {
+  cursor: pointer; list-style: none;
+  font-size: 0.82rem; font-weight: 600; color: #374151; padding: 0.45rem 0;
 }
+.delivery-acs-summary::-webkit-details-marker { display: none; }
+.delivery-acs-summary::before { content: "▸ "; color: #9ca3af; }
+details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ "; }
+.delivery-ac-desc .md-body { font-size: inherit; line-height: 1.4; }
+.delivery-ac-desc .md-body p { margin: 0; }
 .delivery-conf {
   font-size: 0.65rem;
   font-weight: 600;
@@ -626,7 +636,7 @@ a:hover { text-decoration: underline; }
 .class-not-validated { color: #6b7280; }
 .class-unknown       { color: #374151; }
 
-.delivery-md-link { font-size: 0.8rem; color: #2563eb; text-decoration: none; }
+.delivery-md-link { font-size: 0.8rem; color: #2563eb; text-decoration: none; background: none; border: none; cursor: pointer; font: inherit; padding: 0; }
 .delivery-md-link:hover { text-decoration: underline; }
 
 /* ── Markdown renderizado (.md-body) ────────────────────────────────────── */

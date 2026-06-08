@@ -1,7 +1,14 @@
 import type { DeliveryReport } from "../../../src/store/types";
-import { answerTitle, verdictLabel, confidenceLabel, classificationLabel } from "../lib/deliveryLabels";
+import { answerTitle, verdictLabel, confidenceLabel, classificationLabel, acClassificationSummary } from "../lib/deliveryLabels";
+import { Markdown } from "./Markdown";
 
-export function DeliveryReportBlock({ report }: { report: DeliveryReport | null | undefined }) {
+export function DeliveryReportBlock({
+  report,
+  onOpenFile,
+}: {
+  report: DeliveryReport | null | undefined;
+  onOpenFile?: (path: string, title: string) => void;
+}) {
   if (!report) {
     return <p className="delivery-empty">sem parecer de entrega ainda</p>;
   }
@@ -14,21 +21,21 @@ export function DeliveryReportBlock({ report }: { report: DeliveryReport | null 
         <div className={`delivery-verdict verdict-${v.cls}`}>
           <span className="delivery-verdict-label">{v.label}</span>
           {report.verdict.rationale && (
-            <p className="delivery-verdict-rationale">{report.verdict.rationale}</p>
+            <Markdown className="delivery-verdict-rationale">{report.verdict.rationale}</Markdown>
           )}
         </div>
       )}
 
       <div className="delivery-answers">
-        {report.answers.map((a) => {
+        {report.answers.map((a, idx) => {
           const c = confidenceLabel(a.confidence);
           return (
-            <div key={a.key} className="delivery-answer">
-              <h5 className="delivery-answer-title">
-                {answerTitle(a.key)}
+            <details key={a.key} className="delivery-answer" open={idx === 0}>
+              <summary className="delivery-answer-summary">
+                <span className="delivery-answer-title">{answerTitle(a.key)}</span>
                 <span className={`delivery-conf conf-${c.cls}`}>{c.label}</span>
-              </h5>
-              <p className="delivery-answer-text">{a.answer}</p>
+              </summary>
+              <Markdown className="delivery-answer-text">{a.answer}</Markdown>
               {a.evidenceRefs.length > 0 && (
                 <ul className="delivery-evidence">
                   {a.evidenceRefs.map((ref) => (
@@ -36,37 +43,41 @@ export function DeliveryReportBlock({ report }: { report: DeliveryReport | null 
                   ))}
                 </ul>
               )}
-            </div>
+            </details>
           );
         })}
       </div>
 
       {report.acceptanceCriteria.length > 0 && (
-        <table className="delivery-acs">
-          <tbody>
-            {report.acceptanceCriteria.map((ac) => {
-              const cl = classificationLabel(ac.classification);
-              return (
-                <tr key={ac.id} className="delivery-ac">
-                  <td className="delivery-ac-id mono">{ac.id}</td>
-                  <td className="delivery-ac-desc">{ac.description}</td>
-                  <td className={`delivery-ac-class class-${cl.cls}`}>{cl.label}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <details className="delivery-acs-wrap">
+          <summary className="delivery-acs-summary">
+            Critérios de aceite — {acClassificationSummary(report.acceptanceCriteria)}
+          </summary>
+          <table className="delivery-acs">
+            <tbody>
+              {report.acceptanceCriteria.map((ac) => {
+                const cl = classificationLabel(ac.classification);
+                return (
+                  <tr key={ac.id} className="delivery-ac">
+                    <td className="delivery-ac-id mono">{ac.id}</td>
+                    <td className="delivery-ac-desc"><Markdown>{ac.description}</Markdown></td>
+                    <td className={`delivery-ac-class class-${cl.cls}`}>{cl.label}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
       )}
 
-      {report.mdPath && (
-        <a
+      {report.mdPath && onOpenFile && (
+        <button
+          type="button"
           className="delivery-md-link"
-          href={`/file?path=${encodeURIComponent(report.mdPath)}`}
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={() => onOpenFile(report.mdPath!, "delivery-report.md")}
         >
           ver narrativa completa →
-        </a>
+        </button>
       )}
     </section>
   );
