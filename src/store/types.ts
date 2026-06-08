@@ -92,6 +92,7 @@ export interface Spec {
   lastActivityAt: string | null;
   timeline: TimelineEntry[];
   cost: CostRollup;
+  deliveryReport?: DeliveryReport | null; // null em sessões sem parecer (antigas/em curso)
   specPath?: string | null; // caminho absoluto do spec.md resolvido de spec_ref, ou null se ausente/inexistente
 }
 
@@ -101,4 +102,46 @@ export interface Project {
   name: string;
   specs: Spec[];
   hidden: boolean;
+}
+
+// ── Delivery-report (parecer de entrega do ai-squad) ───────────────────────
+// Enums canônicos em INGLÊS: a UI roteia cor/realce sobre estes valores.
+// O parser NÃO faz whitelist — passa valores desconhecidos adiante (robustez a
+// versões do chronicler), por isso os campos abaixo são `string`, não a union.
+export type DeliveryConfidence = "recorded" | "inferred" | "not_recorded";
+export type DeliveryVerdictValue =
+  | "approved" | "approved_with_caveats" | "needs_changes" | "blocked" | "needs_human_review";
+export type DeliveryAcClassification =
+  | "met" | "partially_met" | "not_met" | "not_validated";
+
+export interface DeliveryAnswer {
+  key: string; // uma das 11 chaves canônicas
+  answer: string; // prosa no output_locale
+  confidence: string; // canônico = DeliveryConfidence; string crua se desconhecido
+  evidenceRefs: string[];
+}
+
+export interface DeliveryVerdict {
+  value: string; // canônico = DeliveryVerdictValue; string crua se desconhecido
+  rationale: string;
+  evidenceRefs: string[];
+}
+
+export interface DeliveryAcceptanceCriterion {
+  id: string;
+  description: string;
+  classification: string; // canônico = DeliveryAcClassification; string crua se desconhecido
+  evidenceRefs: string[];
+}
+
+export interface DeliveryReport {
+  specId: string | null;
+  outputLocale: string | null;
+  generatedAt: string | null;
+  verdict: DeliveryVerdict | null;
+  answers: DeliveryAnswer[]; // ordenadas pelas 11 chaves canônicas
+  acceptanceCriteria: DeliveryAcceptanceCriterion[];
+  container: "answers" | "questions";
+  mdPath: string | null;
+  jsonPath: string;
 }
