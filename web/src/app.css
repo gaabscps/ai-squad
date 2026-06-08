@@ -600,7 +600,7 @@ details.delivery-acs-wrap { margin-top: 0.25rem; }
 .delivery-acs-summary::before { content: "▸ "; color: #9ca3af; }
 details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ "; }
 .delivery-ac-desc .md-body { font-size: inherit; line-height: 1.4; }
-.delivery-ac-desc .md-body p { margin: 0; }
+.delivery-ac-desc .md-body > * { margin: 0; }
 .delivery-conf {
   font-size: 0.65rem;
   font-weight: 600;

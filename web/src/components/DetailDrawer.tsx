@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { SpecWithProject } from "../lib/kanban";
 import { attentionReason, columnForSpec } from "../lib/kanban";
 import { fmtTokens, fmtUsd } from "../format";
@@ -21,10 +21,15 @@ export function DetailDrawer({
   item: SpecWithProject | null;
   onClose: () => void;
 }) {
+  // Hooks ANTES de qualquer return condicional (Regras dos Hooks): a gaveta é
+  // sempre montada e renderiza null quando item é null; chamar useState após o
+  // early-return mudaria a contagem de hooks entre renders e quebraria o React.
+  const [viewer, setViewer] = useState<{ path: string; title: string } | null>(null);
+  const closeViewer = useCallback(() => setViewer(null), []);
+
   if (!item) return null;
 
   const { spec, projectId, projectName, projectPath } = item;
-  const [viewer, setViewer] = useState<{ path: string; title: string } | null>(null);
   const openFile = (path: string, title: string) => setViewer({ path, title });
   const reason = attentionReason(spec);
   const t = spec.cost.tokens;
@@ -158,7 +163,7 @@ export function DetailDrawer({
         <MarkdownViewer
           path={viewer?.path ?? null}
           title={viewer?.title ?? ""}
-          onClose={() => setViewer(null)}
+          onClose={closeViewer}
         />
       </aside>
     </div>

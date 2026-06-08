@@ -7,6 +7,7 @@ export function DeliveryReportBlock({
   onOpenFile,
 }: {
   report: DeliveryReport | null | undefined;
+  /** Se ausente, o botão "ver narrativa completa" é suprimido (sem fallback). */
   onOpenFile?: (path: string, title: string) => void;
 }) {
   if (!report) {
