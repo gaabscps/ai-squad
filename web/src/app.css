@@ -171,13 +171,12 @@ a:hover { text-decoration: underline; }
 .timeline-notes time { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .timeline-notes b { color: var(--text); }
 .timeline-docs { display: flex; gap: 8px; margin-top: 10px; }
-.timeline-docs a { font-size: 13px; color: var(--accent); background: #eff4ff; padding: 6px 14px; border-radius: 8px; }
-/* docs da timeline: botões que abrem o viewer, com aparência de link */
+/* docs da timeline: botões que abrem o viewer no app, com o pill visual de antes */
 .timeline-docs button {
-  background: none; border: none; padding: 0; cursor: pointer;
-  color: #2563eb; font-size: 0.8rem; font-family: inherit;
+  font-size: 13px; color: var(--accent); background: #eff4ff;
+  padding: 6px 14px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit;
 }
-.timeline-docs button:hover { text-decoration: underline; }
+.timeline-docs button:hover { background: #e0e9ff; }
 
 /* responsivo: colunas empilham em telas estreitas */
 @media (max-width: 880px) {
