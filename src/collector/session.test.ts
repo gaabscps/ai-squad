@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseSession } from "./session.js";
@@ -235,5 +235,29 @@ describe("parseSession — AC-007: specPath no Spec", () => {
     });
     const spec = parseSession(specDir, projectRoot)!;
     expect(spec.specPath!.startsWith("/")).toBe(true);
+  });
+});
+
+describe("parseSession — delivery-report", () => {
+  it("popula spec.deliveryReport quando há delivery-report.json", () => {
+    const d = mkdtempSync(join(tmpdir(), "aios-sess-dr-"));
+    writeFileSync(join(d, "session.yml"), "task_id: FEAT-Z\ncurrent_phase: done\n");
+    writeFileSync(join(d, "delivery-report.json"), JSON.stringify({
+      verdict: { value: "approved", rationale: "ok", evidence_refs: [] },
+      answers: { what_was_done: { answer: "x", confidence: "recorded", evidence_refs: [] } },
+      acceptance_criteria: [],
+    }));
+    const spec = parseSession(d)!;
+    expect(spec.deliveryReport).not.toBeNull();
+    expect(spec.deliveryReport!.verdict?.value).toBe("approved");
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  it("deliveryReport = null quando não há delivery-report.json", () => {
+    const d = mkdtempSync(join(tmpdir(), "aios-sess-dr-"));
+    writeFileSync(join(d, "session.yml"), "task_id: FEAT-Z\n");
+    const spec = parseSession(d)!;
+    expect(spec.deliveryReport ?? null).toBeNull();
+    rmSync(d, { recursive: true, force: true });
   });
 });

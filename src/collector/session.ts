@@ -3,6 +3,7 @@ import { join, basename, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Spec, SpecStatus, Task, TimelineEntry } from "../store/types.js";
 import { readCostRollup } from "./cost.js";
+import { readDeliveryReport } from "./delivery-report.js";
 import { collectDispatches } from "./dispatches.js";
 
 // View parcial do session.yml: só os campos que deriveStatus consulta.
@@ -93,6 +94,7 @@ export function parseSession(specDir: string, projectRoot?: string): Spec | null
     lastActivityAt: raw.last_activity_at ?? null,
     timeline,
     cost: readCostRollup(specDir),
+    deliveryReport: readDeliveryReport(specDir),
     specPath,
   };
 }
