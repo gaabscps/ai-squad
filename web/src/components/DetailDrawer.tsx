@@ -9,6 +9,7 @@ import { TaskItem } from "./TaskItem";
 import { AttentionPanel } from "./AttentionPanel";
 import { SpecJobIndicator } from "./SpecJobIndicator";
 import { SpecSummaryBlock } from "./SpecSummaryBlock";
+import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { buildStory } from "../lib/buildStory";
 
 export function DetailDrawer({
@@ -67,6 +68,9 @@ export function DetailDrawer({
           specId={spec.id}
           specPath={spec.specPath ?? null}
         />
+
+        <h4 className="drawer-section">Parecer de entrega</h4>
+        <DeliveryReportBlock report={spec.deliveryReport} />
 
         <h4 className="drawer-section">Fases</h4>
         <PhaseBar spec={spec} />
