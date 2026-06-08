@@ -31,8 +31,8 @@ export function DeliveryReportBlock({ report }: { report: DeliveryReport | null 
               <p className="delivery-answer-text">{a.answer}</p>
               {a.evidenceRefs.length > 0 && (
                 <ul className="delivery-evidence">
-                  {a.evidenceRefs.map((ref, i) => (
-                    <li key={i} className="delivery-evidence-ref mono">{ref}</li>
+                  {a.evidenceRefs.map((ref) => (
+                    <li key={ref} className="delivery-evidence-ref mono">{ref}</li>
                   ))}
                 </ul>
               )}
@@ -47,7 +47,7 @@ export function DeliveryReportBlock({ report }: { report: DeliveryReport | null 
             {report.acceptanceCriteria.map((ac) => {
               const cl = classificationLabel(ac.classification);
               return (
-                <tr key={ac.id} className={`delivery-ac ac-${cl.cls}`}>
+                <tr key={ac.id} className="delivery-ac">
                   <td className="delivery-ac-id mono">{ac.id}</td>
                   <td className="delivery-ac-desc">{ac.description}</td>
                   <td className={`delivery-ac-class class-${cl.cls}`}>{cl.label}</td>

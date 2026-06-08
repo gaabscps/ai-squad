@@ -17,5 +17,6 @@ describe("deliveryLabels", () => {
     expect(answerTitle("nova_chave")).toBe("nova_chave");
     expect(verdictLabel("shipped_to_mars")).toEqual({ label: "shipped_to_mars", cls: "unknown" });
     expect(confidenceLabel("")).toEqual({ label: "—", cls: "unknown" });
+    expect(classificationLabel("kinda_met")).toEqual({ label: "kinda_met", cls: "unknown" });
   });
 });

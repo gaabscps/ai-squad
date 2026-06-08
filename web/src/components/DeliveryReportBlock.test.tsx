@@ -17,6 +17,8 @@ describe("DeliveryReportBlock", () => {
     expect(screen.getByText("inferido")).toBeInTheDocument();
     expect(screen.getByText("AC-001")).toBeInTheDocument();
     expect(screen.getByText("parcialmente atendido")).toBeInTheDocument();
+    // chips de evidence-ref renderizam
+    expect(screen.getByText("d#f")).toBeInTheDocument();
   });
 
   it("link pro .md quando mdPath existe; ausente quando null", () => {

@@ -558,6 +558,8 @@ a:hover { text-decoration: underline; }
   color: #374151;
   line-height: 1.45;
 }
+/* Paleta semântica (verde/âmbar/laranja/vermelho/azul) em hex cru: ainda não há
+   tokens de cor por status no design system — extrair para vars se mais blocos usarem. */
 .verdict-approved      { border-color: #16a34a; background: #f0fdf4; }
 .verdict-caveats       { border-color: #d97706; background: #fffbeb; }
 .verdict-changes       { border-color: #ea580c; background: #fff7ed; }
@@ -566,6 +568,9 @@ a:hover { text-decoration: underline; }
 .verdict-unknown       { border-color: #9ca3af; background: #f9fafb; }
 
 .delivery-answers { display: flex; flex-direction: column; gap: 0.6rem; }
+/* separador sutil entre as 11 respostas empilhadas (some na última) */
+.delivery-answer { padding-bottom: 0.6rem; border-bottom: 1px solid #f3f4f6; }
+.delivery-answer:last-child { padding-bottom: 0; border-bottom: none; }
 .delivery-answer-title {
   display: flex;
   align-items: center;
@@ -613,6 +618,7 @@ a:hover { text-decoration: underline; }
 .delivery-acs { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .delivery-ac td { padding: 0.3rem 0.5rem; border-top: 1px solid #f0f0f0; vertical-align: top; }
 .delivery-ac-id { white-space: nowrap; color: #6b7280; }
+.delivery-ac-desc { width: 100%; word-break: break-word; }
 .delivery-ac-class { white-space: nowrap; font-weight: 600; }
 .class-met           { color: #166534; }
 .class-partial       { color: #854d0e; }
