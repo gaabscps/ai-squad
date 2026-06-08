@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { Spec, SpecStatus, Task, TimelineEntry } from "../store/types.js";
 import { readCostRollup } from "./cost.js";
@@ -25,8 +25,13 @@ export function deriveStatus(raw: RawSession, tasks: Task[]): SpecStatus {
   return "running";
 }
 
-/** Lê <specDir>/session.yml num Spec. Retorna null se não houver session.yml. */
-export function parseSession(specDir: string): Spec | null {
+/**
+ * Lê <specDir>/session.yml num Spec. Retorna null se não houver session.yml.
+ * `projectRoot` é a raiz do repositório observado — o ai-squad grava `spec_ref`
+ * relativo a ela (ex.: "./.agent-session/FEAT-006/spec.md"). Quando omitido, deriva
+ * subindo dois níveis do specDir, pois a estrutura <raiz>/.agent-session/<id> é fixa.
+ */
+export function parseSession(specDir: string, projectRoot?: string): Spec | null {
   const file = join(specDir, "session.yml");
   if (!existsSync(file)) return null;
 
@@ -69,6 +74,9 @@ export function parseSession(specDir: string): Spec | null {
 
   const em = raw.escalation_metrics ?? {};
 
+  const root = projectRoot ?? resolve(specDir, "..", "..");
+  const specPath = resolveSpecPath(root, specDir, raw.spec_ref);
+
   return {
     id: raw.task_id ?? basename(specDir),
     squad: raw.squad === "discovery" ? "discovery" : "sdd",
@@ -85,5 +93,23 @@ export function parseSession(specDir: string): Spec | null {
     lastActivityAt: raw.last_activity_at ?? null,
     timeline,
     cost: readCostRollup(specDir),
+    specPath,
   };
+}
+
+/**
+ * Resolve o spec.md de uma Session. Duas fontes, nesta ordem:
+ *  1. spec_ref (relativo à raiz do projeto) — quando presente e o arquivo existe.
+ *  2. Convenção do ai-squad: <specDir>/spec.md — fallback para sessions antigas que
+ *     não gravavam spec_ref no session.yml (ou cujo spec_ref aponta para inexistente).
+ * O spec.md sempre mora em <specDir>/spec.md na convenção do framework; o spec_ref é
+ * um ponteiro redundante presente só nas sessions mais novas.
+ */
+function resolveSpecPath(projectRoot: string, specDir: string, specRef: unknown): string | null {
+  if (typeof specRef === "string" && specRef.trim() !== "") {
+    const abs = resolve(projectRoot, specRef);
+    if (existsSync(abs)) return abs;
+  }
+  const conventional = join(specDir, "spec.md");
+  return existsSync(conventional) ? conventional : null;
 }

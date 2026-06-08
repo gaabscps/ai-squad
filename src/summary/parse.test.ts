@@ -23,8 +23,22 @@ describe("parseStreamLine", () => {
     expect(out?.kind).toBe("error");
   });
 
-  it("ignora linhas de ruído (system, assistant, rate_limit)", () => {
-    expect(parseStreamLine(JSON.stringify({ type: "system", subtype: "init" }))).toBeNull();
+  it("emite init com modelId ao ver system/init com campo model", () => {
+    const line = JSON.stringify({ type: "system", subtype: "init", model: "claude-haiku-4-5-20251001" });
+    expect(parseStreamLine(line)).toEqual({ kind: "init", modelId: "claude-haiku-4-5-20251001" });
+  });
+
+  it("retorna null para system/init sem campo model (não lança)", () => {
+    const line = JSON.stringify({ type: "system", subtype: "init" });
+    expect(parseStreamLine(line)).toBeNull();
+  });
+
+  it("retorna null para system com subtype diferente de init", () => {
+    const line = JSON.stringify({ type: "system", subtype: "something_else", model: "claude-haiku-4-5-20251001" });
+    expect(parseStreamLine(line)).toBeNull();
+  });
+
+  it("ignora linhas de ruído (assistant, rate_limit)", () => {
     expect(parseStreamLine(JSON.stringify({ type: "assistant", message: {} }))).toBeNull();
     expect(parseStreamLine(JSON.stringify({ type: "rate_limit_event" }))).toBeNull();
   });

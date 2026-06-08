@@ -1,10 +1,13 @@
 /**
- * Testes de integração para src/collector/session.ts — injeção de dispatches (T-005).
+ * Testes de integração para src/collector/session.ts — injeção de dispatches (T-005)
+ * e exposição de specPath (T-002 / AC-007).
  *
  * Cobre:
  *   - AC-001: cada Task ganha dispatches do collectDispatches casados por id
+ *   - AC-007: specPath expõe path absoluto quando spec_ref existe em disco, null caso contrário
  *   - AC-009: tarefas sem match em dispatches recebem []
  *   - AC-010: dispatches em cada Task ficam ordenados por loop (garantido pelo collectDispatches)
+ *   - NFR-001: conteúdo do spec.md não entra no Spec (campo ausente)
  *   - NFR-003: parseSession em FEAT-004 (136 dispatches / ~140 arquivos) completa sem erro
  *
  * Usa as sessões REAIS do ai-squad — não cria fixtures artificiais para os casos de
@@ -12,6 +15,9 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseSession } from "./session.js";
 
 const FEAT_003 = `${process.env.HOME}/Developer/ai-squad/.agent-session/FEAT-003`;
@@ -122,5 +128,112 @@ describe("parseSession — FEAT-004 (formato novo, 136 dispatches)", () => {
     expect(Array.isArray(spec.tasks)).toBe(true);
     expect(spec.status).toBeTruthy();
     expect(spec.cost).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-007 / NFR-001: specPath exposto no Spec
+// Usa sessões temporárias (fixtures mínimas) para controlar a existência do spec.md
+// ---------------------------------------------------------------------------
+
+/**
+ * Monta a estrutura REAL que o ai-squad produz: <projectRoot>/.agent-session/<id>/session.yml.
+ * O spec_ref no session.yml é relativo à RAIZ DO PROJETO (ex.: "./.agent-session/FEAT-TEST/spec.md"),
+ * e o spec.md mora em <projectRoot>/<specRealPath>. Reproduzir essa geometria é o que pega o bug
+ * de duplicação de caminho — fixtures planas (session.yml e spec.md no mesmo dir) o mascaravam.
+ */
+function makeProject(opts: {
+  specRef?: string;
+  specRealPath?: string; // path do spec.md relativo à raiz do projeto; cria o arquivo se presente
+}): { projectRoot: string; specDir: string } {
+  const projectRoot = mkdtempSync(join(tmpdir(), "aios-proj-test-"));
+  const specDir = join(projectRoot, ".agent-session", "FEAT-TEST");
+  mkdirSync(specDir, { recursive: true });
+  const specRefLine = opts.specRef !== undefined ? `spec_ref: "${opts.specRef}"` : "";
+  const yaml = [
+    `task_id: "FEAT-TEST"`,
+    `squad: "sdd"`,
+    `feature_name: "Fixture de teste"`,
+    `current_phase: "running"`,
+    specRefLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  writeFileSync(join(specDir, "session.yml"), yaml, "utf-8");
+  if (opts.specRealPath) {
+    const abs = join(projectRoot, opts.specRealPath);
+    mkdirSync(join(abs, ".."), { recursive: true });
+    writeFileSync(abs, "# spec content", "utf-8");
+  }
+  return { projectRoot, specDir };
+}
+
+describe("parseSession — AC-007: specPath no Spec", () => {
+  it("spec_ref relativo à raiz + arquivo existe → specPath aponta pro spec.md real (regressão: sem duplicar caminho)", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: "./.agent-session/FEAT-TEST/spec.md",
+      specRealPath: ".agent-session/FEAT-TEST/spec.md",
+    });
+    const spec = parseSession(specDir, projectRoot)!;
+    expect(spec).not.toBeNull();
+    expect(spec.specPath).toBe(join(projectRoot, ".agent-session/FEAT-TEST/spec.md"));
+    // o segmento .agent-session/FEAT-TEST aparece UMA vez, não duplicado
+    expect(spec.specPath).not.toContain(".agent-session/FEAT-TEST/.agent-session");
+  });
+
+  it("projectRoot omitido → deriva a raiz do specDir (<raiz>/.agent-session/<id>) e resolve igual", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: "./.agent-session/FEAT-TEST/spec.md",
+      specRealPath: ".agent-session/FEAT-TEST/spec.md",
+    });
+    const spec = parseSession(specDir)!;
+    expect(spec.specPath).toBe(join(projectRoot, ".agent-session/FEAT-TEST/spec.md"));
+  });
+
+  it("spec_ref presente mas arquivo não existe em disco → specPath é null", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: "./.agent-session/FEAT-TEST/spec.md",
+      specRealPath: undefined,
+    });
+    const spec = parseSession(specDir, projectRoot)!;
+    expect(spec).not.toBeNull();
+    expect(spec.specPath).toBeNull();
+  });
+
+  it("spec_ref AUSENTE mas spec.md existe no specDir (convenção ai-squad, sessions antigas) → resolve via convenção", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: undefined,
+      specRealPath: ".agent-session/FEAT-TEST/spec.md",
+    });
+    const spec = parseSession(specDir, projectRoot)!;
+    expect(spec.specPath).toBe(join(specDir, "spec.md"));
+  });
+
+  it("spec_ref ausente E sem spec.md no specDir → specPath é null", () => {
+    const { projectRoot, specDir } = makeProject({ specRef: undefined });
+    const spec = parseSession(specDir, projectRoot)!;
+    expect(spec).not.toBeNull();
+    expect(spec.specPath).toBeNull();
+  });
+
+  it("NFR-001: o Spec não expõe campo de conteúdo do spec.md (apenas specPath)", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: "./.agent-session/FEAT-TEST/spec.md",
+      specRealPath: ".agent-session/FEAT-TEST/spec.md",
+    });
+    const spec = parseSession(specDir, projectRoot)!;
+    // O objeto Spec não deve ter nenhum campo carregando o conteúdo do arquivo
+    expect((spec as any).specContent).toBeUndefined();
+    expect((spec as any).specText).toBeUndefined();
+    expect((spec as any).specMarkdown).toBeUndefined();
+  });
+
+  it("specPath é sempre absoluto", () => {
+    const { projectRoot, specDir } = makeProject({
+      specRef: "./.agent-session/FEAT-TEST/spec.md",
+      specRealPath: ".agent-session/FEAT-TEST/spec.md",
+    });
+    const spec = parseSession(specDir, projectRoot)!;
+    expect(spec.specPath!.startsWith("/")).toBe(true);
   });
 });

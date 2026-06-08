@@ -61,6 +61,60 @@ describe("makeSummaryHandler", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it("AC-003: summary:done inclui modelId resolvido quando CLI emite system/init", () => {
+    const root = mkdtempSync(join(tmpdir(), "h-"));
+    const proc = fakeProc();
+    const send = vi.fn();
+    const handle = makeSummaryHandler(store, { cacheRoot: root, spawnFn: (() => proc) as any, now: () => "T0" });
+
+    handle({ type: "summary:generate", projectId: "p1", specId: "FEAT-001", taskId: "T-001" }, send);
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "system", subtype: "init", model: "claude-haiku-4-5-20251001" }) + "\n"));
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Resumo", total_cost_usd: 0.02 }) + "\n"));
+
+    const doneMsg = send.mock.calls.map((c) => JSON.parse(c[0])).find((m) => m.type === "summary:done");
+    expect(doneMsg.modelId).toBe("claude-haiku-4-5-20251001");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("AC-003: summary:done inclui modelId null quando CLI não emite system/init", () => {
+    const root = mkdtempSync(join(tmpdir(), "h-"));
+    const proc = fakeProc();
+    const send = vi.fn();
+    const handle = makeSummaryHandler(store, { cacheRoot: root, spawnFn: (() => proc) as any, now: () => "T0" });
+
+    handle({ type: "summary:generate", projectId: "p1", specId: "FEAT-001", taskId: "T-001" }, send);
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Resumo", total_cost_usd: 0.02 }) + "\n"));
+
+    const doneMsg = send.mock.calls.map((c) => JSON.parse(c[0])).find((m) => m.type === "summary:done");
+    expect(Object.prototype.hasOwnProperty.call(doneMsg, "modelId")).toBe(true);
+    expect(doneMsg.modelId).toBeNull();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("AC-005: summary:generate aceita model e passa ao runSummary (default sonnet quando ausente)", () => {
+    const root = mkdtempSync(join(tmpdir(), "h-"));
+    const proc = fakeProc();
+    const spawnSpy = vi.fn(() => proc) as any;
+    const send = vi.fn();
+    const handle = makeSummaryHandler(store, { cacheRoot: root, spawnFn: spawnSpy, now: () => "T0" });
+
+    handle({ type: "summary:generate", projectId: "p1", specId: "FEAT-001", taskId: "T-001" }, send);
+    expect(spawnSpy).toHaveBeenCalledWith("claude", expect.arrayContaining(["--model", "sonnet"]), expect.any(Object));
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("AC-005: summary:generate com model haiku passa --model haiku ao CLI", () => {
+    const root = mkdtempSync(join(tmpdir(), "h-"));
+    const proc = fakeProc();
+    const spawnSpy = vi.fn(() => proc) as any;
+    const send = vi.fn();
+    const handle = makeSummaryHandler(store, { cacheRoot: root, spawnFn: spawnSpy, now: () => "T0" });
+
+    handle({ type: "summary:generate", projectId: "p1", specId: "FEAT-001", taskId: "T-001", model: "haiku" } as any, send);
+    expect(spawnSpy).toHaveBeenCalledWith("claude", expect.arrayContaining(["--model", "haiku"]), expect.any(Object));
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it("generate com task inexistente: responde error", () => {
     const root = mkdtempSync(join(tmpdir(), "h-"));
     const send = vi.fn();

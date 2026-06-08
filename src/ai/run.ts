@@ -13,9 +13,11 @@ export interface AgentAdapter {
   parseLine: (line: string) => ParsedEvent | null;
 }
 
+export type ModelAlias = "haiku" | "sonnet" | "opus";
+
 export interface AgentCallbacks {
   onChunk: (delta: string) => void;
-  onDone: (fullText: string, costUsd: number | null) => void;
+  onDone: (fullText: string, costUsd: number | null, modelId: string | null) => void;
   onError: (message: string) => void;
 }
 
@@ -29,14 +31,17 @@ export interface RunAgentDeps {
   cwd?: string;
 }
 
-const CLAUDE_ARGS = ["--print", "--output-format=stream-json", "--include-partial-messages", "--model", "sonnet", "--verbose"];
+const CLAUDE_BASE_ARGS = ["--print", "--output-format=stream-json", "--include-partial-messages", "--verbose"];
 
-/** Adaptador do Claude CLI: reusa o parser de stream-json já testado em summary/parse. */
-export const claudeAdapter: AgentAdapter = {
-  command: "claude",
-  buildArgs: () => CLAUDE_ARGS,
-  parseLine: parseStreamLine,
-};
+export function buildClaudeAdapter(model: ModelAlias): AgentAdapter {
+  return {
+    command: "claude",
+    buildArgs: () => [...CLAUDE_BASE_ARGS, "--model", model],
+    parseLine: parseStreamLine,
+  };
+}
+
+export const claudeAdapter: AgentAdapter = buildClaudeAdapter("sonnet");
 
 /**
  * Roda uma CLI de IA com o prompt via stdin (sem interpolação em shell → sem injeção)
@@ -53,9 +58,10 @@ export function runAgent(prompt: string, cb: AgentCallbacks, deps: RunAgentDeps)
 
   let buffer = "";
   let done = false;
+  let modelId: string | null = null;
   // StringDecoder segura bytes de um caractere multi-byte (ã, ç) partido entre chunks.
   const decoder = new StringDecoder("utf8");
-  const finishDone = (text: string, costUsd: number | null) => { if (!done) { done = true; cb.onDone(text, costUsd); } };
+  const finishDone = (text: string, costUsd: number | null) => { if (!done) { done = true; cb.onDone(text, costUsd, modelId); } };
   const finishError = (msg: string) => { if (!done) { done = true; cb.onError(msg); } };
 
   proc.stdout?.on("data", (chunk: Buffer) => {
@@ -66,6 +72,7 @@ export function runAgent(prompt: string, cb: AgentCallbacks, deps: RunAgentDeps)
       buffer = buffer.slice(nl + 1);
       const ev = adapter.parseLine(line);
       if (!ev) continue;
+      if (ev.kind === "init") { modelId = ev.modelId; continue; }
       if (ev.kind === "chunk") cb.onChunk(ev.text);
       else if (ev.kind === "done") finishDone(ev.text, ev.costUsd);
       else finishError(ev.message);

@@ -34,7 +34,7 @@ function loadSpecs(projectPath: string): Spec[] {
     if (!isDir(specDir)) continue;
     let spec;
     try {
-      spec = parseSession(specDir);
+      spec = parseSession(specDir, projectPath);
     } catch {
       continue; // um spec ruim não derruba o scan dos outros
     }

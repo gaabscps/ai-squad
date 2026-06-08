@@ -6,6 +6,9 @@ import { STATE_LABEL } from "../lib/taskState";
 import { useTaskSummary } from "../state/useTaskSummary";
 import { useTypewriter } from "../state/useTypewriter";
 import { MarkdownText } from "../lib/markdown";
+import { ModelSelector } from "./ModelSelector";
+import { modelLabel } from "../lib/modelLabel";
+import type { ModelAlias } from "../state/summaryClient";
 
 const SEVERITY_CLASS: Record<string, string> = { error: "finding-error", warning: "finding-warning", info: "finding-info" };
 
@@ -22,26 +25,34 @@ function FindingRow({ finding }: { finding: DispatchFinding }) {
 
 /** Bloco de resumo de ensino, gerado por IA sob demanda (nunca automático). */
 function SummaryBlock({ projectId, specId, task }: { projectId: string; specId: string; task: Task }) {
+  const [model, setModel] = useState<ModelAlias>("sonnet");
   const s = useTaskSummary(projectId, specId, task.id);
   const hasDispatches = task.dispatches.length > 0;
   // Anima a revelação só quando o texto veio do stream (cache → instantâneo).
   const animate = s.streamed && (s.state === "streaming" || s.state === "ready");
   const display = useTypewriter(s.text, animate);
   const typing = s.state === "streaming" || (animate && display.length < s.text.length);
+  const label = modelLabel(s.modelId);
   return (
     <section className="task-summary" data-state={s.state}>
       <header className="task-summary-head">
         <span className="task-summary-label">✨ Resumo</span>
         {s.state === "ready" && s.generatedAt && (
-          <span className="task-summary-meta">gerado {new Date(s.generatedAt).toLocaleTimeString()}</span>
+          <span className="task-summary-meta">
+            gerado {new Date(s.generatedAt).toLocaleTimeString()}
+            {label && <> · {label}</>}
+          </span>
         )}
         {(s.state === "ready" || s.state === "stale") && (
-          <button type="button" className="task-summary-btn" onClick={s.regenerate}>↻ regerar</button>
+          <button type="button" className="task-summary-btn" onClick={() => s.regenerate(model)}>↻ regerar</button>
         )}
         {(s.state === "empty" || s.state === "error") && (
-          <button type="button" className="task-summary-btn primary" onClick={s.generate} disabled={!hasDispatches}>
-            gerar resumo
-          </button>
+          <>
+            <ModelSelector storageKey="aios-model-task" defaultValue="sonnet" onChange={setModel} />
+            <button type="button" className="task-summary-btn primary" onClick={() => s.generate(model)} disabled={!hasDispatches}>
+              gerar resumo
+            </button>
+          </>
         )}
       </header>
       {s.state === "empty" && (

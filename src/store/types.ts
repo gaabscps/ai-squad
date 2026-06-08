@@ -92,6 +92,7 @@ export interface Spec {
   lastActivityAt: string | null;
   timeline: TimelineEntry[];
   cost: CostRollup;
+  specPath?: string | null; // caminho absoluto do spec.md resolvido de spec_ref, ou null se ausente/inexistente
 }
 
 export interface Project {

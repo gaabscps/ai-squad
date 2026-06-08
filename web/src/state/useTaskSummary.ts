@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { summaryClient as defaultClient, type SummaryClient, type SummaryServerMsg } from "./summaryClient";
+import { summaryClient as defaultClient, type SummaryClient, type SummaryServerMsg, type ModelAlias } from "./summaryClient";
 
 export type SummaryState = "empty" | "loading" | "streaming" | "ready" | "stale" | "error";
 
@@ -8,11 +8,12 @@ export interface TaskSummary {
   text: string;
   generatedAt: string | null;
   costUsd: number | null;
+  modelId: string | null;
   /** true quando o texto chegou via streaming (anima); false quando veio do cache (instantâneo). */
   streamed: boolean;
   error: string | null;
-  generate: () => void;
-  regenerate: () => void;
+  generate: (model?: ModelAlias) => void;
+  regenerate: (model?: ModelAlias) => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export function useTaskSummary(projectId: string, specId: string, taskId: string
   const [text, setText] = useState("");
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [costUsd, setCostUsd] = useState<number | null>(null);
+  const [modelId, setModelId] = useState<string | null>(null);
   const [streamed, setStreamed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textRef = useRef("");
@@ -49,6 +51,7 @@ export function useTaskSummary(projectId: string, specId: string, taskId: string
         setText(textRef.current);
         setGeneratedAt(m.generatedAt ?? null);
         setCostUsd(m.costUsd ?? null);
+        setModelId(m.modelId ?? null);
         setState("ready");
       } else if (m.type === "summary:error") {
         setError(m.message ?? "erro ao gerar");
@@ -59,19 +62,20 @@ export function useTaskSummary(projectId: string, specId: string, taskId: string
     return off;
   }, [projectId, specId, taskId, client]);
 
-  const start = useCallback((force: boolean) => {
+  const start = useCallback((force: boolean, model?: ModelAlias) => {
     textRef.current = "";
     setText("");
     setError(null);
     setCostUsd(null);
+    setModelId(null);
     setStreamed(false);
     setState("loading");
-    client.generate(projectId, specId, taskId, force);
+    client.generate(projectId, specId, taskId, force, model);
   }, [projectId, specId, taskId, client]);
 
   return {
-    state, text, generatedAt, costUsd, streamed, error,
-    generate: () => start(false),
-    regenerate: () => start(true),
+    state, text, generatedAt, costUsd, modelId, streamed, error,
+    generate: (model?: ModelAlias) => start(false, model),
+    regenerate: (model?: ModelAlias) => start(true, model),
   };
 }

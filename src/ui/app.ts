@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Store } from "../store/store.js";
 import { makeSummaryHandler } from "../summary/handler.js";
+import { makeSpecSummaryHandler } from "../spec-summary/handler.js";
 import { makeDiagnosisHandler } from "../attention/handler.js";
 import { listDirs } from "../collector/browse.js";
 
@@ -124,6 +125,7 @@ export function createServer(
     // antes do primeiro frame chegar. Entrega mais previsível; custo ~0 (app local).
     setTimeout(() => socket.send(snapshotMessage()), 0);
     const onSummary = makeSummaryHandler(store);
+    const onSpecSummary = makeSpecSummaryHandler(store);
     const onDiagnosis = makeDiagnosisHandler(store);
     socket.on("message", (raw) => {
       let msg: { type?: string; id?: string; specId?: string; taskId?: string; force?: boolean };
@@ -136,6 +138,20 @@ export function createServer(
         onSummary(msg as never, (data) => {
           if (socket.readyState === WebSocket.OPEN) socket.send(data);
         });
+        return;
+      }
+      if (msg.type === "spec-summary:fetch" || msg.type === "spec-summary:generate") {
+        try {
+          onSpecSummary(msg as never, (data) => {
+            if (socket.readyState === WebSocket.OPEN) socket.send(data);
+          });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error("[spec-summary] erro síncrono inesperado:", err);
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "spec-summary:error", message }));
+          }
+        }
         return;
       }
       if (msg.type === "attention:fetch" || msg.type === "attention:generate") {

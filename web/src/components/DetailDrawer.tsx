@@ -8,6 +8,7 @@ import { Timeline } from "./Timeline";
 import { TaskItem } from "./TaskItem";
 import { AttentionPanel } from "./AttentionPanel";
 import { SpecJobIndicator } from "./SpecJobIndicator";
+import { SpecSummaryBlock } from "./SpecSummaryBlock";
 import { buildStory } from "../lib/buildStory";
 
 export function DetailDrawer({
@@ -60,6 +61,12 @@ export function DetailDrawer({
         {columnForSpec(spec) === "attention" && (
           <AttentionPanel projectId={projectId} specId={spec.id} />
         )}
+
+        <SpecSummaryBlock
+          projectId={projectId}
+          specId={spec.id}
+          specPath={spec.specPath ?? null}
+        />
 
         <h4 className="drawer-section">Fases</h4>
         <PhaseBar spec={spec} />

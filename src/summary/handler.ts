@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { spawn as realSpawn } from "node:child_process";
 import type { Store } from "../store/store.js";
 import type { Task } from "../store/types.js";
+import type { ModelAlias } from "../ai/run.js";
 import { taskFingerprint } from "./fingerprint.js";
 import { buildSummaryPrompt } from "./prompt.js";
 import { readSummary, writeSummary } from "./cache.js";
@@ -12,6 +13,7 @@ export interface SummaryMsg {
   projectId?: unknown;
   specId?: unknown;
   taskId?: unknown;
+  model?: unknown;
 }
 type Send = (data: string) => void;
 
@@ -66,6 +68,7 @@ export function makeSummaryHandler(store: Store, deps: HandlerDeps = {}) {
         send(JSON.stringify({ type: "summary:error", projectId, specId, taskId, message: "tarefa não encontrada" }));
         return;
       }
+      const model = (msg.model === "haiku" || msg.model === "opus" || msg.model === "sonnet") ? msg.model as ModelAlias : "sonnet";
       active.get(key)?.handle.cancel(); // cancela a geração anterior dessa task, se houver
       const prompt = buildSummaryPrompt(found.title, found.task);
       const fingerprint = taskFingerprint(found.task);
@@ -76,14 +79,14 @@ export function makeSummaryHandler(store: Store, deps: HandlerDeps = {}) {
       let acc = "";
       const handle = runSummary(prompt, {
         onChunk: (delta) => { acc += delta; send(JSON.stringify({ type: "summary:chunk", projectId, specId, taskId, delta })); },
-        onDone: (full, costUsd) => {
+        onDone: (full, costUsd, modelId) => {
           const text = full || acc;
           const rec = writeSummary(cacheRoot, projectId, specId, taskId, { text, fingerprint, costUsd }, now);
           clearIfCurrent();
-          send(JSON.stringify({ type: "summary:done", projectId, specId, taskId, text, generatedAt: rec.generatedAt, costUsd: rec.costUsd }));
+          send(JSON.stringify({ type: "summary:done", projectId, specId, taskId, text, generatedAt: rec.generatedAt, costUsd: rec.costUsd, modelId: modelId ?? null }));
         },
         onError: (message) => { clearIfCurrent(); send(JSON.stringify({ type: "summary:error", projectId, specId, taskId, message })); },
-      }, { spawnFn: deps.spawnFn });
+      }, { spawnFn: deps.spawnFn, model });
       active.set(key, { id, handle });
     }
   };

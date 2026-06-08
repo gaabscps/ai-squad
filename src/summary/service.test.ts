@@ -28,7 +28,7 @@ describe("runSummary", () => {
     expect(onChunk).toHaveBeenCalledWith("Olá");
 
     proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "Olá mundo", total_cost_usd: 0.05 }) + "\n"));
-    expect(onDone).toHaveBeenCalledWith("Olá mundo", 0.05);
+    expect(onDone).toHaveBeenCalledWith("Olá mundo", 0.05, null);
     expect(onError).not.toHaveBeenCalled();
   });
 
@@ -69,5 +69,27 @@ describe("runSummary", () => {
     const handle = runSummary("P", { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() }, { spawnFn: (() => proc) as any });
     handle.cancel();
     expect(proc.kill).toHaveBeenCalled();
+  });
+
+  it("passa modelId resolvido do evento system/init para onDone", () => {
+    const proc = fakeProc();
+    const onDone = vi.fn(), onError = vi.fn();
+    runSummary("P", { onChunk: vi.fn(), onDone, onError }, { spawnFn: (() => proc) as any });
+
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "system", subtype: "init", model: "claude-haiku-4-5-20251001" }) + "\n"));
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "ok", total_cost_usd: 0.01 }) + "\n"));
+
+    expect(onDone).toHaveBeenCalledWith("ok", 0.01, "claude-haiku-4-5-20251001");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("passa modelId null quando não há evento system/init", () => {
+    const proc = fakeProc();
+    const onDone = vi.fn();
+    runSummary("P", { onChunk: vi.fn(), onDone, onError: vi.fn() }, { spawnFn: (() => proc) as any });
+
+    proc.stdout.emit("data", Buffer.from(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "ok", total_cost_usd: 0 }) + "\n"));
+
+    expect(onDone).toHaveBeenCalledWith("ok", 0, null);
   });
 });

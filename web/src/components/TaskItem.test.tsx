@@ -5,8 +5,16 @@ import { TaskItem } from "./TaskItem";
 import { makeTask, makeDispatch } from "../test-utils";
 import type { DispatchFinding, DispatchTestEvidence } from "../../../src/store/types";
 
+const mockGenerate = vi.fn();
+const mockRegenerate = vi.fn();
+
+const mockUseTaskSummary = vi.fn(() => ({
+  state: "empty" as const, text: "", generatedAt: null, costUsd: null, modelId: null,
+  streamed: false, error: null, generate: mockGenerate, regenerate: mockRegenerate,
+}));
+
 vi.mock("../state/useTaskSummary", () => ({
-  useTaskSummary: () => ({ state: "empty", text: "", generatedAt: null, costUsd: null, streamed: false, error: null, generate: vi.fn(), regenerate: vi.fn() }),
+  useTaskSummary: (...args: any[]) => mockUseTaskSummary(...args),
 }));
 
 function makeFinding(over: Partial<DispatchFinding> = {}): DispatchFinding {
@@ -402,5 +410,73 @@ describe("Resumo IA + Detalhes técnicos", () => {
     await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
     expect(screen.getByRole("button", { name: /gerar resumo/i })).toBeDisabled();
     expect(screen.getByText(/sem dados para resumir/i)).toBeInTheDocument();
+  });
+});
+
+// ─── AC-005: ModelSelector no SummaryBlock de tarefa ─────────────────────────
+
+describe("AC-005: ModelSelector ao lado do botão 'gerar resumo'", () => {
+  it("exibe o seletor de modelo quando a task está expandida", async () => {
+    const task = makeTask({ dispatches: [makeDispatch({ summary: "fez X" })] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("seletor contém as opções Haiku, Sonnet e Opus", async () => {
+    const task = makeTask({ dispatches: [makeDispatch({ summary: "fez X" })] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    const select = screen.getByRole("combobox");
+    expect(within(select as HTMLElement).getByRole("option", { name: /haiku/i })).toBeInTheDocument();
+    expect(within(select as HTMLElement).getByRole("option", { name: /sonnet/i })).toBeInTheDocument();
+    expect(within(select as HTMLElement).getByRole("option", { name: /opus/i })).toBeInTheDocument();
+  });
+
+  it("seletor tem 'sonnet' como valor padrão", async () => {
+    const task = makeTask({ dispatches: [makeDispatch({ summary: "fez X" })] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    expect(screen.getByRole("combobox")).toHaveValue("sonnet");
+  });
+
+  it("clicar em 'gerar resumo' chama generate com o modelo selecionado", async () => {
+    mockGenerate.mockClear();
+    const task = makeTask({ dispatches: [makeDispatch({ summary: "fez X" })] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001|tarefa/i }));
+    await userEvent.selectOptions(screen.getByRole("combobox"), "haiku");
+    await userEvent.click(screen.getByRole("button", { name: /gerar resumo/i }));
+    expect(mockGenerate).toHaveBeenCalledWith("haiku");
+  });
+});
+
+// ─── AC-003: exibe modelLabel no SummaryBlock quando disponível ───────────────
+
+describe("AC-003: exibe modelLabel(modelId) junto do carimbo 'gerado às'", () => {
+  it("exibe label legível do modelo quando modelId está disponível no estado ready", async () => {
+    mockUseTaskSummary.mockReturnValue({
+      state: "ready", text: "Resumo pronto", generatedAt: new Date().toISOString(),
+      costUsd: 0.01, modelId: "claude-haiku-4-5-20251001", streamed: false, error: null,
+      generate: mockGenerate, regenerate: mockRegenerate,
+    });
+    const task = makeTask({ dispatches: [makeDispatch()] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001/i }));
+    expect(screen.getByText(/Haiku 4\.5/)).toBeInTheDocument();
+    mockUseTaskSummary.mockReset();
+  });
+
+  it("não exibe label do modelo quando modelId é null", async () => {
+    mockUseTaskSummary.mockReturnValue({
+      state: "ready", text: "Resumo", generatedAt: new Date().toISOString(),
+      costUsd: 0.01, modelId: null, streamed: false, error: null,
+      generate: mockGenerate, regenerate: mockRegenerate,
+    });
+    const task = makeTask({ dispatches: [makeDispatch()] });
+    render(<TaskItem task={task} projectId="proj-1" specId="FEAT-001" />);
+    await userEvent.click(screen.getByRole("button", { name: /T-001/i }));
+    expect(screen.queryByText(/Haiku|Sonnet|Opus/)).toBeNull();
+    mockUseTaskSummary.mockReset();
   });
 });

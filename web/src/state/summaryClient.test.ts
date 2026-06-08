@@ -25,6 +25,23 @@ describe("createSummaryClient", () => {
     expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:generate", projectId: "proj-1", force: true });
   });
 
+  it("AC-005: generate manda model quando fornecido", () => {
+    const sock = fakeSocket();
+    const client = createSummaryClient(() => sock);
+    client.generate("proj-1", "FEAT-001", "T-001", false, "haiku");
+    sock.onopen?.();
+    expect(JSON.parse(sock.sent[0])).toMatchObject({ type: "summary:generate", model: "haiku" });
+  });
+
+  it("AC-005: generate não manda model quando não fornecido", () => {
+    const sock = fakeSocket();
+    const client = createSummaryClient(() => sock);
+    client.generate("proj-1", "FEAT-001", "T-001");
+    sock.onopen?.();
+    const msg = JSON.parse(sock.sent[0]);
+    expect(msg).not.toHaveProperty("model");
+  });
+
   it("entrega mensagens só ao subscriber da chave certa (projectId|specId|taskId)", () => {
     const sock = fakeSocket();
     const client = createSummaryClient(() => sock);

@@ -1,4 +1,5 @@
 export type ParsedEvent =
+  | { kind: "init"; modelId: string }
   | { kind: "chunk"; text: string }
   | { kind: "done"; text: string; costUsd: number | null }
   | { kind: "error"; message: string };
@@ -21,6 +22,10 @@ export function parseStreamLine(line: string): ParsedEvent | null {
   }
   if (typeof msg !== "object" || msg === null) return null;
   const m = msg as Record<string, unknown>;
+
+  if (m.type === "system" && m.subtype === "init") {
+    return typeof m.model === "string" ? { kind: "init", modelId: m.model } : null;
+  }
 
   if (m.type === "stream_event") {
     const event = m.event as Record<string, unknown> | undefined;

@@ -7,16 +7,19 @@ export interface SummaryServerMsg {
   delta?: string;
   generatedAt?: string;
   costUsd?: number | null;
+  modelId?: string | null;
   stale?: boolean;
   message?: string;
 }
 type Handler = (msg: SummaryServerMsg) => void;
 type SocketFactory = () => WebSocket;
 
+export type ModelAlias = "haiku" | "sonnet" | "opus";
+
 export interface SummaryClient {
   subscribe: (key: string, fn: Handler) => () => void;
   fetch: (projectId: string, specId: string, taskId: string) => void;
-  generate: (projectId: string, specId: string, taskId: string, force?: boolean) => void;
+  generate: (projectId: string, specId: string, taskId: string, force?: boolean, model?: ModelAlias) => void;
 }
 
 /**
@@ -60,7 +63,9 @@ export function createSummaryClient(makeSocket: SocketFactory): SummaryClient {
       return () => { set.delete(fn); if (set.size === 0) subs.delete(key); };
     },
     fetch(projectId, specId, taskId) { sendOrQueue({ type: "summary:fetch", projectId, specId, taskId }); },
-    generate(projectId, specId, taskId, force = false) { sendOrQueue({ type: "summary:generate", projectId, specId, taskId, force }); },
+    generate(projectId, specId, taskId, force = false, model?: ModelAlias) {
+      sendOrQueue({ type: "summary:generate", projectId, specId, taskId, force, ...(model ? { model } : {}) });
+    },
   };
 }
 
