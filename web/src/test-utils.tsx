@@ -48,6 +48,7 @@ export function makeSpec(over: Partial<Spec> = {}): Spec {
     lastActivityAt: "2026-05-20T10:00:00Z",
     timeline: [],
     cost: makeCost(),
+    deliveryReport: null,
     ...over,
   };
 }

@@ -99,6 +99,17 @@ describe("readDeliveryReport — robustez", () => {
     expect(r.acceptanceCriteria[0].classification).toBe("kinda_met");
   });
 
+  it("quando answers E questions estão ambos presentes, answers vence", () => {
+    const d = specDir();
+    write(d, "delivery-report.json", JSON.stringify({
+      answers: { what_was_done: { answer: "do answers", confidence: "recorded", evidence_refs: [] } },
+      questions: { what_was_done: { answer: "do questions", confidence: "recorded", evidence_refs: [] } },
+    }));
+    const r = readDeliveryReport(d)!;
+    expect(r.container).toBe("answers");
+    expect(r.answers[0].answer).toBe("do answers");
+  });
+
   it("colisão acceptance_criteria: array top-level vira tabela; chave homônima vira resposta", () => {
     const d = specDir();
     write(d, "delivery-report.json", report("answers"));

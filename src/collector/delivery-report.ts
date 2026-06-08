@@ -51,7 +51,7 @@ export function readDeliveryReport(specDir: string): DeliveryReport | null {
   const hasAnswers = raw.answers && typeof raw.answers === "object";
   const hasQuestions = raw.questions && typeof raw.questions === "object";
   const blocks: Record<string, any> =
-    (hasAnswers ? raw.answers : hasQuestions ? raw.questions : {}) ?? {};
+    hasAnswers ? raw.answers : hasQuestions ? raw.questions : {};
   const container: "answers" | "questions" = hasQuestions && !hasAnswers ? "questions" : "answers";
 
   const answers: DeliveryAnswer[] = [];

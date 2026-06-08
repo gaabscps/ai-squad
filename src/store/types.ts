@@ -92,7 +92,7 @@ export interface Spec {
   lastActivityAt: string | null;
   timeline: TimelineEntry[];
   cost: CostRollup;
-  deliveryReport?: DeliveryReport | null; // null em sessões sem parecer (antigas/em curso)
+  deliveryReport: DeliveryReport | null; // null em sessões sem parecer (antigas/em curso)
   specPath?: string | null; // caminho absoluto do spec.md resolvido de spec_ref, ou null se ausente/inexistente
 }
 

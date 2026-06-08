@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseSession } from "./session.js";
@@ -250,7 +250,6 @@ describe("parseSession — delivery-report", () => {
     const spec = parseSession(d)!;
     expect(spec.deliveryReport).not.toBeNull();
     expect(spec.deliveryReport!.verdict?.value).toBe("approved");
-    rmSync(d, { recursive: true, force: true });
   });
 
   it("deliveryReport = null quando não há delivery-report.json", () => {
@@ -258,6 +257,5 @@ describe("parseSession — delivery-report", () => {
     writeFileSync(join(d, "session.yml"), "task_id: FEAT-Z\n");
     const spec = parseSession(d)!;
     expect(spec.deliveryReport ?? null).toBeNull();
-    rmSync(d, { recursive: true, force: true });
   });
 });
