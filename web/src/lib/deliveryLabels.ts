@@ -58,3 +58,22 @@ const CLASSIFICATIONS: Record<string, LabelStyle> = {
 export function classificationLabel(value: string): LabelStyle {
   return lookup(CLASSIFICATIONS, value);
 }
+
+// Resume a tabela de ACs por classificação, ex.: "25 atendidos · 6 parcialmente atendidos".
+// Ordem canônica met→partial→not_met→not_validated, depois quaisquer valores desconhecidos.
+// Plural simples: +"s" quando a contagem > 1 (vale pros 4 rótulos canônicos).
+export function acClassificationSummary(acs: { classification: string }[]): string {
+  const order = ["met", "partially_met", "not_met", "not_validated"];
+  const counts = new Map<string, number>();
+  for (const ac of acs) counts.set(ac.classification, (counts.get(ac.classification) ?? 0) + 1);
+  const keys = [
+    ...order.filter((k) => counts.has(k)),
+    ...[...counts.keys()].filter((k) => !order.includes(k)),
+  ];
+  return keys
+    .map((k) => {
+      const n = counts.get(k)!;
+      return `${n} ${classificationLabel(k).label}${n > 1 ? "s" : ""}`;
+    })
+    .join(" · ");
+}

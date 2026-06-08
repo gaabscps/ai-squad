@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { answerTitle, verdictLabel, confidenceLabel, classificationLabel } from "./deliveryLabels";
+import { answerTitle, verdictLabel, confidenceLabel, classificationLabel, acClassificationSummary } from "./deliveryLabels";
 
 describe("deliveryLabels", () => {
   it("traduz as 11 chaves e o veredicto", () => {
@@ -18,5 +18,19 @@ describe("deliveryLabels", () => {
     expect(verdictLabel("shipped_to_mars")).toEqual({ label: "shipped_to_mars", cls: "unknown" });
     expect(confidenceLabel("")).toEqual({ label: "—", cls: "unknown" });
     expect(classificationLabel("kinda_met")).toEqual({ label: "kinda_met", cls: "unknown" });
+  });
+});
+
+describe("acClassificationSummary", () => {
+  it("resume contagens por classificação, na ordem canônica, pluralizando", () => {
+    const acs = [
+      { classification: "met" }, { classification: "met" },
+      { classification: "partially_met" }, { classification: "not_met" },
+    ];
+    expect(acClassificationSummary(acs)).toBe("2 atendidos · 1 parcialmente atendido · 1 não atendido");
+  });
+
+  it("vazio → string vazia", () => {
+    expect(acClassificationSummary([])).toBe("");
   });
 });
