@@ -33,4 +33,9 @@ describe("acClassificationSummary", () => {
   it("vazio → string vazia", () => {
     expect(acClassificationSummary([])).toBe("");
   });
+
+  it("classificação desconhecida entra após as canônicas", () => {
+    const acs = [{ classification: "new_enum" }, { classification: "met" }];
+    expect(acClassificationSummary(acs)).toBe("1 atendido · 1 new_enum");
+  });
 });

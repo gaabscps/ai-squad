@@ -654,7 +654,7 @@ a:hover { text-decoration: underline; }
 
 /* ── Markdown viewer (modal de .md) ─────────────────────────────────────── */
 .md-viewer-overlay {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed; inset: 0; z-index: 50;
   background: rgba(0, 0, 0, 0.4);
   display: flex; justify-content: center; align-items: flex-start;
   padding: 3rem 1rem;

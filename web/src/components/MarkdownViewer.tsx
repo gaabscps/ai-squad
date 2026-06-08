@@ -56,7 +56,7 @@ export function MarkdownViewer({
 
   return (
     <div className="md-viewer-overlay" onClick={onClose}>
-      <div className="md-viewer" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className="md-viewer" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <header className="md-viewer-head">
           <span className="md-viewer-title mono">{title}</span>
           <button type="button" className="md-viewer-close" aria-label="fechar" onClick={onClose}>
