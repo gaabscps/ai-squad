@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Markdown } from "./Markdown";
 import { ModelSelector } from "./ModelSelector";
 import { modelLabel } from "../lib/modelLabel";
 import type { ModelAlias } from "../lib/modelLabel";
@@ -85,7 +86,7 @@ export function SpecSummaryBlock({
         <p className="spec-summary-warn">{s.error}</p>
       )}
       {(s.state === "streaming" || s.state === "ready" || s.state === "stale") && s.text && (
-        <div className="spec-summary-text">{s.text}</div>
+        <Markdown className="spec-summary-text">{s.text}</Markdown>
       )}
     </section>
   );
