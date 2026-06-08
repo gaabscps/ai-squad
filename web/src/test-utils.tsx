@@ -1,4 +1,4 @@
-import type { Project, Spec, Task, CostRollup, Dispatch } from "../../src/store/types";
+import type { Project, Spec, Task, CostRollup, Dispatch, DeliveryReport } from "../../src/store/types";
 
 export function makeDispatch(over: Partial<Dispatch> = {}): Dispatch {
   return {
@@ -27,6 +27,27 @@ export function makeCost(over: Partial<CostRollup> = {}): CostRollup {
     recoveredSubagents: null,
     byPhase: null,
     complete: null,
+    ...over,
+  };
+}
+
+export function makeDeliveryReport(over: Partial<DeliveryReport> = {}): DeliveryReport {
+  return {
+    specId: "FEAT-011",
+    outputLocale: "pt-BR",
+    generatedAt: "2026-06-07T12:00:00Z",
+    verdict: { value: "approved_with_caveats", rationale: "ok com ressalvas", evidenceRefs: ["o#1"] },
+    answers: [
+      { key: "what_was_done", answer: "fez X", confidence: "recorded", evidenceRefs: ["d#f"] },
+      { key: "risks_and_pending", answer: "risco Y", confidence: "inferred", evidenceRefs: [] },
+    ],
+    acceptanceCriteria: [
+      { id: "AC-001", description: "faz isso", classification: "met", evidenceRefs: [] },
+      { id: "AC-002", description: "faz aquilo", classification: "partially_met", evidenceRefs: [] },
+    ],
+    container: "answers",
+    mdPath: "/x/delivery-report.md",
+    jsonPath: "/x/delivery-report.json",
     ...over,
   };
 }
