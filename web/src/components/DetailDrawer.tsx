@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { SpecWithProject } from "../lib/kanban";
 import { attentionReason, columnForSpec } from "../lib/kanban";
 import { fmtTokens, fmtUsd } from "../format";
@@ -10,6 +11,7 @@ import { AttentionPanel } from "./AttentionPanel";
 import { SpecJobIndicator } from "./SpecJobIndicator";
 import { SpecSummaryBlock } from "./SpecSummaryBlock";
 import { DeliveryReportBlock } from "./DeliveryReportBlock";
+import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
 
 export function DetailDrawer({
@@ -22,6 +24,8 @@ export function DetailDrawer({
   if (!item) return null;
 
   const { spec, projectId, projectName, projectPath } = item;
+  const [viewer, setViewer] = useState<{ path: string; title: string } | null>(null);
+  const openFile = (path: string, title: string) => setViewer({ path, title });
   const reason = attentionReason(spec);
   const t = spec.cost.tokens;
   const story = buildStory(spec);
@@ -70,7 +74,7 @@ export function DetailDrawer({
         />
 
         <h4 className="drawer-section">Parecer de entrega</h4>
-        <DeliveryReportBlock report={spec.deliveryReport} />
+        <DeliveryReportBlock report={spec.deliveryReport} onOpenFile={openFile} />
 
         <h4 className="drawer-section">Fases</h4>
         <PhaseBar spec={spec} />
@@ -149,7 +153,13 @@ export function DetailDrawer({
         )}
 
         <h4 className="drawer-section">Linha do tempo</h4>
-        <Timeline spec={spec} projectPath={projectPath} />
+        <Timeline spec={spec} projectPath={projectPath} onOpenFile={openFile} />
+
+        <MarkdownViewer
+          path={viewer?.path ?? null}
+          title={viewer?.title ?? ""}
+          onClose={() => setViewer(null)}
+        />
       </aside>
     </div>
   );
