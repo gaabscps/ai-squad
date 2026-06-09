@@ -307,6 +307,14 @@ def build_cost_report(session_dir):
                 unpriced |= pu | ou
                 _absorb((d.get("planning") or {}).get("by_model"), "planning")
                 _absorb((d.get("orchestration") or {}).get("by_model"), "orchestration")
+                # New trail (/implementer): the main session carries an
+                # `implementation` slice (spend after implement_trail.started_at).
+                # It joins the implementation bucket but is NOT a subagent.
+                if d.get("implementation") is not None:
+                    sic, siu = _phase_cost(d.get("implementation"))
+                    implementation += sic
+                    unpriced |= siu
+                    _absorb((d.get("implementation") or {}).get("by_model"), "implementation")
             elif scope == "implementation":
                 parent = _parent_session(d.get("transcript_path"))
                 if not _agent_in_scope(parent, allowed_sessions, present_sessions):

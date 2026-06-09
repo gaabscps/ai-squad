@@ -31,6 +31,35 @@ def test_aggregates_planning_and_implementation(tmp_path):
     assert rep["subagent_count"] == 2
 
 
+def test_session_implementation_slice_lands_in_implementation(tmp_path):
+    # New trail (/implementer): the main session's spend after the
+    # implement_trail.started_at mark is captured under an `implementation`
+    # key in the session-*.json — it must land in the implementation bucket,
+    # alongside subagent costs, never in planning.
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "session-s1.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {"total_cost_usd": 4.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+        "implementation": {"total_cost_usd": 7.0, "unpriced_models": [],
+                           "by_model": {"m": {"input_tokens": 5, "output_tokens": 3,
+                                              "cost_usd": 7.0,
+                                              "cost_by_type": {"input": 4.0, "output": 3.0,
+                                                               "cache_read": 0.0, "cache_creation": 0.0}}}},
+    }))
+    (costs / "agent-a.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 2.0, "agent_id": "a", "unpriced_models": []}))
+
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["planning_cost_usd"] == 4.0
+    assert rep["implementation_cost_usd"] == 9.0  # 7 main-session slice + 2 subagent
+    assert rep["total_cost_usd"] == 13.0
+    assert rep["subagent_count"] == 1  # the slice is NOT a subagent
+    assert rep["tokens"]["by_phase"]["implementation"]["input"] == 5
+    assert rep["tokens"]["by_phase"]["implementation"]["output"] == 3
+
+
 def test_flags_unpriced_models(tmp_path):
     costs = tmp_path / "costs"
     costs.mkdir()

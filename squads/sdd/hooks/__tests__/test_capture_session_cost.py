@@ -57,3 +57,80 @@ def test_read_pipeline_start_empty_returns_none(tmp_path):
     session_dir.mkdir(parents=True)
     (session_dir / "session.yml").write_text('pipeline_started_at: ""\n')
     assert mod._read_pipeline_start(session_dir) is None
+
+
+# ---- new trail (/implementer): slice planning vs implementation ----
+
+def test_splits_by_implement_start(tmp_path):
+    tr = tmp_path / "sess.jsonl"
+    _transcript(tr)
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    mod.capture(session_id="sess", transcript_path=str(tr), session_dir=session_dir,
+                pipeline_started_at=None, prices=PRICES,
+                implement_started_at="2026-05-27T11:00:00Z")
+    data = json.loads((session_dir / "costs" / "session-sess.json").read_text())
+    assert data["planning"]["total_cost_usd"] == 10.0        # plan1 only
+    assert data["implementation"]["total_cost_usd"] == 20.0  # impl1 only
+    assert data["orchestration"]["total_cost_usd"] == 0.0
+
+
+def test_implement_start_takes_precedence_over_pipeline_start(tmp_path):
+    # Strangler: when both marks exist, the new trail's cut wins — the feature
+    # was implemented by /implementer, so main-session spend after the mark is
+    # implementation, not orchestration.
+    tr = tmp_path / "sess.jsonl"
+    _transcript(tr)
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    mod.capture(session_id="sess", transcript_path=str(tr), session_dir=session_dir,
+                pipeline_started_at="2026-05-27T09:00:00Z", prices=PRICES,
+                implement_started_at="2026-05-27T11:00:00Z")
+    data = json.loads((session_dir / "costs" / "session-sess.json").read_text())
+    assert data["planning"]["total_cost_usd"] == 10.0
+    assert data["implementation"]["total_cost_usd"] == 20.0
+    assert data["orchestration"]["total_cost_usd"] == 0.0
+
+
+def test_old_trail_payload_has_no_implementation_key(tmp_path):
+    # Old-trail captures stay byte-compatible: no implementation key appears
+    # unless the new mark exists.
+    tr = tmp_path / "sess.jsonl"
+    _transcript(tr)
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    mod.capture(session_id="sess", transcript_path=str(tr), session_dir=session_dir,
+                pipeline_started_at="2026-05-27T11:00:00Z", prices=PRICES)
+    data = json.loads((session_dir / "costs" / "session-sess.json").read_text())
+    assert "implementation" not in data
+
+
+def test_reads_implement_start_from_session_yml(tmp_path):
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session.yml").write_text(
+        'task_id: "FEAT-001"\n'
+        'implement_trail:\n'
+        '  started_at: "2026-05-27T11:00:00Z"\n'
+        '  reuse_map_ready_at: "2026-05-27T11:05:00Z"\n'
+        'status: done\n'
+    )
+    assert mod._read_implement_start(session_dir) == "2026-05-27T11:00:00Z"
+
+
+def test_read_implement_start_ignores_top_level_started_at(tmp_path):
+    # A started_at outside the implement_trail block must not be picked up.
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session.yml").write_text(
+        'started_at: "2026-05-27T08:00:00Z"\n'
+        'task_id: "FEAT-001"\n'
+    )
+    assert mod._read_implement_start(session_dir) is None
+
+
+def test_read_implement_start_absent_returns_none(tmp_path):
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session.yml").write_text('task_id: "FEAT-001"\n')
+    assert mod._read_implement_start(session_dir) is None

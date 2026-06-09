@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """ai-squad Stop hook — capture-session-cost.
 
-Splits the main-session transcript cost into planning vs orchestration by the
-pipeline start timestamp from session.yml, and writes
-.agent-session/<FEAT>/costs/session-<sessionId>.json. Fail-open.
+Splits the main-session transcript cost by the cut marks in session.yml and
+writes .agent-session/<FEAT>/costs/session-<sessionId>.json. Old trail
+(orchestrator): planning vs orchestration at pipeline_started_at. New trail
+(/implementer): planning vs implementation at implement_trail.started_at,
+which takes precedence. Fail-open.
 """
 import json
 import os
@@ -19,12 +21,22 @@ import transcript_cost  # noqa: E402
 from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
 
 
-def capture(session_id, transcript_path, session_dir, pipeline_started_at, prices):
+def capture(session_id, transcript_path, session_dir, pipeline_started_at, prices,
+            implement_started_at=None):
     try:
         session_dir = Path(session_dir)
         out_dir = session_dir / "costs"
         out_dir.mkdir(parents=True, exist_ok=True)
-        if pipeline_started_at:
+        implementation = None
+        if implement_started_at:
+            # New trail (/implementer): the implementation runs IN the main
+            # session, so the cut is implement_trail.started_at — and it wins
+            # over pipeline_started_at (the feature was implemented by
+            # /implementer, not dispatched by the orchestrator).
+            planning = transcript_cost.extract_transcript_cost(transcript_path, prices, until=implement_started_at)
+            implementation = transcript_cost.extract_transcript_cost(transcript_path, prices, since=implement_started_at)
+            orchestration = {"total_cost_usd": 0.0, "by_model": {}, "unpriced_models": [], "error": None}
+        elif pipeline_started_at:
             planning = transcript_cost.extract_transcript_cost(transcript_path, prices, until=pipeline_started_at)
             orchestration = transcript_cost.extract_transcript_cost(transcript_path, prices, since=pipeline_started_at)
         else:
@@ -32,6 +44,8 @@ def capture(session_id, transcript_path, session_dir, pipeline_started_at, price
             orchestration = {"total_cost_usd": 0.0, "by_model": {}, "unpriced_models": [], "error": None}
         payload = {"session_id": session_id, "scope": "session",
                    "planning": planning, "orchestration": orchestration}
+        if implementation is not None:
+            payload["implementation"] = implementation
         out_file = out_dir / f"session-{session_id}.json"
         tmp = out_file.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -53,6 +67,28 @@ def _read_pipeline_start(session_dir: Path):
     return None
 
 
+def _read_implement_start(session_dir: Path):
+    """implement_trail.started_at from session.yml, or None. Cheap block parse,
+    no PyYAML — only a started_at indented under implement_trail counts."""
+    sy = session_dir / "session.yml"
+    if not sy.exists():
+        return None
+    in_block = False
+    for line in sy.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.strip().startswith("implement_trail:") and not line.startswith((" ", "\t")):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        if line.strip() and not line.startswith((" ", "\t")):
+            break  # a new top-level key ends the block
+        stripped = line.strip()
+        if stripped.startswith("started_at:"):
+            val = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+            return val or None
+    return None
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -67,7 +103,8 @@ def main():
     if session_dir is None:
         return 0
     return capture(session_id, transcript_path, session_dir,
-                   _read_pipeline_start(session_dir), pricing.load_prices())
+                   _read_pipeline_start(session_dir), pricing.load_prices(),
+                   implement_started_at=_read_implement_start(session_dir))
 
 
 if __name__ == "__main__":

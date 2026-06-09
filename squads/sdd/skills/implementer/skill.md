@@ -32,7 +32,8 @@ Load everything from the written artifacts, NOT from any prior planning conversa
 ## Steps
 
 ### 1. Discover (reuse-mapper)
-Dispatch `reuse-mapper` via `Task` (`model: sonnet`) with `spec_ref`, `plan_ref`, `standards_ref`, `output_locale`, and `touched_areas` derived from the plan/ACs. Read the resulting `.agent-session/<spec_id>/reuse-map.json` and sanity-check it has the required keys (`spec_id`, `generated_for`, `existing_code`, `boundaries`, `applicable_rules`). (The schema file is source-only / not deployed — do not depend on its path at runtime.)
+First, record the trail start in `session.yml` — `implement_trail: {started_at: <now, UTC ISO-8601>}`. This mark is the cost cut: everything the main session spends after it is implementation, not planning (the cost hooks consume it; see Trail timestamps).
+Dispatch `reuse-mapper` via `Task` (`model: sonnet`) with `spec_ref`, `plan_ref`, `standards_ref`, `output_locale`, and `touched_areas` derived from the plan/ACs. Read the resulting `.agent-session/<spec_id>/reuse-map.json` and sanity-check it has the required keys (`spec_id`, `generated_for`, `existing_code`, `boundaries`, `applicable_rules`). (The schema file is source-only / not deployed — do not depend on its path at runtime.) Then set `implement_trail.reuse_map_ready_at`.
 
 ### 2. Plan of attack
 From the ACs + the Reuse Map, draft: what to **reuse** (cite the Reuse Map `ref`), what to **create new** (and why nothing existing fits), what to **touch**. Apply the Reuse Map's `applicable_rules` as you draft — the anti-abstraction / readability rules are first-class here, not ignored.
@@ -50,10 +51,10 @@ On approval: set `status: implementing` and record the **approved write scope** 
 - **Ask, don't guess:** on a Spec ambiguity, a borderline reuse-vs-rewrite call, or a material plan deviation → write `status: needs_attention`, `attention: {kind: input}`, ask the human, then resume. (Optional mid-slice checkpoint only for larger/riskier features — ~8+ files or a sensitive area.)
 
 ### 5. Verify (verification-before-completion)
-Run the tests covering the ACs; record commands + exit codes. Never declare done without running them.
+Run the tests covering the ACs; record commands + exit codes. Never declare done without running them. When they pass, set `implement_trail.code_done_at`.
 
 ### 6. Review (fresh-eyes-reviewer)
-Dispatch `fresh-eyes-reviewer` via `Task` (`model: sonnet`) with full context: `changed_files`, `reuse_map_ref`, `spec_ref`, `standards_ref`, `output_locale`. Read `.agent-session/<spec_id>/review.json`.
+Dispatch `fresh-eyes-reviewer` via `Task` (`model: sonnet`) with full context: `changed_files`, `reuse_map_ref`, `spec_ref`, `standards_ref`, `output_locale`. Read `.agent-session/<spec_id>/review.json` and set `implement_trail.review_ready_at`.
 - `severity: trivial` findings → apply them yourself.
 - `severity: material` findings → carry to Checkpoint B (never silently auto-resolve a judgment call).
 
@@ -62,6 +63,19 @@ Write `status: needs_attention`, `attention: {kind: final_approval}`. Present: w
 
 ### 8. Emit evidence
 Record `evidence[]` + `decisions[]` into `session.yml` — the chronicler (delivery report) consumes these later.
+
+## Trail timestamps (observability)
+Milestones live in one `session.yml` block (all UTC ISO-8601):
+
+```yaml
+implement_trail:
+  started_at:          # skill invoked — the planning/implementation cost cut
+  reuse_map_ready_at:  # reuse-mapper done
+  code_done_at:        # AC tests green, pre-review
+  review_ready_at:     # fresh-eyes-reviewer done
+```
+
+With `plan_approved_at` / `final_approved_at` (top-level, unchanged) this splits every checkpoint window into agent-working vs human-reviewing, and gives the cost hooks the cut to attribute main-session spend to the right phase.
 
 ## Status vocabulary (read by aiOS — MVP, informal)
 `session.yml.status`: `implementing` | `needs_attention` | `done`. When `needs_attention`, set `attention.kind` ∈ `{plan_approval, input, final_approval}`. aiOS routes any `needs_attention` to the "needs your attention" column; `final_approval` is the pre-done seal. (Schema formalization in `session.schema.json` is Phase 2.)
