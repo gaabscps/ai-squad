@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Reuse Map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_id", "generated_for", "existing_code", "boundaries", "applicable_rules"],
+  "properties": {
+    "spec_id": {"type": "string", "pattern": "^FEAT-[0-9]+$"},
+    "generated_for": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature_summary", "touched_areas"],
+      "properties": {
+        "feature_summary": {"type": "string"},
+        "touched_areas": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "existing_code": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref", "what", "relevance"],
+        "properties": {
+          "kind": {"enum": ["util", "handler", "component", "service", "hook", "type", "other"]},
+          "ref": {"type": "string"},
+          "what": {"type": "string"},
+          "relevance": {"type": "string"}
+        }
+      }
+    },
+    "boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["area", "scope", "note"],
+        "properties": {
+          "area": {"type": "string"},
+          "scope": {"enum": ["global", "local"]},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "applicable_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "source", "directive"],
+        "properties": {
+          "rule": {"type": "string"},
+          "source": {"type": "string"},
+          "directive": {"type": "string"}
+        }
+      }
+    },
+    "notes": {"type": "string"}
+  }
+}
