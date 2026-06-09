@@ -30,10 +30,10 @@ A missing optional field never blocks — map what you can and record the gap in
 3. `Read` the relevant candidates (the relevant span, not whole files). For each, record `kind`, `ref` (file:line), `what` (one line), and `relevance` (which AC could reuse it).
 4. Identify the global×local boundaries of the touched areas — where shared code lives vs. what is feature-local. This is what stops the implementer from copying a global into a local.
 5. Read `standards_ref` (the consumer's CLAUDE.md / conventions) and distill the `applicable_rules` that bear on THIS feature (anti-abstraction, readability, naming/structure conventions). One concrete `directive` per rule.
-6. Write the Reuse Map to `.agent-session/<spec_id>/reuse-map.json` (atomic: tmp + rename), validated against `shared/schemas/reuse-map.schema.json`.
+6. Write the Reuse Map to `.agent-session/<spec_id>/reuse-map.json` (atomic: tmp + rename), conforming to the Output contract below.
 
 ## Output contract (Reuse Map)
-Conforms to `shared/schemas/reuse-map.schema.json`. Required: `spec_id`, `generated_for` (`feature_summary`, `touched_areas`), `existing_code[]`, `boundaries[]`, `applicable_rules[]`. Optional `notes`.
+The inline contract here is authoritative at runtime. (It mirrors `shared/schemas/reuse-map.schema.json`, which lives in the ai-squad SOURCE for repo-side tests and is NOT deployed to consumer repos — never depend on that path at runtime.) Required: `spec_id`, `generated_for` (`feature_summary`, `touched_areas`), `existing_code[]`, `boundaries[]`, `applicable_rules[]`. Optional `notes`.
 - `existing_code[].kind` ∈ `{util, handler, component, service, hook, type, other}`.
 - `boundaries[].scope` ∈ `{global, local}`.
 

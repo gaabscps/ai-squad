@@ -32,7 +32,7 @@ Load everything from the written artifacts, NOT from any prior planning conversa
 ## Steps
 
 ### 1. Discover (reuse-mapper)
-Dispatch `reuse-mapper` via `Task` (`model: sonnet`) with `spec_ref`, `plan_ref`, `standards_ref`, `output_locale`, and `touched_areas` derived from the plan/ACs. Read the resulting `.agent-session/<spec_id>/reuse-map.json` and validate it against `shared/schemas/reuse-map.schema.json`.
+Dispatch `reuse-mapper` via `Task` (`model: sonnet`) with `spec_ref`, `plan_ref`, `standards_ref`, `output_locale`, and `touched_areas` derived from the plan/ACs. Read the resulting `.agent-session/<spec_id>/reuse-map.json` and sanity-check it has the required keys (`spec_id`, `generated_for`, `existing_code`, `boundaries`, `applicable_rules`). (The schema file is source-only / not deployed — do not depend on its path at runtime.)
 
 ### 2. Plan of attack
 From the ACs + the Reuse Map, draft: what to **reuse** (cite the Reuse Map `ref`), what to **create new** (and why nothing existing fits), what to **touch**. Apply the Reuse Map's `applicable_rules` as you draft — the anti-abstraction / readability rules are first-class here, not ignored.
