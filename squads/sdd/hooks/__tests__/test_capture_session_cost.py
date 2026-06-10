@@ -134,3 +134,17 @@ def test_read_implement_start_absent_returns_none(tmp_path):
     session_dir.mkdir(parents=True)
     (session_dir / "session.yml").write_text('task_id: "FEAT-001"\n')
     assert mod._read_implement_start(session_dir) is None
+
+
+def test_payload_records_transcript_path(tmp_path):
+    # The post-hoc analyst (chronicler in free/observed mode) mines the
+    # transcript; the cost capture is the only hook that reliably sees its
+    # path at Stop, so it must persist the pointer.
+    tr = tmp_path / "sess.jsonl"
+    _transcript(tr)
+    session_dir = tmp_path / ".agent-session" / "FEAT-001"
+    session_dir.mkdir(parents=True)
+    mod.capture(session_id="sess", transcript_path=str(tr), session_dir=session_dir,
+                pipeline_started_at=None, prices=PRICES)
+    data = json.loads((session_dir / "costs" / "session-sess.json").read_text())
+    assert data["transcript_path"] == str(tr)

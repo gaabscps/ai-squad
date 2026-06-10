@@ -42,7 +42,10 @@ def capture(session_id, transcript_path, session_dir, pipeline_started_at, price
         else:
             planning = transcript_cost.extract_transcript_cost(transcript_path, prices)
             orchestration = {"total_cost_usd": 0.0, "by_model": {}, "unpriced_models": [], "error": None}
+        # transcript_path is the pointer the post-hoc analyst (chronicler in
+        # observed mode) uses to find the recording — persist it.
         payload = {"session_id": session_id, "scope": "session",
+                   "transcript_path": str(transcript_path),
                    "planning": planning, "orchestration": orchestration}
         if implementation is not None:
             payload["implementation"] = implementation

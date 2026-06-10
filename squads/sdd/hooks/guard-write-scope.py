@@ -47,15 +47,20 @@ from hook_runtime import (
 _FENCE_STATUSES = {"implementing", "needs_attention"}
 
 
-def parse_session_state(text: str) -> tuple[str, list]:
-    """(status, approved_write_scope) from session.yml. Cheap line parse, no
-    PyYAML (consistent with the hooks). Strips quotes and inline comments."""
+def parse_session_state(text: str) -> tuple[str, list, str]:
+    """(status, approved_write_scope, mode) from session.yml. Cheap line parse,
+    no PyYAML (consistent with the hooks). Strips quotes and inline comments."""
     status = ""
+    mode = ""
     scope = []
     in_scope = False
     for line in text.splitlines():
         if re.match(r"^status\s*:", line):
             status = line.split(":", 1)[1].strip().strip('"').strip("'")
+            in_scope = False
+            continue
+        if re.match(r"^mode\s*:", line):
+            mode = line.split(":", 1)[1].strip().strip('"').strip("'")
             in_scope = False
             continue
         if re.match(r"^approved_write_scope\s*:", line):
@@ -72,7 +77,7 @@ def parse_session_state(text: str) -> tuple[str, list]:
             continue
         elif not line.startswith((" ", "\t")):
             in_scope = False  # a new top-level key ends the list block
-    return status, scope
+    return status, scope, mode
 
 
 def _in_scope(rel: str, scope: list) -> bool:
@@ -103,8 +108,7 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
 
-    if detect_active_skill(payload) != "implementer":
-        return 0
+    implementer_mode = detect_active_skill(payload) == "implementer"
 
     file_path = edit_target_path(tool_input_dict(payload))
     if not file_path:
@@ -130,9 +134,16 @@ def main() -> int:
         return 0  # no Session to enforce against — fail open
     session_yml = Path(session_dir) / "session.yml"
     try:
-        status, scope = parse_session_state(
+        status, scope, mode = parse_session_state(
             session_yml.read_text(encoding="utf-8", errors="replace"))
     except OSError:
+        return 0
+
+    # Observed (free) sessions: the fence is à la carte — it exists ONLY when
+    # the session declared an approved_write_scope (/observe, optional
+    # governance). No scope -> no Checkpoint A semantics -> stay free.
+    observed_mode = mode == "observed" and bool(scope)
+    if not implementer_mode and not observed_mode:
         return 0
 
     if status == "done":
