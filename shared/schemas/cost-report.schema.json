@@ -51,7 +51,7 @@
         "by_type": { "type": "object" }
       }
     },
-    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name." },
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC|OBS)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name." },
     "generated_at": { "type": "string", "format": "date-time", "description": "ISO 8601 timestamp of the reconciliation that produced this report." }
   }
 }

@@ -19,7 +19,7 @@
     }
   },
   "properties": {
-    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$" },
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC|OBS)-\\d{3,}$" },
     "squad": { "type": "string", "description": "Optional; consumers may derive it from session.yml." },
     "feature_name": { "type": "string" },
     "output_locale": { "type": "string" },

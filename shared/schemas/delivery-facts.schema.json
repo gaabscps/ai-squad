@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["spec_id", "squad", "feature_name", "outcome", "intent", "work_units", "gate", "timeline"],
   "properties": {
-    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$" },
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC|OBS)-\\d{3,}$" },
     "squad": { "type": "string", "description": "Which extractor produced this (sdd | discovery | council)." },
     "feature_name": { "type": "string" },
     "output_locale": { "type": "string", "description": "BCP-47; language the chronicler writes prose in. Absent -> en." },

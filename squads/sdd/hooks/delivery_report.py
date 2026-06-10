@@ -48,7 +48,8 @@ def _read_session_scalars(session_dir: Path) -> dict:
             key, val = top.group(1), top.group(2).strip()
             in_metrics = key == "escalation_metrics"
             if key in ("spec_id", "squad", "feature_name", "output_locale",
-                       "started_at", "completed_at"):
+                       "started_at", "completed_at",
+                       "mode", "session_id", "intent", "status", "created_at"):
                 out[key] = val.strip().strip('"').strip("'")
             continue
         if in_metrics:
@@ -223,17 +224,154 @@ def extract_sdd(session_dir: Path) -> dict:
     return facts
 
 
+def _read_yaml_items(text: str, key: str) -> list:
+    """Items of a top-level `key:` list block as dicts of scalar fields.
+    Same no-PyYAML line discipline as the rest of this module."""
+    items, in_block, cur = [], False, None
+    for line in text.splitlines():
+        if re.match(rf"^{key}\s*:\s*$", line):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        if line.strip() and not line.startswith((" ", "\t")):
+            break  # next top-level key ends the block
+        m = re.match(r"^\s+-\s*(.*)$", line)
+        if m:
+            cur = {}
+            items.append(cur)
+            kv = re.match(r"([A-Za-z_]+):\s*(.*)$", m.group(1))
+            if kv:
+                cur[kv.group(1)] = kv.group(2).strip().strip('"').strip("'")
+            continue
+        kv = re.match(r"^\s+([A-Za-z_]+):\s*(.*)$", line)
+        if kv and cur is not None:
+            cur[kv.group(1)] = kv.group(2).strip().strip('"').strip("'")
+    return items
+
+
+_VERIFY_CMD_RE = re.compile(
+    r"\b(test|jest|pytest|vitest|tsc|--noEmit|node --check|lint|build)\b")
+
+
+def _mine_transcript(session_dir: Path) -> tuple[list, list]:
+    """(files_changed, verification_cmds) from the session transcript.
+
+    The pointer comes from costs/session-*.json (persisted by
+    capture-session-cost). This is the worst-case floor of the observed
+    extractor: even with zero model discipline, the recording yields what
+    changed and what was run to verify it."""
+    files, cmds = [], []
+    tp = None
+    costs = session_dir / "costs"
+    if costs.is_dir():
+        for f in sorted(costs.glob("session-*.json")):
+            data = _load_json(f) or {}
+            if data.get("transcript_path"):
+                tp = data["transcript_path"]
+                break
+    if not tp:
+        return files, cmds
+    try:
+        fh = open(tp, encoding="utf-8", errors="replace")
+    except OSError:
+        return files, cmds
+    with fh:
+        for line in fh:
+            try:
+                o = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if o.get("type") != "assistant":
+                continue
+            content = (o.get("message") or {}).get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    continue
+                name = block.get("name")
+                inp = block.get("input") or {}
+                if name in ("Write", "Edit", "MultiEdit"):
+                    fp = inp.get("file_path") or ""
+                    if fp and ".agent-session" not in fp and fp not in files:
+                        files.append(fp)
+                elif name == "Bash":
+                    cmd = inp.get("command") or ""
+                    if cmd and _VERIFY_CMD_RE.search(cmd):
+                        entry = f"ran: {cmd[:160]}"
+                        if entry not in cmds:
+                            cmds.append(entry)
+    return files, cmds
+
+
+def extract_observed(session_dir: Path) -> dict:
+    """Observed (free-session) extractor: session.yml + transcript mining.
+
+    No manifest, no Output Packets, no dispatches — the gate is the human
+    (status: done is their seal). decisions[]/evidence[] are enrichment when
+    the model kept them; files/commands are mined from the recording either way.
+    """
+    session_dir = Path(session_dir).resolve()
+    scalars = _read_session_scalars(session_dir)
+    try:
+        yml_text = (session_dir / "session.yml").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        yml_text = ""
+    status = scalars.get("status", "")
+    outcome = {"done": "success", "abandoned": "refused"}.get(status, "mixed")
+    files, cmds = _mine_transcript(session_dir)
+    evidence_refs = list(cmds)
+    for ev in _read_yaml_items(yml_text, "evidence"):
+        ref = " -> ".join(v for v in (ev.get("cmd"), ev.get("result")) if v) or ev.get("kind", "")
+        if ref and ref not in evidence_refs:
+            evidence_refs.append(ref)
+    sid = scalars.get("session_id") or session_dir.name
+    unit = {
+        "id": sid, "title": scalars.get("intent", ""), "planned_scope": [],
+        "final_status": status or "unknown",
+        "loops": {"review": 0, "qa": 0, "blocker": 0}, "dispatches": [],
+        "decisions": _read_yaml_items(yml_text, "decisions"),
+        "findings": [], "ac_coverage": {},
+        "files_changed": files, "evidence_refs": evidence_refs,
+    }
+    return {
+        "spec_id": sid,
+        "squad": "observed",
+        "feature_name": scalars.get("intent", ""),
+        "output_locale": scalars.get("output_locale", "en"),
+        "outcome": outcome,
+        "intent": {"spec_ref": "", "plan_ref": "", "tasks_ref": "",
+                   "acceptance_criteria": []},
+        "work_units": [unit],
+        "escalations": [],
+        # The human IS the gate of a free session; their done is the seal.
+        "gate": {"role": "human", "status": status or "absent"},
+        "cost": {"total_usd": None, "complete": False},
+        "timeline": {"started_at": scalars.get("created_at", ""),
+                     "completed_at": scalars.get("completed_at", ""),
+                     "phases": []},
+        "generated_from": {"session_dir": str(session_dir), "extractor": "observed"},
+    }
+
+
 # Extension point: register a new squad extractor here. The chronicler and the
 # Facts schema do not change — adding Discovery is acoplar um extrator.
 EXTRACTORS = {
     "sdd": extract_sdd,
+    "observed": extract_observed,
 }
 
 
 def build_delivery_facts(session_dir: str) -> dict:
     sdir = Path(session_dir)
     scalars = _read_session_scalars(sdir)
-    squad = scalars.get("squad", "sdd")
+    # mode: observed is the free-session discriminator (written by /observe);
+    # it wins over squad so a free session never falls into the SDD extractor.
+    if scalars.get("mode") == "observed":
+        squad = "observed"
+    else:
+        squad = scalars.get("squad", "sdd")
     extractor = EXTRACTORS.get(squad)
     if extractor is None:
         raise NotImplementedError(

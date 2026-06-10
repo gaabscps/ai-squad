@@ -7,8 +7,8 @@
   "additionalProperties": false,
   "required": ["spec_id", "schema_version", "current_phase", "planned_phases"],
   "properties": {
-    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name. Legacy sessions used task_id for this field; readers accept task_id as an alias." },
-    "task_id": { "type": "string", "pattern": "^(FEAT|DISC)-\\d{3,}$", "description": "Deprecated alias of spec_id, present only on legacy Sessions. New Sessions write spec_id." },
+    "spec_id": { "type": "string", "pattern": "^(FEAT|DISC|OBS)-\\d{3,}$", "description": "Session/feature id; must match the .agent-session/<spec_id>/ directory name. Legacy sessions used task_id for this field; readers accept task_id as an alias." },
+    "task_id": { "type": "string", "pattern": "^(FEAT|DISC|OBS)-\\d{3,}$", "description": "Deprecated alias of spec_id, present only on legacy Sessions. New Sessions write spec_id." },
     "feature_name": { "type": "string", "description": "Human-readable Spec title; populated by spec-writer at first draft." },
     "schema_version": { "type": "integer", "const": 1, "description": "Schema version anchor for future migration. Currently 1 (first machine schema)." },
     "squad": { "type": "string", "enum": ["sdd", "discovery"], "description": "Which squad owns the Session. Absent defaults to sdd." },
