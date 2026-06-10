@@ -20,6 +20,16 @@
             "type": "command",
             "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-session-scope.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-session-scope.py\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-impl-seal.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-impl-seal.py\"",
+            "timeout": 5
           }
         ]
       },

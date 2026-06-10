@@ -40,7 +40,7 @@ From the ACs + the Reuse Map, draft: what to **reuse** (cite the Reuse Map `ref`
 
 ### 3. Checkpoint A — plan + reuse (FIXED)
 Write to `session.yml`: `status: needs_attention`, `attention: {kind: plan_approval}`. Present the plan of attack + reuse to the human (use `AskUserQuestion` or wait). This is the cheapest place to catch over-abstraction, duplication, and global-as-local — before a line is written.
-On approval: set `status: implementing` and record the **approved write scope** (the file list) for the write fence.
+On approval: set `status: implementing` and record the **approved write scope** (the file list) under `approved_write_scope:` in `session.yml`. This is enforced, not advisory: the `guard-write-scope` hook denies any Write/Edit outside it (and denies ALL source writes before this approval). To widen scope mid-implementation: escalate (`attention: {kind: input}`), get the human's yes, append the path to `approved_write_scope`, then retry.
 
 ### 4. Implement (TDD-leaning, reuse-first, rules-on)
 - Before creating ANY helper/component, check the Reuse Map — reuse or extend what exists.
@@ -59,7 +59,7 @@ Dispatch `fresh-eyes-reviewer` via `Task` (`model: sonnet`) with full context: `
 - `severity: material` findings → carry to Checkpoint B (never silently auto-resolve a judgment call).
 
 ### 7. Checkpoint B — final seal (FIXED)
-Write `status: needs_attention`, `attention: {kind: final_approval}`. Present: what was built, the reviewer's material findings and how each was resolved (or why not), the evidence (tests), and `decisions[]`. On the human's seal → `status: done`.
+Write `status: needs_attention`, `attention: {kind: final_approval}`. Present: what was built, the reviewer's material findings and how each was resolved (or why not), the evidence (tests), and `decisions[]`. On the human's seal → `status: done`. Enforced: the `verify-impl-seal` hook denies this write while `decisions:`/`evidence:` are missing or empty in `session.yml` — record them first.
 
 ### 8. Emit evidence
 Record `evidence[]` + `decisions[]` into `session.yml` — the chronicler (delivery report) consumes these later.
