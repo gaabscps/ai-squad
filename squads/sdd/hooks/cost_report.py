@@ -93,6 +93,17 @@ def _parent_session(transcript_path):
     return m.group(1) if m else None
 
 
+def _read_mode(session_dir):
+    """`mode:` scalar from session.yml ('observed' for free sessions), or None."""
+    sy = Path(session_dir) / "session.yml"
+    if not sy.exists():
+        return None
+    for line in sy.read_text(encoding="utf-8", errors="replace").splitlines():
+        if re.match(r"^mode\s*:", line):
+            return line.split(":", 1)[1].strip().strip('"').strip("'") or None
+    return None
+
+
 def _read_implementation_sessions(session_dir):
     """Authoritative allow-list of this feature's implementation session id(s).
 
@@ -219,6 +230,7 @@ def build_cost_report(session_dir):
     costs = session_dir / "costs"
     planning = orchestration = implementation = 0.0
     subagents = 0
+    session_captures = 0
     excluded_records = []  # (parent_session, cost_obj) for each out-of-scope agent
     unpriced = set()
     # Read-scoping anchors (Gap A): an authoritative allow-list from session.yml
@@ -300,6 +312,7 @@ def build_cost_report(session_dir):
                 continue
             scope = d.get("scope")
             if scope == "session":
+                session_captures += 1
                 pc, pu = _phase_cost(d.get("planning"))
                 oc, ou = _phase_cost(d.get("orchestration"))
                 planning += pc
@@ -346,6 +359,7 @@ def build_cost_report(session_dir):
         else:
             scoping_suspect = True
     excluded = len(excluded_records)
+    mode = _read_mode(session_dir)
     total = round(planning + orchestration + implementation, 6)
     tokens_by_type = _empty_typemap()
     cost_by_type = {t: 0.0 for t in _TOKEN_TYPES}
@@ -355,7 +369,9 @@ def build_cost_report(session_dir):
             cost_by_type[t] += cost_phase[p][t]
         tok_phase[p]["total"] = sum(tok_phase[p][t] for t in _TOKEN_TYPES)
     tokens_total = sum(tokens_by_type[t] for t in _TOKEN_TYPES)
+    rep_mode = {"mode": "observed"} if mode == "observed" else {}
     return {
+        **rep_mode,
         "planning_cost_usd": round(planning, 6),
         "orchestration_cost_usd": round(orchestration, 6),
         "implementation_cost_usd": round(implementation, 6),
@@ -377,7 +393,10 @@ def build_cost_report(session_dir):
         # measured was priced". Zero captures (empty costs/) is NOT complete —
         # the old `len(unpriced) == 0` reported complete:true for a $0/0-subagent
         # report, masking a capture failure as a clean run (the FEAT-010 bug).
-        "complete": subagents > 0 and not unpriced,
+        # Observed (free) sessions have no subagents BY DESIGN, so their
+        # "measured something" is the main-session capture itself.
+        "complete": ((session_captures > 0) if mode == "observed"
+                     else (subagents > 0)) and not unpriced,
         "tokens": {"by_phase": tok_phase, "by_type": tokens_by_type, "total": tokens_total},
         "token_cost": {
             "by_phase": {p: {**{t: round(cost_phase[p][t], 6) for t in _TOKEN_TYPES},
@@ -410,6 +429,20 @@ def write_cost_report_json(session_dir):
 
 
 def render_markdown(rep, task_id):
+    if rep.get("mode") == "observed":
+        # Free session: no phase machine — one Session row is the honest shape.
+        lines = [
+            f"## Cost report — {task_id}",
+            "",
+            "| Scope | Cost (USD) | Tokens |",
+            "|---|---|---|",
+            f"| Session | ${rep['planning_cost_usd']:.4f} | {fmt_tokens(rep['tokens']['by_phase']['planning']['total'])} |",
+            f"| **Total** | **${rep['total_cost_usd']:.4f}** | **{fmt_tokens(rep['tokens']['total'])}** |",
+        ]
+        if not rep["complete"]:
+            lines += ["", "> WARNING: cost incomplete "
+                          f"(unpriced models or missing capture): {', '.join(rep['unpriced_models'])}"]
+        return "\n".join(lines)
     impl_cell = "unknown" if rep.get("scoping_suspect") else f"${rep['implementation_cost_usd']:.4f}"
     lines = [
         f"## Cost report — {task_id}",

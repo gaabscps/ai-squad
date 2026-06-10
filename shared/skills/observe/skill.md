@@ -23,8 +23,9 @@ only observes, reports, and (optionally) fences.
 ## Steps
 
 ### 1. Open the contract
-Generate the next free id `OBS-NNN` (scan `.agent-session/OBS-*`). Write
-`.agent-session/OBS-NNN/session.yml`:
+Generate the next free id `OBS-NNN` (scan `.agent-session/OBS-*`). Get the
+real timestamp via Bash (`date -u +%Y-%m-%dT%H:%M:%SZ`) — never guess the
+clock. Write `.agent-session/OBS-NNN/session.yml`:
 
 ```yaml
 schema_version: 1
@@ -40,7 +41,10 @@ Tell the human the contract is open and what is now captured automatically
 (cost, time, attention status), then continue with whatever they asked.
 
 ### 2. Work (not this Skill's business)
-No steps here, on purpose.
+No steps here, on purpose. One instrumentation preference (not an opinion on
+the work): when you need a blocking decision from the human, prefer the
+`AskUserQuestion` tool over a plain-text question — the tool call is what
+flips `needs_attention` mechanically for the aiOS attention column.
 
 ### 3. Trail enrichment (best effort, not load-bearing)
 While working, when you make a REAL choice between alternatives or reject an

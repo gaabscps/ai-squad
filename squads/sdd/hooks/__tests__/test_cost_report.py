@@ -71,6 +71,62 @@ def test_flags_unpriced_models(tmp_path):
     assert rep["complete"] is False
 
 
+# ---- observed (free-session) mode ----
+
+def _observed_session(tmp_path, with_capture=True):
+    (tmp_path / "session.yml").write_text(
+        "session_id: OBS-001\nmode: observed\nstatus: in_progress\n", encoding="utf-8")
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    if with_capture:
+        (costs / "session-s1.json").write_text(json.dumps({
+            "scope": "session",
+            "planning": {"total_cost_usd": 3.69, "unpriced_models": []},
+            "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+        }))
+    return tmp_path
+
+
+def test_observed_complete_without_subagents(tmp_path):
+    # Free sessions have no subagents by design — the FEAT-010 guard
+    # (subagents > 0) must not apply; captured + priced == complete.
+    _observed_session(tmp_path)
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["mode"] == "observed"
+    assert rep["complete"] is True
+    assert rep["total_cost_usd"] == 3.69
+
+
+def test_observed_no_capture_is_incomplete(tmp_path):
+    _observed_session(tmp_path, with_capture=False)
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["complete"] is False
+
+
+def test_sdd_zero_subagents_still_incomplete(tmp_path):
+    # Regression pin: WITHOUT mode: observed the FEAT-010 guard stands —
+    # a pipeline run with 0 subagents is a capture failure, never complete.
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    (costs / "session-s1.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {"total_cost_usd": 4.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+    }))
+    rep = cr.build_cost_report(tmp_path)
+    assert "mode" not in rep
+    assert rep["complete"] is False
+
+
+def test_observed_markdown_renders_single_session_row(tmp_path):
+    _observed_session(tmp_path)
+    rep = cr.build_cost_report(tmp_path)
+    md = cr.render_markdown(rep, "OBS-001")
+    assert "| Session |" in md
+    assert "Planning (spec/design/tasks)" not in md
+    assert "Orchestration" not in md
+
+
 def test_markdown_renders(tmp_path):
     (tmp_path / "costs").mkdir()
     rep = cr.build_cost_report(tmp_path)
