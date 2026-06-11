@@ -54,13 +54,20 @@ def parse_session_state(text: str) -> tuple[str, list, str]:
     mode = ""
     scope = []
     in_scope = False
+    def _clean(raw):
+        raw = raw.strip()
+        for q in ('"', "'"):
+            if raw.startswith(q) and q in raw[1:]:
+                return raw[1:raw.index(q, 1)]
+        return raw.split(" #", 1)[0].strip()
+
     for line in text.splitlines():
         if re.match(r"^status\s*:", line):
-            status = line.split(":", 1)[1].strip().strip('"').strip("'")
+            status = _clean(line.split(":", 1)[1])
             in_scope = False
             continue
         if re.match(r"^mode\s*:", line):
-            mode = line.split(":", 1)[1].strip().strip('"').strip("'")
+            mode = _clean(line.split(":", 1)[1])
             in_scope = False
             continue
         if re.match(r"^approved_write_scope\s*:", line):

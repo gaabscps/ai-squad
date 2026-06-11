@@ -137,7 +137,7 @@ class TestGuardWriteScope(unittest.TestCase):
     # --- observed mode (à la carte fence; /observe sessions) ---
     def test_observed_mode_enforces_declared_scope(self):
         self._write_session(
-            "session_id: OBS-001\nmode: observed\nstatus: in_progress\n"
+            "session_id: OBS-001\nmode: observed   # wakes track-attention\nstatus: in_progress\n"
             "approved_write_scope:\n  - src/feature/\n")
         observe = _skill_transcript(self.tmp, "observe")
         result, _ = _run_hook(self._payload("jest.setup.js", transcript=observe))

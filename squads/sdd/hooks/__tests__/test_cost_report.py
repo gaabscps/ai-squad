@@ -74,8 +74,11 @@ def test_flags_unpriced_models(tmp_path):
 # ---- observed (free-session) mode ----
 
 def _observed_session(tmp_path, with_capture=True):
+    # Inline comment is realistic: /observe sessions copy it from the skill's
+    # YAML example (OBS-003 did) — the parser must strip it.
     (tmp_path / "session.yml").write_text(
-        "session_id: OBS-001\nmode: observed\nstatus: in_progress\n", encoding="utf-8")
+        "session_id: OBS-001\nmode: observed   # wakes track-attention\nstatus: in_progress\n",
+        encoding="utf-8")
     costs = tmp_path / "costs"
     costs.mkdir()
     if with_capture:

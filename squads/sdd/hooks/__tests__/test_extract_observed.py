@@ -24,7 +24,7 @@ _spec.loader.exec_module(dr)
 OBSERVED_YML = """\
 schema_version: 1
 session_id: OBS-001
-mode: observed
+mode: observed   # wakes track-attention; SDD machines ignore it
 intent: "fixar emails importantes na dashboard"
 status: done
 output_locale: pt-BR

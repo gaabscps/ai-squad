@@ -93,6 +93,16 @@ def _parent_session(transcript_path):
     return m.group(1) if m else None
 
 
+def _clean_scalar(raw):
+    """YAML-ish scalar cleanup: honor quotes, else drop inline ` # comments`.
+    /observe sessions copy the skill's example comment onto `mode: observed`."""
+    raw = raw.strip()
+    for q in ('"', "'"):
+        if raw.startswith(q) and q in raw[1:]:
+            return raw[1:raw.index(q, 1)]
+    return raw.split(" #", 1)[0].strip()
+
+
 def _read_mode(session_dir):
     """`mode:` scalar from session.yml ('observed' for free sessions), or None."""
     sy = Path(session_dir) / "session.yml"
@@ -100,7 +110,7 @@ def _read_mode(session_dir):
         return None
     for line in sy.read_text(encoding="utf-8", errors="replace").splitlines():
         if re.match(r"^mode\s*:", line):
-            return line.split(":", 1)[1].strip().strip('"').strip("'") or None
+            return _clean_scalar(line.split(":", 1)[1]) or None
     return None
 
 

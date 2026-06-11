@@ -50,7 +50,12 @@ def _read_session_scalars(session_dir: Path) -> dict:
             if key in ("spec_id", "squad", "feature_name", "output_locale",
                        "started_at", "completed_at",
                        "mode", "session_id", "intent", "status", "created_at"):
-                out[key] = val.strip().strip('"').strip("'")
+                v = val.strip()
+                if v[:1] in ('"', "'") and v[0] in v[1:]:
+                    v = v[1:v.index(v[0], 1)]
+                else:
+                    v = v.split(" #", 1)[0].strip()
+                out[key] = v
             continue
         if in_metrics:
             m = re.match(r"^\s+([a-z_]+):\s*([0-9.]+)\s*$", line)
