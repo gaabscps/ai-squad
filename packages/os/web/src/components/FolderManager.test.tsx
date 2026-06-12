@@ -391,8 +391,10 @@ describe("FolderManager", () => {
       mockUseProjects.mockReturnValue({ ...BASE_PROJECTS_STATE, include: ["/fake/home/novo"] });
       rerender(<FolderManager open={true} onClose={vi.fn()} />);
 
+      // O componente abrevia o home para `~` via displayPath; após o homePath
+      // já estar resolvido (homePath="/fake/home"), o path entra como "~/novo".
       await waitFor(() =>
-        expect(screen.getByText("/fake/home/novo")).toBeInTheDocument()
+        expect(screen.getByText("~/novo")).toBeInTheDocument()
       );
     });
 

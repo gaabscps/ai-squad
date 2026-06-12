@@ -222,6 +222,24 @@ a:hover { text-decoration: underline; }
 @keyframes tw-blink { to { visibility: hidden; } }
 .task-summary-cost { margin: 10px 0 0; font-size: 11px; color: var(--text-mute); border-top: 1px solid var(--border-soft); padding-top: 8px; cursor: help; }
 
+/* Resumo de spec (gêmeo visual do .task-summary, fica no topo do drawer) ──── */
+/* Vive solto no fluxo do drawer (sem pai com gap), por isso tem margem própria. */
+.spec-summary { background: #f7f9ff; border: 1px solid #e0e8ff; border-radius: 10px; padding: 12px 14px; margin: 8px 0 18px; }
+.spec-summary-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+/* margin-right:auto empurra meta + seletor de modelo + botão como um grupo à direita */
+.spec-summary-label { font-weight: 700; font-size: 13px; margin-right: auto; }
+.spec-summary-meta { font-size: 11px; color: var(--text-mute); }
+.spec-summary-btn { border: 1px solid var(--border-soft); background: #fff; border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--text); }
+.spec-summary-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.spec-summary-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* mantém o texto branco no hover do primário (evita azul-sobre-azul ilegível) */
+.spec-summary-btn.primary:hover:not(:disabled) { filter: brightness(0.95); color: #fff; }
+.spec-summary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.spec-summary-hint { margin: 10px 0 0; font-size: 12px; font-style: italic; color: var(--text-mute); }
+.spec-summary-warn { margin: 10px 0 0; font-size: 12px; font-style: italic; color: #b45309; }
+/* tipografia do corpo vem de .md-body (texto passa pelo <Markdown>); aqui só o respiro */
+.spec-summary-text { margin-top: 10px; }
+
 /* Detalhes técnicos (recolhido) */
 .task-details-summary { cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-mute); padding: 4px 0; }
 .task-details-body { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
