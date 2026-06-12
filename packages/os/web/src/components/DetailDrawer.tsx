@@ -14,7 +14,7 @@ import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
 import { visibleDecisions, visibleEvidence } from "../lib/observedTrail";
-import type { ObservedDecision, ObservedEvidence } from "../../../src/store/types";
+import { DecisionCard } from "./DecisionCard";
 
 export function DetailDrawer({
   item,
@@ -103,6 +103,8 @@ export function DetailDrawer({
             {(() => {
               const shownDecisions = visibleDecisions(obs);
               const shownEvidence = visibleEvidence(obs);
+              const openRef = (ref: string) =>
+                openFile(`${projectPath}/${ref}`, ref);
               return (
                 <>
                   <h4 className="drawer-section">Decisões</h4>
@@ -110,33 +112,26 @@ export function DetailDrawer({
                     <p className="drawer-empty">nenhuma decisão registrada</p>
                   ) : (
                     <ol className="obs-decisions">
-                      {shownDecisions.map((d: ObservedDecision, i: number) => (
-                        <li key={i} className="obs-decision">
-                          {d.what && <p className="obs-decision-what">{d.what}</p>}
-                          {d.why && <p className="obs-decision-why">{d.why}</p>}
-                          {d.rejected && (
-                            <p className="obs-decision-rejected">rejeitado: {d.rejected}</p>
-                          )}
-                          {d.ref && (
-                            <code className="obs-decision-ref">{d.ref}</code>
-                          )}
-                        </li>
+                      {shownDecisions.map((d, i) => (
+                        <DecisionCard key={i} decision={d} onOpenRef={openRef} />
                       ))}
                     </ol>
                   )}
 
-                  <h4 className="drawer-section">Evidências</h4>
-                  {shownEvidence.length === 0 ? (
-                    <p className="drawer-empty">nenhuma evidência registrada</p>
-                  ) : (
-                    <ol className="obs-evidence">
-                      {shownEvidence.map((e: ObservedEvidence, i: number) => (
-                        <li key={i} className="obs-evidence-item">
-                          {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
-                          {e.result && <p className="obs-evidence-result">{e.result}</p>}
-                        </li>
-                      ))}
-                    </ol>
+                  {/* Evidências acopladas à trilha (mesma seção, sub-rótulo — não h4 irmã) */}
+                  {shownEvidence.length > 0 && (
+                    <>
+                      <p className="obs-trail-sub">verificações</p>
+                      <ol className="obs-evidence">
+                        {shownEvidence.map((e, i) => (
+                          <li key={i} className="obs-evidence-item">
+                            <span className="evidence-mark" aria-hidden="true">✓</span>
+                            {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
+                            {e.result && <span className="obs-evidence-result">→ {e.result}</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    </>
                   )}
                 </>
               );

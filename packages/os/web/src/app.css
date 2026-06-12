@@ -724,37 +724,31 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
   padding: 6px 10px; border-radius: 6px; margin: 0 0 12px;
 }
 
-/* lista de decisões */
+/* lista de decisões — wrapper da <ol> que contém os DecisionCard */
 .obs-decisions {
   list-style: none; margin: 0 0 12px; padding: 0;
   display: flex; flex-direction: column; gap: 0;
 }
-.obs-decision {
-  padding: 10px 0; border-bottom: 1px solid var(--border-soft);
-  display: flex; flex-direction: column; gap: 3px;
-}
-.obs-decision:last-child { border-bottom: none; }
-.obs-decision-what { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
-.obs-decision-why { margin: 0; font-size: 12px; color: var(--text-dim); }
-.obs-decision-rejected { margin: 0; font-size: 12px; color: var(--text-mute); font-style: italic; }
-.obs-decision-ref {
-  font-family: var(--mono); font-size: 11px;
-  background: #f3f4f6; color: #374151;
-  padding: 1px 6px; border-radius: 4px;
-  align-self: flex-start;
-  word-break: break-all;
-}
+
+/* Forquilha de decisão: escolhido em destaque, rejeitado esmaecido */
+.decision-fork { margin: 0 0 12px; padding: 10px 12px; background: var(--surface-soft); border: 1px solid var(--border-soft); border-radius: 8px; }
+.decision-chosen { display: flex; gap: 8px; align-items: baseline; }
+.decision-chosen .decision-what { margin: 0; font-weight: 600; }
+.decision-rejected { display: flex; gap: 8px; align-items: baseline; opacity: 0.55; margin-top: 4px; }
+.decision-rejected-text { margin: 0; font-size: 12.5px; }
+.decision-mark { flex: none; font-size: 11px; }
+.decision-why { margin: 6px 0 0 19px; font-size: 12.5px; color: var(--text-dim); }
+.decision-ref { display: inline-block; margin: 6px 0 0 19px; font-size: 11px; }
+button.decision-ref { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 2px 8px; cursor: pointer; color: var(--accent); }
+.obs-trail-sub { margin: 14px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-mute); }
 
 /* lista de evidências */
 .obs-evidence {
   list-style: none; margin: 0 0 12px; padding: 0;
   display: flex; flex-direction: column; gap: 0;
 }
-.obs-evidence-item {
-  padding: 10px 0; border-bottom: 1px solid var(--border-soft);
-  display: flex; flex-direction: column; gap: 4px;
-}
-.obs-evidence-item:last-child { border-bottom: none; }
+.obs-evidence-item { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
+.evidence-mark { flex: none; color: var(--done); font-size: 11px; }
 .obs-evidence-cmd {
   font-family: var(--mono); font-size: 12px;
   background: #f6f8fa; border: 1px solid #e5e7eb;
@@ -762,7 +756,7 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
   display: inline-block;
   overflow-wrap: break-word;
 }
-.obs-evidence-result { margin: 0; font-size: 12px; color: var(--text-dim); }
+.obs-evidence-result { color: var(--text-dim); }
 
 /* estado vazio para decisões/evidências */
 .drawer-empty { font-size: 12px; color: var(--text-mute); margin: 0 0 12px; font-style: italic; }

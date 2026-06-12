@@ -651,8 +651,10 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getByText("usar queue em vez de chamada direta")).toBeInTheDocument();
     expect(screen.getByText("evita bloqueio no request cycle")).toBeInTheDocument();
-    expect(screen.getByText(/rejeitado:.*chamada síncrona/)).toBeInTheDocument();
-    const ref = container.querySelector("code.obs-decision-ref");
+    // novo: texto rejeitado sem prefixo "rejeitado:" — está dentro de .decision-rejected
+    expect(screen.getByText("chamada síncrona").closest(".decision-rejected")).not.toBeNull();
+    // ref não-.md renderiza como <code> inerte com classe decision-ref
+    const ref = container.querySelector("code.decision-ref");
     expect(ref).not.toBeNull();
     expect(ref!.textContent).toBe("ADR-012");
   });
@@ -668,8 +670,8 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getByText("usar TypeScript strict")).toBeInTheDocument();
     expect(screen.getByText("detecta erros cedo")).toBeInTheDocument();
-    expect(screen.queryByText(/rejeitado:/i)).toBeNull();
-    expect(container.querySelector("code.obs-decision-ref")).toBeNull();
+    expect(container.querySelector(".decision-rejected")).toBeNull();
+    expect(container.querySelector(".decision-ref")).toBeNull();
   });
 
   it("lista vazia: exibe estado vazio 'nenhuma decisão registrada'", () => {
@@ -689,7 +691,7 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
       }),
     });
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(container.querySelector(".obs-decision-why")).toBeNull();
+    expect(container.querySelector(".decision-why")).toBeNull();
   });
 
   it("item degenerado (what vazio + why/rejected/ref null) não renderiza li vazio — cai no estado vazio", () => {
@@ -699,15 +701,15 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
       }),
     });
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // item degenerado deve ser filtrado — nenhum obs-decision renderizado
-    expect(container.querySelectorAll(".obs-decision")).toHaveLength(0);
+    // item degenerado deve ser filtrado — nenhum decision-fork renderizado
+    expect(container.querySelectorAll(".decision-fork")).toHaveLength(0);
     // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
     expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
   });
 });
 
 describe("DetailDrawer — modo observado: seção Evidências", () => {
-  it("evidência: cmd em monospace e result como texto", () => {
+  it("evidência: cmd em monospace e result como span com seta", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({
         evidence: [
@@ -719,15 +721,18 @@ describe("DetailDrawer — modo observado: seção Evidências", () => {
     const cmdEl = container.querySelector("code.obs-evidence-cmd");
     expect(cmdEl).not.toBeNull();
     expect(cmdEl!.textContent).toBe("npm test");
-    expect(screen.getByText("42 tests passed")).toBeInTheDocument();
+    // result agora renderiza como span com prefixo "→ "
+    expect(screen.getByText(/42 tests passed/)).toBeInTheDocument();
   });
 
-  it("lista vazia: exibe estado vazio 'nenhuma evidência registrada'", () => {
+  it("lista vazia: sub-rótulo 'verificações' NÃO é exibido (sem seção prometida)", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({ evidence: [] }),
     });
-    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // evidência vazia não renderiza nada — sem sub-rótulo, sem lista, sem empty-state
+    expect(container.querySelector(".obs-trail-sub")).toBeNull();
+    expect(screen.queryByText("nenhuma evidência registrada")).toBeNull();
   });
 
   it("item degenerado (cmd/result/kind todos null) não renderiza li vazio bordejado", () => {
@@ -737,10 +742,10 @@ describe("DetailDrawer — modo observado: seção Evidências", () => {
       }),
     });
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // item degenerado deve ser filtrado — nenhum obs-evidence-item renderizado
+    // item degenerado filtrado por visibleEvidence — nenhum obs-evidence-item renderizado
     expect(container.querySelectorAll(".obs-evidence-item")).toHaveLength(0);
-    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
-    expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
+    // sem evidência visível → sem sub-rótulo nem empty-state
+    expect(container.querySelector(".obs-trail-sub")).toBeNull();
   });
 });
 
