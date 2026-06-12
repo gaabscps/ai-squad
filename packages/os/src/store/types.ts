@@ -40,10 +40,12 @@ export interface Task {
 }
 
 // Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.
-// Hierarquia de fonte: "report" = report.html parseado (fonte canônica);
+// Hierarquia SDD: "report" = report.html parseado (fonte canônica SDD);
 // "unreliable" = report.html presente mas ilegível/não-parseável;
 // "partial" = soma crua dos costs/*.json (sem report.html); "empty" = sem dados.
-// "cost_report" = cost-report.json (caminho observado; lido em Task 3).
+// Hierarquia observada: "cost_report" = cost-report.json (fonte primária do caminho
+// observado; lido por readObservedCostRollup em cost-report.ts); fallback a "partial"/"empty"
+// quando o report está ausente ou mais velho que costs/*.json (staleness).
 export type CostSource = "empty" | "partial" | "unreliable" | "report" | "cost_report";
 
 export interface CostPhaseBreakdown {

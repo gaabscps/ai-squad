@@ -26,7 +26,7 @@ import type {
   ObservedEvidence,
 } from "../store/types.js";
 import { readDeliveryReport } from "./delivery-report.js";
-import { readCostRollup } from "./cost.js"; // Task 3 substituirá pela fonte cost-report.json
+import { readObservedCostRollup } from "./cost-report.js";
 
 // Padrão de nome de diretório OBS-NNN (3 ou mais dígitos) — case-sensitive conforme o schema
 const OBS_DIR_RE = /^OBS-\d{3,}$/;
@@ -109,7 +109,7 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     health: { pendingHuman: 0, escalationRate: 0, auditException: false },
     lastActivityAt: lastActivity(specDir, raw),
     timeline: [],
-    cost: readCostRollup(specDir),
+    cost: readObservedCostRollup(specDir),
     deliveryReport: readDeliveryReport(specDir),
     specPath: null,
     observed,
@@ -214,7 +214,7 @@ function degradedSpec(specDir: string): Spec {
     health: { pendingHuman: 0, escalationRate: 0, auditException: false },
     lastActivityAt: lastActivity(specDir, {}),
     timeline: [],
-    cost: readCostRollup(specDir),
+    cost: readObservedCostRollup(specDir),
     deliveryReport: null,
     specPath: null,
     observed,

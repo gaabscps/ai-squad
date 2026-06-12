@@ -1,0 +1,17 @@
+{
+  "spec_id": "OBS-018",
+  "mode": "observed",
+  "total_cost_usd": 1.23,
+  "complete": true,
+  "unpriced_models": [],
+  "generated_at": "2026-06-10T18:00:00Z",
+  "tokens": {
+    "total": 500000,
+    "by_type": {
+      "input": 100000,
+      "output": 50000,
+      "cache_read": 340000,
+      "cache_creation": 10000
+    }
+  }
+}

@@ -249,6 +249,74 @@ describe("readSessionDir — OBS-019 (YAML raiz não-objeto)", () => {
 // 12. obs-closed-vazio (OBS-020): closed_at: "" → tratado como ausente (Fix 2)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 13. obs-custo-ok (OBS-018): cost-report.json completo + completo → custo real
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-custo-ok (OBS-018, cost-report.json completo)", () => {
+  it("cost.totalCostUsd === 1.23 (lido do cost-report.json)", () => {
+    const spec = readSessionDir(fixt("obs-custo-ok"))!;
+    expect(spec.cost.totalCostUsd).toBe(1.23);
+  });
+
+  it("cost.source === 'cost_report'", () => {
+    const spec = readSessionDir(fixt("obs-custo-ok"))!;
+    expect(spec.cost.source).toBe("cost_report");
+  });
+
+  it("cost.byPhase === null (breakdown SDD seria falso para observado)", () => {
+    const spec = readSessionDir(fixt("obs-custo-ok"))!;
+    expect(spec.cost.byPhase).toBeNull();
+  });
+
+  it("cost.totalTokens === 500000", () => {
+    const spec = readSessionDir(fixt("obs-custo-ok"))!;
+    expect(spec.cost.totalTokens).toBe(500000);
+  });
+
+  it("cost.partial === false (complete true + unpriced_models vazio)", () => {
+    const spec = readSessionDir(fixt("obs-custo-ok"))!;
+    expect(spec.cost.partial).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. obs-unpriced (OBS-017): unpriced_models não-vazio → null, nunca 0
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-unpriced (OBS-017, modelo sem preço)", () => {
+  it("cost.totalCostUsd === null (NUNCA 0 quando há unpriced_models)", () => {
+    const spec = readSessionDir(fixt("obs-unpriced"))!;
+    expect(spec.cost.totalCostUsd).toBeNull();
+  });
+
+  it("cost.partial === true", () => {
+    const spec = readSessionDir(fixt("obs-unpriced"))!;
+    expect(spec.cost.partial).toBe(true);
+  });
+
+  it("cost.totalTokens > 0 (tokens preservados mesmo sem custo)", () => {
+    const spec = readSessionDir(fixt("obs-unpriced"))!;
+    expect(spec.cost.totalTokens).toBeGreaterThan(0);
+  });
+
+  it("cost.source === 'cost_report'", () => {
+    const spec = readSessionDir(fixt("obs-unpriced"))!;
+    expect(spec.cost.source).toBe("cost_report");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. obs-aberto (OBS-010): sem cost-report.json → source é partial ou empty
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-aberto (OBS-010) sem cost-report.json → fallback", () => {
+  it("cost.source está em {'partial', 'empty'} (sem cost-report.json, cai na soma crua)", () => {
+    const spec = readSessionDir(fixt("obs-aberto"))!;
+    expect(["partial", "empty"]).toContain(spec.cost.source);
+  });
+});
+
 describe("readSessionDir — obs-closed-vazio (OBS-020, closed_at vazio)", () => {
   it("status é 'running' (empty string = ausente, status in_progress mantido)", () => {
     const spec = readSessionDir(fixt("obs-closed-vazio"))!;

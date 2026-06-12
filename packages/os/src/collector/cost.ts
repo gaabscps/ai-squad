@@ -61,9 +61,11 @@ function sumRawCosts(costsDir: string): RawSum {
 }
 
 /**
- * Custo de uma Session. Prioridade: report.html parseado (source="report") >
+ * Custo de uma Session SDD. Prioridade: report.html parseado (source="report") >
  * report.html não-parseável (source="unreliable") > soma crua costs/*.json
- * (source="partial") > nada (source="empty"). cost-report.json não é mais usado.
+ * (source="partial") > nada (source="empty").
+ * Sessões observadas usam readObservedCostRollup (cost-report.ts), que consulta
+ * cost-report.json como fonte primária e cai aqui como fallback de staleness.
  * Read-only.
  */
 export function readCostRollup(specDir: string): CostRollup {
