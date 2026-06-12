@@ -39,9 +39,9 @@ export function columnForSpec(spec: Spec): ColumnKey {
 
 // ─── Motivo de atenção ─────────────────────────────────────────────────────────
 
-/** Shape idêntico ao AttentionReason do legado; consumers (DetailDrawer, KanbanCard) compilam sem mudança. */
+/** Motivo de atenção; kind restrito à union literal para typecheck exaustivo nos consumers. */
 export interface AttentionReason {
-  kind: string;
+  kind: "input" | "unreadable" | "blocked" | "escalated" | "paused";
   label: string;
 }
 
@@ -52,7 +52,7 @@ export interface AttentionReason {
 export function attentionReason(spec: Spec): AttentionReason | null {
   if (spec.status === "needs_attention") return { kind: "input",      label: "aguardando sua resposta" };
   if (spec.status === "unreadable")      return { kind: "unreadable", label: "session.yml ilegível"    };
-  // Mantém compatibilidade com statuses SDD que também caem em attention
+  // Mantém compatibilidade de STATUS com statuses SDD que também caem em attention (health.auditException não é consultado aqui)
   if (spec.status === "blocked") {
     const blocked = spec.tasks.find((t) => t.state === "blocked");
     return { kind: "blocked", label: blocked ? `${blocked.id} bloqueada` : "bloqueado" };

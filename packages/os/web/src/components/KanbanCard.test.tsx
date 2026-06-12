@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanCard } from "./KanbanCard";
-import { makeSpec, makeProject, makeCost, makeTask } from "../test-utils";
+import { makeSpec, makeProject, makeCost, makeTask, makeObservedSpec } from "../test-utils";
 import { flattenSpecs } from "../lib/kanban";
 
 function item(spec = makeSpec()) {
@@ -143,5 +143,72 @@ describe("KanbanCard", () => {
     const style = orchestrationItem!.getAttribute("style") ?? "";
     // orchestration é 70% do total (10+70+20=100)
     expect(style).toContain("70");
+  });
+});
+
+describe("KanbanCard — modo observado", () => {
+  it("NÃO renderiza o contador de tarefas N/M concluídas", () => {
+    const spec = makeObservedSpec({ id: "OBS-001", title: "Refatorar auth" });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.queryByText(/concluídas/i)).not.toBeInTheDocument();
+  });
+
+  it("renderiza data-mode='observed' no article", () => {
+    const spec = makeObservedSpec({ id: "OBS-001" });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    const article = screen.getByRole("article");
+    expect(article).toHaveAttribute("data-mode", "observed");
+  });
+
+  it("elemento de título tem atributo title para tooltip em intents longos", () => {
+    const longIntent = "Implementar novo fluxo de autenticação com SSO e 2FA completo";
+    const spec = makeObservedSpec({ id: "OBS-001", title: longIntent });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    const titleEl = screen.getByText(longIntent);
+    expect(titleEl).toHaveAttribute("title", longIntent);
+  });
+
+  it("custo: totalCostUsd presente → exibe fmtUsd", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "cost_report", totalCostUsd: 4.37 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/4\.37/)).toBeInTheDocument();
+  });
+
+  it("custo: source=cost_report + totalCostUsd null → exibe tokens como métrica primária + hint '$ indisponível'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "cost_report", totalCostUsd: null, totalTokens: 7_700_000 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    // token total como métrica primária (7.7M tokens)
+    expect(screen.getByText(/7[.,]7M/)).toBeInTheDocument();
+    // hint de $ indisponível com classe cost-unpriced
+    const hint = screen.getByText(/indisponível/i);
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveClass("cost-unpriced");
+  });
+
+  it("custo: source=cost_report + totalCostUsd null → NUNCA exibe '$0.00' nem '—' sozinho", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "cost_report", totalCostUsd: null, totalTokens: 500 }),
+    });
+    const { container } = render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(container.textContent).not.toContain("$0.00");
+    // "—" sozinho no custo é proibido; tokens devem aparecer
+    expect(screen.getByText(/500/)).toBeInTheDocument();
+  });
+
+  it("custo: source=empty em spec observada → exibe 'sem custo ainda' (não 'em planejamento')", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "empty", totalCostUsd: null }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/sem custo ainda/i)).toBeInTheDocument();
+    expect(screen.queryByText(/em planejamento/i)).not.toBeInTheDocument();
   });
 });

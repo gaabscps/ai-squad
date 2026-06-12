@@ -24,4 +24,16 @@ describe("StatusBadge", () => {
     render(<StatusBadge spec={makeSpec()} />);
     expect(screen.queryByText("⚠ audit")).toBeNull();
   });
+
+  it("needs_attention → badge usa classe status-needs_attention", () => {
+    render(<StatusBadge spec={makeSpec({ status: "needs_attention" })} />);
+    const badge = screen.getByText("precisa de você");
+    expect(badge).toHaveClass("status-needs_attention");
+  });
+
+  it("abandoned → badge usa classe status-abandoned", () => {
+    render(<StatusBadge spec={makeSpec({ status: "abandoned" })} />);
+    const badge = screen.getByText("abandonado");
+    expect(badge).toHaveClass("status-abandoned");
+  });
 });

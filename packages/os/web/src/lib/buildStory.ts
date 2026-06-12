@@ -1,4 +1,6 @@
 import type { Spec, CostPhaseBreakdown, SpecStatus } from "../../../src/store/types";
+import { STATUS_LABEL as BADGE_LABEL } from "../components/StatusBadge";
+import { fmtTokens } from "../format";
 
 const PHASE_PRIORITY: Array<keyof CostPhaseBreakdown> = [
   "planning",
@@ -40,6 +42,18 @@ function formatCost(usd: number): string {
 export function buildStory(spec: Spec): string {
   const { cost, tasks, status } = spec;
   const statusLabel = STATUS_LABEL[status];
+
+  // Sessão observada: frase curta pt-BR sem vocabulário SDD
+  if (spec.observed) {
+    const obsLabel = BADGE_LABEL[status];
+    if (cost.totalCostUsd !== null) {
+      return `${obsLabel} · US$ ${cost.totalCostUsd.toFixed(2)}`;
+    }
+    if (cost.source === "cost_report") {
+      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens`;
+    }
+    return `${obsLabel} · sem custo ainda`;
+  }
 
   if (cost.source === "empty") {
     return `${statusLabel} · em planejamento`;

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SpecTable } from "./SpecTable";
-import { makeSpec, makeProject, makeCost } from "../test-utils";
+import { makeSpec, makeProject, makeCost, makeObservedSpec } from "../test-utils";
 import { flattenSpecs } from "../lib/kanban";
 
 const items = flattenSpecs(
@@ -48,5 +48,31 @@ describe("SpecTable", () => {
     await userEvent.click(screen.getByRole("button", { name: /custo/i }));
     const rows2 = screen.getAllByRole("row").slice(1);
     expect(within(rows2[0]).getByText("FEAT-2")).toBeInTheDocument();
+  });
+
+  it("coluna 'fase' foi renomeada para 'modo'", () => {
+    render(<SpecTable items={items} onSelect={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /^modo/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^fase$/i })).not.toBeInTheDocument();
+  });
+
+  it("spec observada mostra 'observado' na célula de modo", () => {
+    const obsItems = flattenSpecs(
+      [makeProject({ name: "p", specs: [makeObservedSpec({ id: "OBS-001", title: "Obs test" })] })],
+      false,
+    );
+    render(<SpecTable items={obsItems} onSelect={vi.fn()} />);
+    expect(screen.getByText("observado")).toBeInTheDocument();
+  });
+
+  it("status cell exibe o label em pt-BR (não a string crua do enum)", () => {
+    const obsItems = flattenSpecs(
+      [makeProject({ name: "p", specs: [makeObservedSpec({ id: "OBS-001", status: "needs_attention" })] })],
+      false,
+    );
+    render(<SpecTable items={obsItems} onSelect={vi.fn()} />);
+    // label mapeado, não o enum cru "needs_attention"
+    expect(screen.getByText("precisa de você")).toBeInTheDocument();
+    expect(screen.queryByText("needs_attention")).not.toBeInTheDocument();
   });
 });

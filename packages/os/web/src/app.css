@@ -103,12 +103,13 @@ a:hover { text-decoration: underline; }
 .kcard-id { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .kcard-proj { font-size: 9px; color: var(--sdd); background: #eff4ff; padding: 1px 7px; border-radius: 999px; margin-left: auto; }
 .kcard[data-squad="discovery"] .kcard-proj { color: var(--discovery); background: #effcfa; }
-.kcard-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.kcard-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kcard-why { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; margin-bottom: 8px; }
 .why-blocked { color: #b91c1c; background: #fef2f2; }
 .why-escalated { color: #7e22ce; background: #faf5ff; }
 .why-paused, .why-audit { color: #b45309; background: #fffbeb; }
-.why-input { color: #1d4ed8; background: #eff6ff; }
+/* Recolorado para âmbar: combina com o badge vermelho de needs_attention na mesma urgência */
+.why-input { color: #92400e; background: #fffbeb; }
 .why-unreadable { color: #b91c1c; background: #fef2f2; }
 .kcard-phase { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
 .kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
@@ -477,6 +478,8 @@ a:hover { text-decoration: underline; }
 .kcard-cost { margin-left: 10px; color: var(--text-dim); }
 .cost-empty { color: var(--text-mute); }
 .cost-unreliable { color: var(--blocked); font-size: 10px; }
+/* Hint muted em cards observados onde USD não está disponível mas tokens estão */
+.cost-unpriced { color: var(--text-mute); font-size: 10px; }
 
 /* ── Cost Phase Bar (barra proporcional no card) ──────────────────────── */
 .cost-phase-bar {

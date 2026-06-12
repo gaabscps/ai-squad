@@ -7,7 +7,7 @@ import {
   COLUMN_DEFS,
 } from "./kanbanObserved";
 import { flattenSpecs } from "./kanbanObserved";
-import { makeSpec, makeProject, makeTask, makeObservedSpec } from "../test-utils";
+import { makeSpec, makeProject, makeObservedSpec } from "../test-utils";
 
 // ─── columnForSpec ─────────────────────────────────────────────────────────────
 
@@ -56,6 +56,15 @@ describe("attentionReason (observed)", () => {
   it("running → null (sem motivo de atenção)", () => {
     expect(attentionReason(makeSpec({ status: "running" }))).toBeNull();
   });
+
+  it("blocked → kind=blocked, label usa o id da task bloqueada", () => {
+    const r = attentionReason(
+      makeSpec({ status: "blocked", tasks: [{ id: "T-007", state: "blocked", loops: 0, dispatches: [] }] }),
+    );
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe("blocked");
+    expect(r!.label).toMatch(/T-007/);
+  });
 });
 
 // ─── isArchived ────────────────────────────────────────────────────────────────
@@ -83,6 +92,12 @@ describe("isArchived (observed)", () => {
     const spec = makeSpec({ status: "running", lastActivityAt: "2020-01-01T00:00:00Z" });
     expect(isArchived(spec, NOW, 7)).toBe(false);
   });
+
+  it("done + idade == limite → NÃO arquivada (limite é exclusivo)", () => {
+    // NOW=2026-06-10, limit=9 dias → 2026-06-01 = exatamente 9 dias → ainda aparece
+    const spec = makeSpec({ status: "done", lastActivityAt: "2026-06-01T00:00:00Z" });
+    expect(isArchived(spec, NOW, 9)).toBe(false);
+  });
 });
 
 // ─── bucketByColumn ────────────────────────────────────────────────────────────
@@ -91,7 +106,7 @@ describe("bucketByColumn (observed)", () => {
   it("distribui specs nas 3 colunas certas e preserva a forma do objeto", () => {
     const items = flattenSpecs(
       [makeProject({ specs: [
-        makeObservedSpec({ status: "running" }),
+        makeObservedSpec({ id: "OBS-001", status: "running" }),
         makeObservedSpec({ id: "OBS-002", status: "needs_attention" }),
         makeObservedSpec({ id: "OBS-003", status: "done" }),
         makeObservedSpec({ id: "OBS-004", status: "abandoned" }),
@@ -99,7 +114,7 @@ describe("bucketByColumn (observed)", () => {
       false,
     );
     const buckets = bucketByColumn(items);
-    expect(buckets.running.map((i) => i.spec.id)).toEqual(["FEAT-001"]);
+    expect(buckets.running.map((i) => i.spec.id)).toEqual(["OBS-001"]);
     expect(buckets.attention.map((i) => i.spec.id)).toEqual(["OBS-002"]);
     expect(buckets.done.map((i) => i.spec.id)).toEqual(["OBS-003", "OBS-004"]);
   });

@@ -1,6 +1,7 @@
 import type { Spec } from "../../../src/store/types";
 
-const STATUS_LABEL: Record<Spec["status"], string> = {
+/** Rótulos pt-BR por status — fonte única usada pelo badge e pela tabela. */
+export const STATUS_LABEL: Record<Spec["status"], string> = {
   running: "rodando",
   paused: "pausado",
   blocked: "bloqueado",

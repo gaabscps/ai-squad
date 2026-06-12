@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SpecWithProject } from "../lib/kanbanObserved";
 import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
 import { SpecJobIndicator } from "./SpecJobIndicator";
+import { STATUS_LABEL } from "./StatusBadge";
 
 type SortKey = "project" | "id" | "status" | "phase" | "cost" | "activity";
 
@@ -52,7 +53,7 @@ export function SpecTable({
     { key: "project", label: "projeto" },
     { key: "id", label: "id" },
     { key: "status", label: "status" },
-    { key: "phase", label: "fase" },
+    { key: "phase", label: "modo" },
     { key: "cost", label: "custo" },
     { key: "activity", label: "atividade" },
   ];
@@ -83,10 +84,10 @@ export function SpecTable({
             <td className="mono">{it.spec.id}</td>
             <td>
               <span className={`status status-${it.spec.status}`}>
-                {it.spec.status}
+                {STATUS_LABEL[it.spec.status]}
               </span>
             </td>
-            <td>{it.spec.phase}</td>
+            <td>{it.spec.observed ? "observado" : it.spec.phase}</td>
             <td className="mono">
               {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
               {it.spec.cost.source === "partial" && (
