@@ -1,0 +1,7 @@
+schema_version: 1
+session_id: "OBS-030"
+mode: observed
+intent: "Implementar autenticação por OAuth"
+status: in_progress
+output_locale: pt-BR
+created_at: "2026-06-12T09:00:00Z"

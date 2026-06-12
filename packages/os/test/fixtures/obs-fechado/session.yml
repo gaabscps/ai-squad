@@ -1,0 +1,16 @@
+schema_version: 1
+session_id: "OBS-011"
+mode: observed
+intent: "Implementar login com Google"
+status: done
+output_locale: pt-BR
+created_at: "2026-06-10T10:00:00Z"
+closed_at: "2026-06-10T18:00:00Z"
+decisions:
+  - what: "OAuth2 via biblioteca oficial"
+    why: "Reduz surface de ataque"
+evidence:
+  - cmd: "npm run build"
+    result: "build ok"
+observed_sessions:
+  - "uuid-1"

@@ -1,4 +1,8 @@
 import type { Spec, CostPhaseBreakdown, SpecStatus } from "../../../src/store/types";
+// BADGE_LABEL = masculino curto (badge); STATUS_LABEL local = feminino narrativo (story).
+// Dualidade intencional — badge diz "bloqueado", prosa diz "bloqueada".
+import { STATUS_LABEL as BADGE_LABEL } from "./statusLabels";
+import { fmtUsd, fmtTokens } from "../format";
 
 const PHASE_PRIORITY: Array<keyof CostPhaseBreakdown> = [
   "planning",
@@ -12,6 +16,9 @@ const STATUS_LABEL: Record<SpecStatus, string> = {
   blocked: "bloqueada",
   done: "concluída",
   escalated: "escalada",
+  needs_attention: "precisa de você",
+  abandoned: "abandonado",
+  unreadable: "ilegível",
 };
 
 function dominantPhase(byPhase: CostPhaseBreakdown): string | null {
@@ -37,6 +44,22 @@ function formatCost(usd: number): string {
 export function buildStory(spec: Spec): string {
   const { cost, tasks, status } = spec;
   const statusLabel = STATUS_LABEL[status];
+
+  // Sessão observada: frase curta pt-BR sem vocabulário SDD
+  if (spec.observed) {
+    const obsLabel = BADGE_LABEL[status];
+    if (cost.totalCostUsd !== null) {
+      return `${obsLabel} · ${fmtUsd(cost.totalCostUsd)}`;
+    }
+    if (cost.source === "cost_report") {
+      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens`;
+    }
+    // Fallback partial/empty: se já há tokens, mostrar queima; senão, vazio
+    if (cost.totalTokens > 0) {
+      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens (em coleta)`;
+    }
+    return `${obsLabel} · sem custo ainda`;
+  }
 
   if (cost.source === "empty") {
     return `${statusLabel} · em planejamento`;

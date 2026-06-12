@@ -1,7 +1,7 @@
 import { readdirSync, existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Project, Spec } from "../store/types.js";
-import { parseSession } from "./session.js";
+import { readSessionDir } from "./observed.js";
 import { projectId } from "./project-id.js";
 
 export interface DiscoveryOptions {
@@ -18,7 +18,15 @@ function isDir(p: string): boolean {
   }
 }
 
-/** Lê todas as Sessions em <projectPath>/.agent-session/<id>/session.yml. */
+/**
+ * Lê todos os dirs em <projectPath>/.agent-session/ e despacha cada um pelo
+ * campo `mode` do session.yml:
+ *   - mode: observed → card observado (running, needs_attention, done, abandoned)
+ *   - modo SDD legado (ausente / outro valor) → filtrado do board (null)
+ *   - dir OBS-* com YAML ilegível → card degradado (nunca some do board)
+ *   - dir não-OBS com YAML ilegível → null (comportamento legado)
+ * O try/catch por dir preserva a resiliência: um dir ruim não derruba o scan.
+ */
 function loadSpecs(projectPath: string): Spec[] {
   const agentDir = join(projectPath, ".agent-session");
   if (!existsSync(agentDir)) return [];
@@ -34,7 +42,7 @@ function loadSpecs(projectPath: string): Spec[] {
     if (!isDir(specDir)) continue;
     let spec;
     try {
-      spec = parseSession(specDir, projectPath);
+      spec = readSessionDir(specDir, projectPath);
     } catch {
       continue; // um spec ruim não derruba o scan dos outros
     }

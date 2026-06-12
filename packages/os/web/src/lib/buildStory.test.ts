@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildStory } from "./buildStory";
-import { makeSpec, makeTask, makeCost } from "../test-utils";
+import { makeSpec, makeTask, makeCost, makeObservedSpec } from "../test-utils";
 
 // AC-008: frase-resumo determinística com nº de tarefas, bloqueios, custo e fase dominante
 // AC-011: source "empty" / sem fases → "em planejamento" (omissão graciosa)
@@ -271,5 +271,70 @@ describe("buildStory – AC-008: tarefas bloqueadas e sem tarefas", () => {
     const result = buildStory(spec);
     expect(result).toContain("bloqueada");
     expect(result).toMatch(/1\s*bloqueada/);
+  });
+});
+
+describe("buildStory — modo observado", () => {
+  it("spec observada com custo: frase contém status label e custo em USD", () => {
+    const spec = makeObservedSpec({
+      status: "done",
+      cost: makeCost({ source: "cost_report", totalCostUsd: 3.5 }),
+    });
+    const result = buildStory(spec);
+    expect(result).toContain("concluído");
+    expect(result).toMatch(/3[.,]50/);
+  });
+
+  it("spec observada com custo null: frase contém status label e tokens", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ source: "cost_report", totalCostUsd: null, totalTokens: 5_200_000 }),
+    });
+    const result = buildStory(spec);
+    // status label presente (qualquer forma natural de "running")
+    expect(result.toLowerCase()).toMatch(/rodando|em andamento|em execu/);
+    // tokens formatados aparecem (ex: "5.2M tokens")
+    expect(result).toMatch(/5[.,]2M/);
+  });
+
+  it("spec observada NÃO contém 'tarefa', 'planejamento' nem 'fase'", () => {
+    const spec = makeObservedSpec({
+      status: "needs_attention",
+      cost: makeCost({ source: "cost_report", totalCostUsd: 1.0 }),
+    });
+    const result = buildStory(spec);
+    expect(result).not.toMatch(/tarefa/i);
+    expect(result).not.toMatch(/planejamento/i);
+    expect(result).not.toMatch(/fase/i);
+  });
+
+  it("spec observada preserva branch SDD quando spec.observed está ausente", () => {
+    // spec SDD legado — observed ausente → buildStory usa o branch SDD intacto
+    const spec = makeSpec({
+      tasks: [makeTask({ state: "done" })],
+      cost: makeCost({ source: "report", totalCostUsd: 10.0, byPhase: { planning: 10, orchestration: 0, implementation: 0 } }),
+    });
+    const result = buildStory(spec);
+    expect(result).toContain("tarefa"); // SDD sempre menciona tarefas
+  });
+
+  it("observed partial com tokens > 0 → frase contém tokens + '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 2_100_000 }),
+    });
+    const result = buildStory(spec);
+    expect(result).toMatch(/2[.,]1M/);
+    expect(result).toContain("em coleta");
+    expect(result).not.toContain("sem custo ainda");
+  });
+
+  it("observed partial com totalTokens === 0 → frase contém 'sem custo ainda'", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 0 }),
+    });
+    const result = buildStory(spec);
+    expect(result).toContain("sem custo ainda");
   });
 });

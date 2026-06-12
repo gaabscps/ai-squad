@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-squad/shared/schemas/observed-session.schema.json",
+  "title": "ai-squad Observed Session",
+  "description": "Canonical contract for the observed-mode Session state at .agent-session/OBS-NNN/session.yml, written by the /observe skill and the attention/cost hooks. Dispatch rule: a session.yml belongs to THIS contract iff it has mode: observed; without that field the contract is session.schema.json (SDD legacy). Directory name (OBS-*) is an id fallback, not the discriminator. Derived from the WRITERS (shared/skills/observe/skill.md + track-attention.py + hook_runtime.register_observed_session + guard-write-scope.py), not from on-disk specimens — deployed hooks may lag the source. Evolution protocol: a new field lands in the same PR as the schema update and the contract tests; readers treat every field as optional on read. NOT enforced at write time; consumers validate on read and treat unknown shapes as drift.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "mode", "intent", "status", "created_at"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1, "description": "Schema version anchor. Currently 1." },
+    "session_id": { "type": "string", "pattern": "^OBS-\\d{3,}$", "description": "Contract id; must match the .agent-session/<session_id>/ directory name. Observed dialect keeps session_id (not spec_id) by design — frozen 2026-06-12 (OBS-002)." },
+    "mode": { "type": "string", "const": "observed", "description": "Discriminator. Wakes track-attention and the window-sliced cost capture; SDD machines ignore the dir." },
+    "intent": { "type": "string", "description": "The human's one-line intent. Cockpit card title." },
+    "status": { "type": "string", "enum": ["in_progress", "needs_attention", "done", "abandoned"], "description": "Lifecycle. /observe writes in_progress|done|abandoned; track-attention flips needs_attention⇄in_progress mechanically. done/abandoned are terminal." },
+    "attention": {
+      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "properties": { "kind": { "type": "string", "enum": ["input"], "description": "What the session is blocked on. Only 'input' is written in observed mode today." } },
+      "description": "Present ONLY while status=needs_attention; track-attention strips the block when the human engages."
+    },
+    "output_locale": { "type": "string", "description": "BCP-47 tag; language of human-facing prose. Absent defaults to en." },
+    "created_at": { "type": "string", "description": "ISO 8601 UTC, real clock. Lower bound of the contract's cost window." },
+    "closed_at": { "type": "string", "description": "ISO 8601 UTC. Upper bound of the cost window. Present only on terminal close (done AND abandoned)." },
+    "decisions": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true, "properties": {
+        "what": { "type": "string" }, "why": { "type": "string" }, "rejected": { "type": "string" }, "ref": { "type": "string" }
+      } },
+      "description": "Best-effort trail appended by the model when a real choice is made. Canonical keys what/why/rejected/ref; items are open (no per-item required) — the trail is best-effort, never load-bearing."
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true, "properties": {
+        "cmd": { "type": "string" }, "result": { "type": "string" }, "kind": { "type": "string" }
+      } },
+      "description": "Best-effort verification trail (command + observed result)."
+    },
+    "observed_sessions": { "type": "array", "items": { "type": "string" }, "description": "Adoption registry: chat-session ids captured into this contract, appended by the Stop-hook router (register_observed_session). Allow-list for cost scoping." },
+    "approved_write_scope": { "type": "array", "items": { "type": "string" }, "description": "Optional à-la-carte write fence (repo-relative paths; directory prefix match). Presence enables guard-write-scope; lifted when status=done." }
+  }
+}

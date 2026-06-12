@@ -1,0 +1,8 @@
+schema_version: 1
+session_id: "OBS-020"
+mode: observed
+intent: "Testar closed_at vazio"
+status: in_progress
+output_locale: pt-BR
+created_at: "2026-06-10T10:00:00Z"
+closed_at: ""

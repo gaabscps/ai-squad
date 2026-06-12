@@ -1,5 +1,9 @@
 // Status derivado da Session inteira (não lido cru do YAML).
-export type SpecStatus = "running" | "paused" | "blocked" | "done" | "escalated";
+// Valores SDD: running | paused | blocked | done | escalated.
+// Valores observados: needs_attention | abandoned | unreadable.
+export type SpecStatus =
+  | "running" | "paused" | "blocked" | "done" | "escalated"
+  | "needs_attention" | "abandoned" | "unreadable";
 
 // Estado de uma task individual (task_states.<T>.state no session.yml).
 export type TaskState = "pending" | "running" | "done" | "blocked";
@@ -36,11 +40,13 @@ export interface Task {
 }
 
 // Custo: SEMPRE somado dos total_cost_usd já gravados; nunca recalculado.
-// Hierarquia de fonte: "report" = report.html parseado (fonte canônica);
+// Hierarquia SDD: "report" = report.html parseado (fonte canônica SDD);
 // "unreliable" = report.html presente mas ilegível/não-parseável;
 // "partial" = soma crua dos costs/*.json (sem report.html); "empty" = sem dados.
-// cost-report.json não é consultado.
-export type CostSource = "empty" | "partial" | "unreliable" | "report";
+// Hierarquia observada: "cost_report" = cost-report.json (fonte primária do caminho
+// observado; lido por readObservedCostRollup em cost-report.ts); fallback a "partial"/"empty"
+// quando o report está ausente ou mais velho que costs/*.json (staleness).
+export type CostSource = "empty" | "partial" | "unreliable" | "report" | "cost_report";
 
 export interface CostPhaseBreakdown {
   planning: number | null;
@@ -69,6 +75,36 @@ export interface CostRollup {
   complete: boolean | null; // null quando source != "report"
 }
 
+// Flags de inconsistência de ciclo de vida detectadas em sessões observadas.
+// Exibidas no drawer (badge de drift) — o card nunca some, mas o drawer detalha o problema.
+export type ObservedDriftFlag = "closed_with_open_status" | "unknown_status" | "unreadable_yaml";
+
+// Item de decisão registrado pelo modelo durante a sessão (best-effort, sem required).
+export interface ObservedDecision {
+  what: string;
+  why: string | null;
+  rejected: string | null;
+  ref: string | null;
+}
+
+// Item de evidência de verificação (comando + resultado observado).
+export interface ObservedEvidence {
+  cmd: string | null;
+  result: string | null;
+  kind: string | null;
+}
+
+// Metadados exclusivos do modo observado; presença do campo = card observado.
+export interface ObservedMeta {
+  intent: string;
+  createdAt: string | null;
+  closedAt: string | null;
+  attentionKind: string | null;
+  decisions: ObservedDecision[];
+  evidence: ObservedEvidence[];
+  driftFlags: ObservedDriftFlag[];
+}
+
 export interface TimelineEntry {
   kind: string;
   timestamp: string;
@@ -94,6 +130,7 @@ export interface Spec {
   cost: CostRollup;
   deliveryReport: DeliveryReport | null; // null em sessões sem parecer (antigas/em curso)
   specPath?: string | null; // caminho absoluto do spec.md resolvido de spec_ref, ou null se ausente/inexistente
+  observed?: ObservedMeta; // presente somente em sessões modo observado; ausência = card SDD legado
 }
 
 export interface Project {

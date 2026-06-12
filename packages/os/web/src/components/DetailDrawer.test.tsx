@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DetailDrawer } from "./DetailDrawer";
-import { makeSpec, makeProject, makeCost, makeTask, makeDispatch } from "../test-utils";
+import { makeSpec, makeProject, makeCost, makeTask, makeDispatch, makeObservedSpec, makeObservedMeta } from "../test-utils";
 import { flattenSpecs } from "../lib/kanban";
 
 function item(spec = makeSpec()) {
@@ -576,5 +576,284 @@ describe("AC-021: push WebSocket re-renderiza sem erro; expansão é efêmera", 
       rerender(<DetailDrawer item={item(makeSpec({ tasks: [] }))} onClose={vi.fn()} />)
     ).not.toThrow();
     expect(screen.getByText(/nenhuma tarefa ainda/i)).toBeInTheDocument();
+  });
+});
+
+// ─── Observed drawer ──────────────────────────────────────────────────────────
+
+describe("DetailDrawer — modo observado: header", () => {
+  it("exibe pill OBSERVADO no header", () => {
+    const spec = makeObservedSpec();
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("OBSERVADO")).toBeInTheDocument();
+  });
+
+  it("header observado exibe o nome do projeto junto ao pill", () => {
+    const spec = makeObservedSpec();
+    // item() usa makeProject({ name: "proj-a" }); o nome fica no mesmo span que o pill
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const projSpan = container.querySelector(".drawer-proj");
+    expect(projSpan).not.toBeNull();
+    expect(projSpan!.textContent).toContain("proj-a");
+  });
+
+  it("NÃO exibe o texto '· SDD' ou '· DISCOVERY' (squad label) para observed", () => {
+    const spec = makeObservedSpec({ squad: "sdd" });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // o padrão SDD é "projName · SDD" — deve estar ausente
+    expect(screen.queryByText(/·\s*(SDD|DISCOVERY)/i)).toBeNull();
+  });
+});
+
+describe("DetailDrawer — modo observado: janela do contrato", () => {
+  it("exibe 'aberto em' com a data de createdAt", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ createdAt: "2026-06-01T10:00:00Z", closedAt: null }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText(/aberto em/i)).toBeInTheDocument();
+  });
+
+  it("exibe 'fechado em' quando closedAt está presente", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        createdAt: "2026-06-01T10:00:00Z",
+        closedAt: "2026-06-02T14:30:00Z",
+      }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText(/fechado em/i)).toBeInTheDocument();
+  });
+
+  it("NÃO exibe 'fechado em' quando closedAt é null (contrato aberto)", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ closedAt: null }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.queryByText(/fechado em/i)).toBeNull();
+  });
+});
+
+describe("DetailDrawer — modo observado: seção Decisões", () => {
+  it("decisão completa: what, why, rejected, ref em monospace", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [
+          {
+            what: "usar queue em vez de chamada direta",
+            why: "evita bloqueio no request cycle",
+            rejected: "chamada síncrona",
+            ref: "ADR-012",
+          },
+        ],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("usar queue em vez de chamada direta")).toBeInTheDocument();
+    expect(screen.getByText("evita bloqueio no request cycle")).toBeInTheDocument();
+    expect(screen.getByText(/rejeitado:.*chamada síncrona/)).toBeInTheDocument();
+    const ref = container.querySelector("code.obs-decision-ref");
+    expect(ref).not.toBeNull();
+    expect(ref!.textContent).toBe("ADR-012");
+  });
+
+  it("decisão com what+why apenas: sem linhas de rejected/ref", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [
+          { what: "usar TypeScript strict", why: "detecta erros cedo", rejected: null, ref: null },
+        ],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("usar TypeScript strict")).toBeInTheDocument();
+    expect(screen.getByText("detecta erros cedo")).toBeInTheDocument();
+    expect(screen.queryByText(/rejeitado:/i)).toBeNull();
+    expect(container.querySelector("code.obs-decision-ref")).toBeNull();
+  });
+
+  it("lista vazia: exibe estado vazio 'nenhuma decisão registrada'", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ decisions: [] }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
+  });
+
+  it("decisão com why=null não renderiza parágrafo why vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [
+          { what: "usar cache em memória", why: null, rejected: null, ref: null },
+        ],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(container.querySelector(".obs-decision-why")).toBeNull();
+  });
+
+  it("item degenerado (what vazio + why/rejected/ref null) não renderiza li vazio — cai no estado vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [{ what: "", why: null, rejected: null, ref: null }],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // item degenerado deve ser filtrado — nenhum obs-decision renderizado
+    expect(container.querySelectorAll(".obs-decision")).toHaveLength(0);
+    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
+    expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
+  });
+});
+
+describe("DetailDrawer — modo observado: seção Evidências", () => {
+  it("evidência: cmd em monospace e result como texto", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        evidence: [
+          { cmd: "npm test", result: "42 tests passed", kind: null },
+        ],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const cmdEl = container.querySelector("code.obs-evidence-cmd");
+    expect(cmdEl).not.toBeNull();
+    expect(cmdEl!.textContent).toBe("npm test");
+    expect(screen.getByText("42 tests passed")).toBeInTheDocument();
+  });
+
+  it("lista vazia: exibe estado vazio 'nenhuma evidência registrada'", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ evidence: [] }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
+  });
+
+  it("item degenerado (cmd/result/kind todos null) não renderiza li vazio bordejado", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        evidence: [{ cmd: null, result: null, kind: null }],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // item degenerado deve ser filtrado — nenhum obs-evidence-item renderizado
+    expect(container.querySelectorAll(".obs-evidence-item")).toHaveLength(0);
+    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
+    expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
+  });
+});
+
+describe("DetailDrawer — modo observado: seções SDD ausentes", () => {
+  it("PhaseBar (.phase-bar) ausente para observed", () => {
+    const { container } = render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(container.querySelector(".phase-bar")).toBeNull();
+  });
+
+  it("PhaseJourney (.phase-journey) ausente para observed", () => {
+    const { container } = render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(container.querySelector(".phase-journey")).toBeNull();
+  });
+
+  it("lista de tarefas (.drawer-tasks) ausente para observed", () => {
+    const { container } = render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(container.querySelector(".drawer-tasks")).toBeNull();
+  });
+
+  it("SpecSummaryBlock (.spec-summary) ausente para observed", () => {
+    const { container } = render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(container.querySelector(".spec-summary")).toBeNull();
+  });
+
+  it("Timeline (.timeline) ausente para observed", () => {
+    const { container } = render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(container.querySelector(".timeline")).toBeNull();
+  });
+});
+
+describe("DetailDrawer — modo observado: badge de drift", () => {
+  it("exibe aviso de drift quando driftFlags não-vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ driftFlags: ["closed_with_open_status"] }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const drift = container.querySelector(".obs-drift");
+    expect(drift).not.toBeNull();
+    expect(drift!.textContent).toMatch(/estado inconsistente/i);
+  });
+
+  it("sem drift quando driftFlags está vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ driftFlags: [] }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(container.querySelector(".obs-drift")).toBeNull();
+  });
+});
+
+describe("DetailDrawer — modo SDD legado NÃO afetado por observed", () => {
+  it("drawer SDD renderiza PhaseBar normalmente", () => {
+    const spec = makeSpec({ tasks: [makeTask({ id: "T-1" })] });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(container.querySelector(".phase-bar")).not.toBeNull();
+  });
+
+  it("drawer SDD renderiza lista de tarefas normalmente", () => {
+    const spec = makeSpec({ tasks: [makeTask({ id: "T-SDD-1" })] });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("T-SDD-1")).toBeInTheDocument();
+  });
+
+  it("drawer SDD NÃO exibe pill OBSERVADO", () => {
+    render(<DetailDrawer item={item(makeSpec())} onClose={vi.fn()} />);
+    expect(screen.queryByText("OBSERVADO")).toBeNull();
+  });
+});
+
+// ─── Fix 2: section ORDER lock (legacy drawer) ────────────────────────────────
+
+describe("DetailDrawer — ordem das seções no modo SDD legado", () => {
+  it("Tarefas aparece antes de Custo, e Custo antes de Linha do tempo", () => {
+    const spec = makeSpec({ tasks: [makeTask({ id: "T-ORDER-1" })] });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const html = container.innerHTML;
+    const idxTarefas = html.indexOf("Tarefas");
+    const idxCusto = html.indexOf("Custo");
+    const idxLinha = html.indexOf("Linha do tempo");
+    expect(idxTarefas).toBeGreaterThan(-1);
+    expect(idxCusto).toBeGreaterThan(-1);
+    expect(idxLinha).toBeGreaterThan(-1);
+    // Tarefas < Custo < Linha do tempo
+    expect(idxTarefas).toBeLessThan(idxCusto);
+    expect(idxCusto).toBeLessThan(idxLinha);
+  });
+});
+
+// ─── Fix 4: seção Custo e DeliveryReportBlock presentes em AMBOS os modos ─────
+
+describe("DetailDrawer — seção Custo presente em ambos os modos", () => {
+  it("modo SDD: seção Custo está presente", () => {
+    render(<DetailDrawer item={item(makeSpec())} onClose={vi.fn()} />);
+    expect(screen.getByText("Custo")).toBeInTheDocument();
+  });
+
+  it("modo observado: seção Custo está presente", () => {
+    render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(screen.getByText("Custo")).toBeInTheDocument();
+  });
+});
+
+describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () => {
+  it("modo SDD: bloco de parecer de entrega está presente (estado vazio)", () => {
+    const spec = makeSpec({ deliveryReport: null });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // DeliveryReportBlock renderiza sempre (null-safe); heading é a âncora real
+    expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("modo observado: bloco de parecer de entrega está presente (estado vazio)", () => {
+    const spec = makeObservedSpec({ deliveryReport: null });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
   });
 });

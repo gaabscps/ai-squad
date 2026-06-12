@@ -11,15 +11,26 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 import {
   sessionSchema,
   costReportSchema,
   deliveryReportSchema,
   dispatchManifestSchema,
   outputPacketSchema,
+  observedSessionSchema,
   DELIVERY_ANSWER_KEYS,
   TASK_ID_RE,
   SESSION_NOTE_KINDS,
+  OBSERVED_STATUSES,
+  OBSERVED_REQUIRED,
+  OBSERVED_FIELDS,
+  OBSERVED_ATTENTION_KINDS,
+  OBSERVED_DECISION_KEYS,
+  OBSERVED_EVIDENCE_KEYS,
 } from "./contracts.js";
 import type {
   DeliveryConfidence,
@@ -247,5 +258,100 @@ describe("contrato output-packet.schema ↔ dispatches/dispatch-normalize", () =
   it("files_changed é array de string (formato novo lido direto do topo)", () => {
     expect(props.files_changed.type).toBe("array");
     expect(props.files_changed.items.type).toBe("string");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// observed-session.schema.json — contrato do modo observado
+// ---------------------------------------------------------------------------
+
+describe("contrato observed-session.schema", () => {
+  it("OBSERVED_STATUSES é exatamente o ciclo de vida canônico", () => {
+    expect([...OBSERVED_STATUSES]).toEqual([
+      "in_progress",
+      "needs_attention",
+      "done",
+      "abandoned",
+    ]);
+  });
+
+  it("OBSERVED_REQUIRED ⊆ OBSERVED_FIELDS", () => {
+    const fields = new Set(OBSERVED_FIELDS);
+    for (const r of OBSERVED_REQUIRED) {
+      expect(fields.has(r)).toBe(true);
+    }
+  });
+
+  it("skill.md extraction test (produtor↔contrato)", () => {
+    // Localiza skill.md: de packages/os/src/collector/ subimos 4 níveis (repo root),
+    // depois descemos para shared/skills/observe/skill.md.
+    const here = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = join(here, "..", "..", "..", "..");
+    const skillMd = readFileSync(join(repoRoot, "shared/skills/observe/skill.md"), "utf-8");
+
+    // Extrai o PRIMEIRO bloco ```yaml fenced do skill.md
+    const match = skillMd.match(/```yaml\n([\s\S]*?)```/);
+    if (!match) throw new Error("skill.md sem bloco ```yaml — exemplo do contrato removido?");
+    const example = parseYaml(match[1]) as Record<string, unknown>;
+
+    const exampleKeys = Object.keys(example);
+    const fields = new Set(OBSERVED_FIELDS);
+    const requiredSet = new Set(OBSERVED_REQUIRED);
+
+    // (a) todo campo do exemplo está em OBSERVED_FIELDS
+    for (const key of exampleKeys) {
+      expect(OBSERVED_FIELDS).toContain(key);
+    }
+
+    // (b) todo campo obrigatório está no exemplo (o exemplo abre com todos os required)
+    for (const r of requiredSet) {
+      expect(exampleKeys).toContain(r);
+    }
+
+    // (c) example.status ∈ OBSERVED_STATUSES
+    expect([...OBSERVED_STATUSES]).toContain(example.status as string);
+
+    // (d) example.mode === "observed"
+    expect(example.mode).toBe("observed");
+  });
+
+  // Vocabulário fixado — observed.ts depende destes valores exatos
+  it("OBSERVED_ATTENTION_KINDS é exatamente ['input']", () => {
+    expect([...OBSERVED_ATTENTION_KINDS]).toEqual(["input"]);
+  });
+
+  it("OBSERVED_DECISION_KEYS é exatamente ['what','why','rejected','ref']", () => {
+    expect([...OBSERVED_DECISION_KEYS]).toEqual(["what", "why", "rejected", "ref"]);
+  });
+
+  it("OBSERVED_EVIDENCE_KEYS é exatamente ['cmd','result','kind']", () => {
+    expect([...OBSERVED_EVIDENCE_KEYS]).toEqual(["cmd", "result", "kind"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// observed-session.schema.json ↔ observed.ts (campos lidos pelo leitor)
+// ---------------------------------------------------------------------------
+
+describe("contrato observed-session.schema ↔ observed.ts", () => {
+  // Lista exata dos campos top-level que observed.ts acessa no YAML bruto.
+  // Se um campo for renomeado/removido do schema, OBSERVED_FIELDS não o conterá
+  // e o teste falha no mesmo PR — drift visível antes de chegar à produção.
+  const OBSERVED_TS_READS = [
+    "mode",        // discriminador de despacho
+    "session_id",  // id do card
+    "intent",      // título do card e observed.intent
+    "status",      // ciclo de vida
+    "attention",   // objeto {kind} presente em needs_attention
+    "created_at",  // janela de custo (lower bound)
+    "closed_at",   // janela de custo (upper bound) + lastActivityAt
+    "decisions",   // trail de decisões (best-effort)
+    "evidence",    // trail de evidências (best-effort)
+  ] as const;
+
+  it("todo campo que observed.ts lê está declarado no observed-session.schema", () => {
+    for (const key of OBSERVED_TS_READS) {
+      expect(OBSERVED_FIELDS).toContain(key);
+    }
   });
 });

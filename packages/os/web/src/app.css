@@ -21,6 +21,8 @@
   --audit: #f59e0b;
   --planning: #9ca3af; /* cinza: rascunho, ainda escrevendo */
   --planned: #f59e0b;  /* âmbar: decomposto, aguardando execução */
+  --needs-attention: var(--blocked); /* mesmo peso visual de bloqueio */
+  --abandoned: #9ca3af;
 
   --sdd: #2563eb;
   --discovery: #0d9488;
@@ -78,7 +80,7 @@ a:hover { text-decoration: underline; }
 
 /* ---- Kanban ---- */
 .board-body { padding: 14px 16px; }
-.kboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
+.kboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
 .kcol { background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
 .kcol-head { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #374151; margin-bottom: 10px; }
 .kcol-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--text-mute); }
@@ -101,11 +103,14 @@ a:hover { text-decoration: underline; }
 .kcard-id { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .kcard-proj { font-size: 9px; color: var(--sdd); background: #eff4ff; padding: 1px 7px; border-radius: 999px; margin-left: auto; }
 .kcard[data-squad="discovery"] .kcard-proj { color: var(--discovery); background: #effcfa; }
-.kcard-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.kcard-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kcard-why { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; margin-bottom: 8px; }
 .why-blocked { color: #b91c1c; background: #fef2f2; }
 .why-escalated { color: #7e22ce; background: #faf5ff; }
 .why-paused, .why-audit { color: #b45309; background: #fffbeb; }
+/* Azul lido como informacional; âmbar entra na família "aguardando humano" (vermelho fica para os hard stops) */
+.why-input { color: #b45309; background: #fffbeb; }
+.why-unreadable { color: #b91c1c; background: #fef2f2; }
 .kcard-phase { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
 .kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .kcard-time { margin-left: auto; }
@@ -126,6 +131,9 @@ a:hover { text-decoration: underline; }
 .status-blocked { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
 .status-done { color: var(--done); background: color-mix(in srgb, var(--done) 16%, transparent); }
 .status-escalated { color: var(--escalated); background: color-mix(in srgb, var(--escalated) 14%, transparent); }
+.status-needs_attention { color: var(--needs-attention); background: color-mix(in srgb, var(--needs-attention) 14%, transparent); }
+.status-abandoned { color: var(--abandoned); background: color-mix(in srgb, var(--abandoned) 16%, transparent); }
+.status-unreadable { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
 .flag-audit { font-size: 11px; font-weight: 600; color: var(--audit); background: color-mix(in srgb, var(--audit) 16%, transparent); padding: 2px 8px; border-radius: 999px; }
 
 /* ---- PhaseBar (reuso) ---- */
@@ -470,6 +478,8 @@ a:hover { text-decoration: underline; }
 .kcard-cost { margin-left: 10px; color: var(--text-dim); }
 .cost-empty { color: var(--text-mute); }
 .cost-unreliable { color: var(--blocked); font-size: 10px; }
+/* Hint muted em cards observados onde USD não está disponível mas tokens estão */
+.cost-unpriced { color: var(--text-mute); font-size: 10px; }
 
 /* ── Cost Phase Bar (barra proporcional no card) ──────────────────────── */
 .cost-phase-bar {
@@ -684,6 +694,72 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .md-body th, .md-body td { border: 1px solid #e5e7eb; padding: 0.3em 0.5em; text-align: left; vertical-align: top; }
 .md-body th { background: #f9fafb; font-weight: 700; }
 .md-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.8em 0; }
+
+/* ── Observed drawer — pill, janela, decisões, evidências ───────────────── */
+/* pill "OBSERVADO" no header — substitui o label de squad (azul SDD/verde discovery) */
+.obs-pill {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: #0d9488; background: #effcfa; border: 1px solid #99f6e4;
+  padding: 2px 8px; border-radius: 999px;
+}
+
+/* janela do contrato (aberto em / fechado em) */
+.obs-window {
+  font-size: 12px; color: var(--text-dim);
+  margin: 6px 0 12px;
+}
+.obs-window-label { font-weight: 600; }
+.obs-window-date { font-family: var(--mono); }
+
+/* badge de drift — estado inconsistente detectado no session.yml */
+.obs-drift {
+  font-size: 12px; font-weight: 600;
+  color: #b45309; background: #fffbeb; border: 1px solid #fde68a;
+  padding: 6px 10px; border-radius: 6px; margin: 0 0 12px;
+}
+
+/* lista de decisões */
+.obs-decisions {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: flex; flex-direction: column; gap: 0;
+}
+.obs-decision {
+  padding: 10px 0; border-bottom: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.obs-decision:last-child { border-bottom: none; }
+.obs-decision-what { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.obs-decision-why { margin: 0; font-size: 12px; color: var(--text-dim); }
+.obs-decision-rejected { margin: 0; font-size: 12px; color: var(--text-mute); font-style: italic; }
+.obs-decision-ref {
+  font-family: var(--mono); font-size: 11px;
+  background: #f3f4f6; color: #374151;
+  padding: 1px 6px; border-radius: 4px;
+  align-self: flex-start;
+  word-break: break-all;
+}
+
+/* lista de evidências */
+.obs-evidence {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: flex; flex-direction: column; gap: 0;
+}
+.obs-evidence-item {
+  padding: 10px 0; border-bottom: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.obs-evidence-item:last-child { border-bottom: none; }
+.obs-evidence-cmd {
+  font-family: var(--mono); font-size: 12px;
+  background: #f6f8fa; border: 1px solid #e5e7eb;
+  padding: 3px 8px; border-radius: 4px;
+  display: inline-block;
+  overflow-wrap: break-word;
+}
+.obs-evidence-result { margin: 0; font-size: 12px; color: var(--text-dim); }
+
+/* estado vazio para decisões/evidências */
+.drawer-empty { font-size: 12px; color: var(--text-mute); margin: 0 0 12px; font-style: italic; }
 
 /* ── Markdown viewer (modal de .md) ─────────────────────────────────────── */
 .md-viewer-overlay {

@@ -1,0 +1,15 @@
+{
+  "total_cost_usd": 0.0,
+  "complete": false,
+  "unpriced_models": ["claude-fable-5"],
+  "generated_at": "2026-06-10T17:00:00Z",
+  "tokens": {
+    "total": 320000,
+    "by_type": {
+      "input": 80000,
+      "output": 40000,
+      "cache_read": 180000,
+      "cache_creation": 20000
+    }
+  }
+}

@@ -1,12 +1,5 @@
 import type { Spec } from "../../../src/store/types";
-
-const STATUS_LABEL: Record<Spec["status"], string> = {
-  running: "rodando",
-  paused: "pausado",
-  blocked: "bloqueado",
-  done: "concluído",
-  escalated: "escalado",
-};
+import { STATUS_LABEL } from "../lib/statusLabels";
 
 /**
  * Status colorido (a cor vem da classe status-<status> no CSS) + flag de

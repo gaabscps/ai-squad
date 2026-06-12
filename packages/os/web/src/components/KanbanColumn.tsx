@@ -1,4 +1,4 @@
-import type { ColumnKey, SpecWithProject } from "../lib/kanban";
+import type { ColumnKey, SpecWithProject } from "../lib/kanbanObserved";
 import { KanbanCard } from "./KanbanCard";
 
 /**

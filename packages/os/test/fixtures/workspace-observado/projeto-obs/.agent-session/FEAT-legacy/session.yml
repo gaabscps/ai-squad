@@ -1,0 +1,6 @@
+task_id: "FEAT-legacy"
+squad: "sdd"
+feature_name: "feature legada"
+current_phase: "implementation"
+last_activity_at: "2026-05-01T10:00:00Z"
+planned_phases: ["specify", "plan", "tasks", "implementation"]
