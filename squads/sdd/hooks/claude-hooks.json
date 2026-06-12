@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical Claude Code hook registrations for the SDD pipeline. Consumed by `ai-squad deploy` (packages/cli/lib/deploy.js) and merged idempotently into <repo>/.claude/settings.local.json. Distinct from cursor-hooks.json (Cursor format). Each Python command uses a fail-open guard so partial installs don't break sessions; $CLAUDE_PROJECT_DIR resolves at runtime.",
+  "_comment": "Canonical Claude Code hook registrations for the SDD pipeline. Consumed by `ai-squad deploy` (packages/cli/lib/deploy.js) and merged idempotently into <repo>/.claude/settings.local.json. Each Python command uses a fail-open guard so partial installs don't break sessions; $CLAUDE_PROJECT_DIR resolves at runtime. Hooks under the same event run IN PARALLEL — capture-session-cost and generate-session-report must stay chained in ONE command (capture writes costs/session-*.json, generate reads it; the payload is read from stdin once and re-fed to each script).",
   "version": 1,
   "hooks": {
     "PreToolUse": [
@@ -105,11 +105,7 @@
           },
           {
             "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\""
-          },
-          {
-            "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\" ] || exit 0; python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\""
+            "command": "payload=$(cat); [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\" ] && printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\"; [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\" ] || exit 0; printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\""
           }
         ]
       }

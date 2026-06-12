@@ -72,6 +72,17 @@ const LEGACY_REGISTRATIONS = [
     what: 'agentops capture pipeline',
     since: 'commit 3b30f82 (observability removal)',
   },
+  {
+    // Standalone generate-session-report Stop registration (guard or bare
+    // form). Retired in favor of the single chained command (capture →
+    // generate); same-event hooks run in parallel, so the standalone form
+    // raced the cost capture and froze stale numbers into cost-report.json.
+    // Anchored at ^ so the chained command (starts with `payload=$(cat)`)
+    // never matches.
+    pattern: /^(\[ -f "\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/generate-session-report\.py" \] \|\| exit 0; )?python3 "\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/generate-session-report\.py"$/,
+    what: 'standalone generate-session-report Stop hook (raced capture-session-cost; now chained after it in one command)',
+    since: 'cost-report race fix (2026-06-12)',
+  },
 ];
 
 async function exists(p) {

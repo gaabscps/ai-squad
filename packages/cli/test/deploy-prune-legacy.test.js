@@ -56,6 +56,55 @@ test('safe against null / non-object input', () => {
   assert.deepEqual(pruneLegacyRegistrations('hooks'), []);
 });
 
+const CHAINED_STOP_COMMAND =
+  'payload=$(cat); [ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py" ] && printf \'%s\' "$payload" | python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py"; [ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py" ] || exit 0; printf \'%s\' "$payload" | python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py"';
+
+test('removes the standalone generate-session-report Stop hook (guard form)', () => {
+  const hooks = {
+    Stop: [
+      {
+        matcher: '',
+        hooks: [
+          { type: 'command', command: '[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py" ] || exit 0; python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py"' },
+          { type: 'command', command: CHAINED_STOP_COMMAND },
+        ],
+      },
+    ],
+  };
+  const removed = pruneLegacyRegistrations(hooks);
+  assert.equal(removed.length, 1);
+  assert.match(removed[0].command, /exit 0; python3/);
+  assert.match(removed[0].reason, /raced capture-session-cost/);
+  assert.equal(hooks.Stop[0].hooks.length, 1);
+  assert.equal(hooks.Stop[0].hooks[0].command, CHAINED_STOP_COMMAND);
+});
+
+test('removes the standalone generate-session-report Stop hook (bare form)', () => {
+  const hooks = {
+    Stop: [
+      {
+        matcher: '',
+        hooks: [
+          { type: 'command', command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py"' },
+        ],
+      },
+    ],
+  };
+  const removed = pruneLegacyRegistrations(hooks);
+  assert.equal(removed.length, 1);
+  assert.equal('Stop' in hooks, false);
+});
+
+test('keeps the chained capture→generate Stop command', () => {
+  const hooks = {
+    Stop: [{ matcher: '', hooks: [{ type: 'command', command: CHAINED_STOP_COMMAND }] }],
+  };
+  const before = JSON.stringify(hooks);
+  const removed = pruneLegacyRegistrations(hooks);
+  assert.equal(removed.length, 0);
+  assert.equal(JSON.stringify(hooks), before);
+});
+
 test('removes legacy registration regardless of which event it lives under', () => {
   const hooks = {
     PreToolUse: [{ matcher: 'Bash', hooks: [{ command: 'npx @ai-squad/agentops legacy-prehook' }] }],
