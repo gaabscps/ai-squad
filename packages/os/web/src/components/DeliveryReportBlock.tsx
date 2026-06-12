@@ -1,6 +1,10 @@
 import type { DeliveryReport } from "../../../src/store/types";
 import { answerTitle, verdictLabel, confidenceLabel, classificationLabel, acClassificationSummary } from "../lib/deliveryLabels";
+import { firstSentence } from "../lib/markdownText";
 import { Markdown } from "./Markdown";
+
+// Keys que encabeçam a pirâmide — aparecem primeiro, abertas, com teaser.
+const VITAL_KEYS = ["what_was_done", "why_this_way", "risks_and_pending"];
 
 export function DeliveryReportBlock({
   report,
@@ -16,6 +20,44 @@ export function DeliveryReportBlock({
 
   const v = report.verdict ? verdictLabel(report.verdict.value) : null;
 
+  // Separa as respostas em vitais (topo da pirâmide) e resto (colapsado).
+  const vitals = VITAL_KEYS
+    .map((k) => report.answers.find((a) => a.key === k))
+    .filter((a): a is NonNullable<typeof a> => a != null);
+  const rest = report.answers.filter((a) => !VITAL_KEYS.includes(a.key));
+
+  // Renderiza um accordion de resposta — vital fica com teaser no summary.
+  const renderAnswer = (a: (typeof report.answers)[number], open: boolean, vital: boolean) => {
+    const c = confidenceLabel(a.confidence);
+    return (
+      <details key={a.key} className="delivery-answer" open={open}
+               data-testid={vital ? "delivery-vital" : undefined}>
+        <summary className="delivery-answer-summary">
+          <span className="delivery-answer-title">{answerTitle(a.key)}</span>
+          {vital && <span className="delivery-answer-teaser">{firstSentence(a.answer)}</span>}
+          <span className={`delivery-conf conf-${c.cls}`}>{c.label}</span>
+        </summary>
+        <Markdown className="delivery-answer-text">{a.answer}</Markdown>
+        {a.evidenceRefs.length > 0 && (
+          <ul className="delivery-evidence">
+            {a.evidenceRefs.map((ref) =>
+              ref.endsWith(".md") && ref.startsWith("/") && onOpenFile ? (
+                <li key={ref} className="delivery-evidence-ref">
+                  <button type="button" className="delivery-ref-btn mono"
+                          onClick={() => onOpenFile(ref, ref.split("/").pop()!)}>
+                    {ref} →
+                  </button>
+                </li>
+              ) : (
+                <li key={ref} className="delivery-evidence-ref mono">{ref}</li>
+              ),
+            )}
+          </ul>
+        )}
+      </details>
+    );
+  };
+
   return (
     <section className="delivery" data-testid="delivery-report">
       {report.verdict && v && (
@@ -28,25 +70,13 @@ export function DeliveryReportBlock({
       )}
 
       <div className="delivery-answers">
-        {report.answers.map((a, idx) => {
-          const c = confidenceLabel(a.confidence);
-          return (
-            <details key={a.key} className="delivery-answer" open={idx === 0}>
-              <summary className="delivery-answer-summary">
-                <span className="delivery-answer-title">{answerTitle(a.key)}</span>
-                <span className={`delivery-conf conf-${c.cls}`}>{c.label}</span>
-              </summary>
-              <Markdown className="delivery-answer-text">{a.answer}</Markdown>
-              {a.evidenceRefs.length > 0 && (
-                <ul className="delivery-evidence">
-                  {a.evidenceRefs.map((ref) => (
-                    <li key={ref} className="delivery-evidence-ref mono">{ref}</li>
-                  ))}
-                </ul>
-              )}
-            </details>
-          );
-        })}
+        {vitals.map((a, i) => renderAnswer(a, i === 0, true))}
+        {rest.length > 0 && (
+          <details className="delivery-more">
+            <summary>ler parecer completo ({rest.length} respostas)</summary>
+            {rest.map((a) => renderAnswer(a, false, false))}
+          </details>
+        )}
       </div>
 
       {report.acceptanceCriteria.length > 0 && (
