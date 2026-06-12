@@ -48,7 +48,9 @@ export function DetailDrawer({
         <header className="drawer-head">
           <span className="drawer-id">{spec.id}</span>
           {obs ? (
-            <span className="obs-pill">OBSERVADO</span>
+            <span className="drawer-proj">
+              {projectName} · <span className="obs-pill">OBSERVADO</span>
+            </span>
           ) : (
             <span className="drawer-proj">
               {projectName} · {spec.squad.toUpperCase()}
@@ -97,14 +99,14 @@ export function DetailDrawer({
               <p className="obs-drift">⚠ estado inconsistente no session.yml</p>
             )}
 
-            <h3 className="drawer-section">Decisões</h3>
+            <h4 className="drawer-section">Decisões</h4>
             {obs.decisions.length === 0 ? (
               <p className="drawer-empty">nenhuma decisão registrada</p>
             ) : (
               <ol className="obs-decisions">
-                {obs.decisions.map((d: ObservedDecision, i: number) => (
+                {obs.decisions.filter((d: ObservedDecision) => d.what || d.why || d.rejected || d.ref).map((d: ObservedDecision, i: number) => (
                   <li key={i} className="obs-decision">
-                    <p className="obs-decision-what">{d.what}</p>
+                    {d.what && <p className="obs-decision-what">{d.what}</p>}
                     {d.why && <p className="obs-decision-why">{d.why}</p>}
                     {d.rejected && (
                       <p className="obs-decision-rejected">rejeitado: {d.rejected}</p>
@@ -117,12 +119,12 @@ export function DetailDrawer({
               </ol>
             )}
 
-            <h3 className="drawer-section">Evidências</h3>
+            <h4 className="drawer-section">Evidências</h4>
             {obs.evidence.length === 0 ? (
               <p className="drawer-empty">nenhuma evidência registrada</p>
             ) : (
               <ol className="obs-evidence">
-                {obs.evidence.map((e: ObservedEvidence, i: number) => (
+                {obs.evidence.filter((e: ObservedEvidence) => e.cmd || e.result || e.kind).map((e: ObservedEvidence, i: number) => (
                   <li key={i} className="obs-evidence-item">
                     {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
                     {e.result && <p className="obs-evidence-result">{e.result}</p>}

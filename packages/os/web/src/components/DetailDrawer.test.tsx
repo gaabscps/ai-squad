@@ -588,6 +588,15 @@ describe("DetailDrawer — modo observado: header", () => {
     expect(screen.getByText("OBSERVADO")).toBeInTheDocument();
   });
 
+  it("header observado exibe o nome do projeto junto ao pill", () => {
+    const spec = makeObservedSpec();
+    // item() usa makeProject({ name: "proj-a" }); o nome fica no mesmo span que o pill
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const projSpan = container.querySelector(".drawer-proj");
+    expect(projSpan).not.toBeNull();
+    expect(projSpan!.textContent).toContain("proj-a");
+  });
+
   it("NÃO exibe o texto '· SDD' ou '· DISCOVERY' (squad label) para observed", () => {
     const spec = makeObservedSpec({ squad: "sdd" });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
@@ -670,6 +679,18 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
   });
+
+  it("decisão com why=null não renderiza parágrafo why vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [
+          { what: "usar cache em memória", why: null, rejected: null, ref: null },
+        ],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(container.querySelector(".obs-decision-why")).toBeNull();
+  });
 });
 
 describe("DetailDrawer — modo observado: seção Evidências", () => {
@@ -694,6 +715,17 @@ describe("DetailDrawer — modo observado: seção Evidências", () => {
     });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
+  });
+
+  it("item degenerado (cmd/result/kind todos null) não renderiza li vazio bordejado", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        evidence: [{ cmd: null, result: null, kind: null }],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // item degenerado deve ser filtrado — nenhum obs-evidence-item renderizado
+    expect(container.querySelectorAll(".obs-evidence-item")).toHaveLength(0);
   });
 });
 
@@ -799,16 +831,14 @@ describe("DetailDrawer — seção Custo presente em ambos os modos", () => {
 describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () => {
   it("modo SDD: bloco de parecer de entrega está presente (estado vazio)", () => {
     const spec = makeSpec({ deliveryReport: null });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // DeliveryReportBlock renderiza sempre (null-safe); confirma via heading ou container
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // DeliveryReportBlock renderiza sempre (null-safe); heading é a âncora real
     expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
-    expect(container.querySelector(".delivery-report-block, .delivery-report-empty, h4")).not.toBeNull();
   });
 
   it("modo observado: bloco de parecer de entrega está presente (estado vazio)", () => {
     const spec = makeObservedSpec({ deliveryReport: null });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
-    expect(container.querySelector(".delivery-report-block, .delivery-report-empty, h4")).not.toBeNull();
   });
 });
