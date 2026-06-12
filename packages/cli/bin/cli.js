@@ -3,7 +3,7 @@
  * ai-squad — CLI entrypoint.
  *
  * Subcommands:
- *   deploy [--squad NAME ...] [--cursor] [--force]   Install squads to ~/.claude/
+ *   deploy [--squad NAME ...] [--force]              Install squads to ~/.claude/
  *   help                                             Print usage
  *
  * Future: new, doctor.
@@ -17,13 +17,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const args = { squads: [], cursor: false, force: false, globalOnly: false, hooksOnly: false };
+  const args = { squads: [], force: false, globalOnly: false, hooksOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--squad' || a === '-s') {
       args.squads.push(argv[++i]);
-    } else if (a === '--cursor') {
-      args.cursor = true;
     } else if (a === '--global-only') {
       args.globalOnly = true;
     } else if (a === '--hooks-only') {
@@ -51,7 +49,6 @@ Usage:
 
 Options for deploy:
   --squad NAME, -s NAME    Deploy only the named squad (repeatable). Default: all.
-  --cursor                 Also sync Cursor hooks to ~/.cursor/.
   --global-only            Skip per-repo hook install (only deploy skills+agents).
   --hooks-only             Skip global skills+agents install (only deploy hooks to current repo).
   --repo-root PATH         Target repo for hook install (default: cwd).
@@ -66,7 +63,6 @@ Deploy layout:
 Examples:
   ai-squad deploy                      # full install into current repo
   ai-squad deploy --squad sdd          # only the sdd squad
-  ai-squad deploy --cursor             # full install + Cursor mirror
   ai-squad deploy --global-only        # CI/dotfiles flow — skip per-repo hooks
   cd <consumer-repo> && ai-squad deploy --hooks-only   # re-sync hooks only
 `);

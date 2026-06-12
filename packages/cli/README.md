@@ -19,7 +19,6 @@ ai-squad deploy
 ai-squad deploy --squad sdd          # only the sdd squad
 ai-squad deploy --hooks-only         # re-sync just hooks (after upgrading the CLI)
 ai-squad deploy --global-only        # skip per-repo hooks (CI / dotfile flow)
-ai-squad deploy --cursor             # also mirror to ~/.cursor/
 ai-squad help
 ```
 

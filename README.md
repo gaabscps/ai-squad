@@ -1,6 +1,6 @@
 # ai-squad
 
-![version](https://img.shields.io/badge/version-v0.4-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange) ![cursor](https://img.shields.io/badge/runs%20on-Cursor-black) ![kiro](https://img.shields.io/badge/runs%20on-Kiro-blueviolet)
+![version](https://img.shields.io/badge/version-v0.4-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![smoke](https://img.shields.io/badge/smoke-59%2F59%20PASS-brightgreen) ![claude code](https://img.shields.io/badge/built%20for-Claude%20Code-orange)
 
 > **A structured workflow for AI-assisted development — from fuzzy idea to shipped code.**
 >
@@ -79,7 +79,7 @@ The audit-agent ensures the pipeline wasn't bypassed — every task must produce
 
 ## Install
 
-**Requirements:** Node ≥ 18, Python 3.8+ on `PATH`. Works with **Claude Code**, **Cursor**, or **Kiro** as the agent host.
+**Requirements:** Node ≥ 18, Python 3.8+ on `PATH`. **Claude Code** is the agent host.
 
 ### npm (recommended)
 
@@ -112,22 +112,20 @@ cd <project> && ai-squad deploy --hooks-only
 
 Skills + agents auto-update on any full `ai-squad deploy`. The `--hooks-only` shortcut skips that step when only the hooks need refreshing.
 
-### From source (contributors / Cursor / Kiro)
+### From source (contributors)
 
 ```bash
 git clone https://github.com/<your-handle>/ai-squad.git
 cd ai-squad
 
-./tools/deploy.sh                  # Claude Code
-./tools/deploy-cursor.sh           # Cursor
-./tools/deploy-kiro.sh             # Kiro
+./tools/deploy.sh
 ```
 
 ---
 
 ## ⚡ Running `/pm` on Sonnet 4.6 with bypass — high-throughput, lower cost
 
-The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without your input. Pairing it with **Sonnet 4.6** (instead of the default Opus 4.7) and **bypass-permissions mode** removes both the per-turn approval friction and the higher-tier model cost.
+The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without your input. Pairing it with **Sonnet 4.6** (instead of the default Opus 4.8) and **bypass-permissions mode** removes both the per-turn approval friction and the higher-tier model cost.
 
 > **Bypass mode**: a Claude Code flag that auto-approves every tool call (file edit, shell command, network request) instead of pausing to ask you. The agent runs flat out.
 
@@ -141,7 +139,7 @@ claude --model claude-sonnet-4-6 --dangerously-skip-permissions
 /pm "<your pitch>"
 ```
 
-You must pass `--dangerously-skip-permissions` **at session start** — it cannot be enabled mid-session. The `--model` flag pins the top-level orchestrator to Sonnet 4.6; subagents follow their canonical Tier × Loop table (Haiku for cheap tiers, Sonnet/Opus where the work warrants it), so you still get the right model for each task — just without the Opus 4.7 floor.
+You must pass `--dangerously-skip-permissions` **at session start** — it cannot be enabled mid-session. The `--model` flag pins the top-level orchestrator to Sonnet 4.6; subagents follow their canonical Tier × Loop table (Haiku for cheap tiers, Sonnet/Opus where the work warrants it), so you still get the right model for each task — just without the Opus 4.8 floor.
 
 ### Trade-off at a glance
 
@@ -153,7 +151,7 @@ You must pass `--dangerously-skip-permissions` **at session start** — it canno
 <tr valign="top">
 <td>
 
-- **~5× lower token cost** vs Opus 4.7 baseline
+- **~5× lower token cost** vs Opus 4.8 baseline
 - **Faster turns** — Sonnet 4.6 latency is materially lower
 - **Zero approval prompts** for the full multi-hour pipeline
 - **Hands-off**: spec → plan → tasks → code → handoff, untouched
@@ -263,37 +261,6 @@ Each phase auto-advances after your approval — no need to copy-paste IDs betwe
 </details>
 
 <details>
-<summary><b>⚙️ Host compatibility — Claude Code · Cursor · Kiro</b></summary>
-
-<br/>
-
-Claude Code is the **source of truth**. Cursor and Kiro are translations via dedicated deploy scripts.
-
-| Capability | Claude Code | Cursor | Kiro CLI/IDE |
-|---|---|---|---|
-| **Skill invocation** | `/spec-writer`, `/discovery-lead`, … | `/<name>`, `@<name>`, picker | `kiro-cli --agent <name>` · `/agent` picker |
-| **Subagent dispatch** | `Task` tool, parallel fan-out | sequential (depends on build) | `delegate` tool, parallel |
-| **`block-git-write`** | ✅ orchestrator only | ✅ global | ✅ orchestrator only |
-| **`verify-audit-dispatch`** | ✅ orchestrator only | ✅ global | ✅ orchestrator only |
-| **`verify-output-packet`** | ✅ each Subagent | ✅ global | ✅ each agent |
-| **`guard-session-scope`** | ✅ orchestrator only | ❌ omitted (would block `dev`) | ✅ orchestrator only |
-
-**Functional coverage**: Claude Code 100% · Cursor ~90% · Kiro ~95%  
-**Mechanical coverage (hooks)**: Claude Code 4/4 · Cursor 3/4 · Kiro 4/4
-
-> If you need full mechanical enforcement outside Claude Code, prefer Kiro — its per-agent hook model lets `guard-session-scope` fire only for the orchestrator.
-
-**Deploy scripts:**
-
-| Script | Host |
-|---|---|
-| [`./tools/deploy.sh`](tools/deploy.sh) | Claude Code |
-| [`./tools/deploy-cursor.sh`](tools/deploy-cursor.sh) | Cursor |
-| [`./tools/deploy-kiro.sh`](tools/deploy-kiro.sh) | Kiro |
-
-</details>
-
-<details>
 <summary><b>📂 Repo layout</b></summary>
 
 <br/>
@@ -382,7 +349,7 @@ sequenceDiagram
 
 ## Contributing
 
-PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` must PASS, `./scripts/smoke-cursor-export.sh` must PASS, `./scripts/smoke-kiro-export.sh` must PASS, and `./tools/deploy.sh` must report no length-budget warnings.
+PRs welcome. Before opening: `./scripts/smoke-walkthrough.sh` must PASS, and `./tools/deploy.sh` must report no length-budget warnings.
 
 ---
 

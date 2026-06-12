@@ -20,28 +20,12 @@ in the markdown components, exactly where the rules are.
 
 | Script | Wired to | Event | What it enforces |
 |--------|----------|-------|------------------|
-| [`hook_runtime.py`](hook_runtime.py) | *(library)* | — | Shared `resolve_project_root()` (Claude `CLAUDE_PROJECT_DIR` vs Cursor `workspace_roots` / `cwd`), helpers, `should_run_audit_manifest_verify()` for global `stop` hooks. |
+| [`hook_runtime.py`](hook_runtime.py) | *(library)* | — | Shared `resolve_project_root()` (`CLAUDE_PROJECT_DIR`, falling back to the payload's `cwd`), helpers, `should_run_audit_manifest_verify()` for `Stop` hooks. |
 | [`guard-session-scope.py`](guard-session-scope.py) | `skills/orchestrator` | `PreToolUse` (Edit\|Write\|MultiEdit) | Orchestrator can edit only inside `.agent-session/<spec_id>/`. Any source-tree edit is denied. |
 | [`block-git-write.py`](block-git-write.py) | `skills/orchestrator` | `PreToolUse` (Bash) | Orchestrator cannot run git write commands (commit, add, reset, push, branch -d, etc.). Read-only commands (status, diff, log) are allowed. |
 | [`verify-audit-dispatch.py`](verify-audit-dispatch.py) | `skills/orchestrator` | `Stop` | Orchestrator session cannot end without an `audit-agent` entry in `dispatch-manifest.json`'s `actual_dispatches[]` with `status: done`. |
 | [`register-impl-session.py`](register-impl-session.py) | `skills/orchestrator` | `Stop` | Bookkeeping (fail-open, never blocks). Records the orchestrator's own session id into `implementation_sessions:` in `session.yml` — the authoritative anchor `cost_report.build_cost_report` uses to scope which subagent cost files belong to this feature (ignoring foreign-session/project contamination on read). |
 | [`verify-output-packet.py`](verify-output-packet.py) | every Phase 4 Subagent (`dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent`) | `Stop` (auto-becomes `SubagentStop`) | Subagent cannot complete without writing `outputs/<dispatch_id>.json` (parsed dispatch_id from its prompt). Validates required fields + status enum. |
-
-## Cursor / Cursor CLI (same scripts, native `hooks.json`)
-
-[`./tools/deploy-cursor.sh`](../../../tools/deploy-cursor.sh) syncs these `.py` files to `~/.cursor/hooks/ai-squad/` and merges [`cursor-hooks.json`](cursor-hooks.json) into `~/.cursor/hooks.json`. Cursor's runtime accepts the **same stdout JSON** as Claude Code ([compatibility](https://cursor.com/docs/reference/third-party-hooks)).
-
-Shared logic lives in **[`hook_runtime.py`](hook_runtime.py)** (`resolve_project_root`, etc.): the hook reads `CLAUDE_PROJECT_DIR` **or** Cursor’s `workspace_roots` / `cwd` from stdin so path checks resolve to the consumer project.
-
-| Script | In `cursor-hooks.json` | Notes |
-|--------|------------------------|--------|
-| `block-git-write.py` | yes (`preToolUse` / Shell) | Safe globally — blocks git writes for orchestrator **and** dev (human commits after handoff). |
-| `verify-audit-dispatch.py` | yes (`stop`) | Skips verification unless `dispatch-manifest.json` exists **and** `session.yml` shows Phase 4–style state (avoids blocking unrelated chats). |
-| `register-impl-session.py` | yes (`stop`) | Gated to the orchestrator Skill via the transcript marker. No-ops (cost read-scoping falls back to disk cross-validation) when the active skill can't be confirmed. |
-| `verify-output-packet.py` | yes (`subagentStop`) | Same as Claude. |
-| `guard-session-scope.py` | **no** | Would deny every `Write` outside `.agent-session/`, including **`dev`** editing source. Keep this hook on **Claude Code** only (orchestrator Skill frontmatter / Third-party Claude config). |
-
-To merge hooks manually: `python3 tools/merge_ai_squad_cursor_hooks.py`. Use `SKIP_CURSOR_HOOK_MERGE=1` with `deploy-cursor.sh` to skip merging.
 
 ## Deployment
 
@@ -87,10 +71,6 @@ echo '{"tool_input":{"command":"git commit -m foo"}}' | \
 
 # Should ALLOW
 echo '{"tool_input":{"command":"git status"}}' | \
-  python3 squads/sdd/hooks/block-git-write.py
-
-# Cursor-style stdin (project root from workspace_roots)
-echo '{"tool_input":{"command":"git status"},"workspace_roots":["'$PWD'"]}' | \
   python3 squads/sdd/hooks/block-git-write.py
 ```
 

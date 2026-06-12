@@ -14,11 +14,6 @@
  * Hook scripts get chmod +x. The per-repo hook dir is appended to the
  * repo's .gitignore (idempotent) so deployed scripts don't pollute git
  * history; users re-run `ai-squad deploy` whenever they update the CLI.
- *
- * Cursor mirror (--cursor): copies *.py hooks to ~/.cursor/hooks/ai-squad/
- * (still global — Cursor lacks per-project hook config) and merges
- * <squad>/hooks/cursor-hooks.json into ~/.cursor/hooks.json (additive,
- * deduped by command path).
  */
 import { appendFile, chmod, cp, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -597,66 +592,7 @@ async function ensureGitignore(repoRoot) {
   console.log(`  [gitignore] appended .claude/hooks/ to ${gitignorePath}`);
 }
 
-async function deployCursor({ componentsRoot, squads }) {
-  const home = homedir();
-  const cursorHooksDst = join(home, '.cursor', 'hooks', 'ai-squad');
-  const cursorConfigPath = join(home, '.cursor', 'hooks.json');
-
-  await mkdir(cursorHooksDst, { recursive: true });
-
-  console.log('');
-  console.log('ai-squad deploy (Cursor)');
-  console.log(`  hooks:   -> ${cursorHooksDst}`);
-  console.log(`  config:  -> ${cursorConfigPath} (merged additively)`);
-  console.log('');
-
-  let cursorConfig = { version: 1, hooks: {} };
-  if (await exists(cursorConfigPath)) {
-    try {
-      cursorConfig = JSON.parse(await readFile(cursorConfigPath, 'utf8'));
-      cursorConfig.hooks ??= {};
-    } catch (err) {
-      console.error(`  [WARN] could not parse existing ${cursorConfigPath}: ${err.message}`);
-      console.error('  [WARN] aborting Cursor merge to avoid clobbering it. Run with care.');
-      return;
-    }
-  }
-
-  for (const squad of squads) {
-    console.log(`[squad: ${squad}]`);
-    const hooksSrc = join(componentsRoot, squad, 'hooks');
-
-    for (const hookFile of await listFiles(hooksSrc, '.py')) {
-      const src = join(hooksSrc, hookFile);
-      const dst = join(cursorHooksDst, hookFile);
-      console.log(`  [sync hook]   ${hookFile}`);
-      await cp(src, dst);
-      await chmod(dst, 0o755);
-    }
-
-    // Merge cursor-hooks.json
-    const squadHooksJson = join(hooksSrc, 'cursor-hooks.json');
-    if (await exists(squadHooksJson)) {
-      const squadConfig = JSON.parse(await readFile(squadHooksJson, 'utf8'));
-      for (const [eventName, entries] of Object.entries(squadConfig.hooks || {})) {
-        cursorConfig.hooks[eventName] ??= [];
-        const existingCmds = new Set(cursorConfig.hooks[eventName].map((e) => e.command));
-        for (const entry of entries) {
-          if (!existingCmds.has(entry.command)) {
-            cursorConfig.hooks[eventName].push(entry);
-            console.log(`  [add hook]    ${eventName}: ${entry.command}`);
-          }
-        }
-      }
-    }
-  }
-
-  await writeFile(cursorConfigPath, JSON.stringify(cursorConfig, null, 2) + '\n');
-  console.log('');
-  console.log('Done. ai-squad available in Cursor.');
-}
-
-export async function runDeploy({ pkgRoot, squads = [], cursor = false, repoRoot, globalOnly = false, hooksOnly = false }) {
+export async function runDeploy({ pkgRoot, squads = [], repoRoot, globalOnly = false, hooksOnly = false }) {
   const componentsRoot = join(pkgRoot, 'components');
 
   if (!(await isDir(componentsRoot))) {
@@ -707,9 +643,5 @@ export async function runDeploy({ pkgRoot, squads = [], cursor = false, repoRoot
     console.log(`Done. Hooks installed to ${repoRootResolved}/.claude/hooks/. (skipped skills+agents — --hooks-only)`);
   } else {
     console.log(`Done. Skills+agents in ~/.claude/, hooks in ${repoRootResolved}/.claude/hooks/.`);
-  }
-
-  if (cursor) {
-    await deployCursor({ componentsRoot, squads: target });
   }
 }
