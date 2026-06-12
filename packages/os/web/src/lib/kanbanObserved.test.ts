@@ -7,7 +7,7 @@ import {
   COLUMN_DEFS,
 } from "./kanbanObserved";
 import { flattenSpecs } from "./kanbanObserved";
-import { makeSpec, makeProject, makeObservedSpec } from "../test-utils";
+import { makeSpec, makeProject, makeObservedSpec, makeTask } from "../test-utils";
 
 // ─── columnForSpec ─────────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ describe("attentionReason (observed)", () => {
 
   it("blocked → kind=blocked, label usa o id da task bloqueada", () => {
     const r = attentionReason(
-      makeSpec({ status: "blocked", tasks: [{ id: "T-007", state: "blocked", loops: 0, dispatches: [] }] }),
+      makeSpec({ status: "blocked", tasks: [makeTask({ id: "T-007", state: "blocked" })] }),
     );
     expect(r).not.toBeNull();
     expect(r!.kind).toBe("blocked");

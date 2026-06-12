@@ -174,7 +174,7 @@ describe("KanbanCard — modo observado", () => {
       cost: makeCost({ source: "cost_report", totalCostUsd: 4.37 }),
     });
     render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
-    expect(screen.getByText(/4\.37/)).toBeInTheDocument();
+    expect(screen.getByText(/4[.,]37/)).toBeInTheDocument();
   });
 
   it("custo: source=cost_report + totalCostUsd null → exibe tokens como métrica primária + hint '$ indisponível'", () => {
@@ -197,7 +197,7 @@ describe("KanbanCard — modo observado", () => {
       cost: makeCost({ source: "cost_report", totalCostUsd: null, totalTokens: 500 }),
     });
     const { container } = render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
-    expect(container.textContent).not.toContain("$0.00");
+    expect(container.textContent).not.toMatch(/US\$\s*0[.,]00/);
     // "—" sozinho no custo é proibido; tokens devem aparecer
     expect(screen.getByText(/500/)).toBeInTheDocument();
   });
@@ -205,10 +205,30 @@ describe("KanbanCard — modo observado", () => {
   it("custo: source=empty em spec observada → exibe 'sem custo ainda' (não 'em planejamento')", () => {
     const spec = makeObservedSpec({
       id: "OBS-001",
-      cost: makeCost({ source: "empty", totalCostUsd: null }),
+      cost: makeCost({ source: "empty", totalCostUsd: null, totalTokens: 0 }),
     });
     render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
     expect(screen.getByText(/sem custo ainda/i)).toBeInTheDocument();
     expect(screen.queryByText(/em planejamento/i)).not.toBeInTheDocument();
+  });
+
+  it("custo: observed partial com tokens > 0 → exibe tokens + '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 3_400_000 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/3[.,]4M/)).toBeInTheDocument();
+    expect(screen.getByText(/em coleta/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sem custo ainda/i)).not.toBeInTheDocument();
+  });
+
+  it("custo: observed partial com totalTokens === 0 → exibe 'sem custo ainda'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 0 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/sem custo ainda/i)).toBeInTheDocument();
   });
 });

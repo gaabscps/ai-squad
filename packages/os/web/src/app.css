@@ -108,8 +108,8 @@ a:hover { text-decoration: underline; }
 .why-blocked { color: #b91c1c; background: #fef2f2; }
 .why-escalated { color: #7e22ce; background: #faf5ff; }
 .why-paused, .why-audit { color: #b45309; background: #fffbeb; }
-/* Recolorado para âmbar: combina com o badge vermelho de needs_attention na mesma urgência */
-.why-input { color: #92400e; background: #fffbeb; }
+/* Azul lido como informacional; âmbar entra na família "aguardando humano" (vermelho fica para os hard stops) */
+.why-input { color: #b45309; background: #fffbeb; }
 .why-unreadable { color: #b91c1c; background: #fef2f2; }
 .kcard-phase { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
 .kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }

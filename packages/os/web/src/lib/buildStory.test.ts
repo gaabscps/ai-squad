@@ -282,7 +282,7 @@ describe("buildStory — modo observado", () => {
     });
     const result = buildStory(spec);
     expect(result).toContain("concluído");
-    expect(result).toContain("3.50");
+    expect(result).toMatch(/3[.,]50/);
   });
 
   it("spec observada com custo null: frase contém status label e tokens", () => {
@@ -316,5 +316,25 @@ describe("buildStory — modo observado", () => {
     });
     const result = buildStory(spec);
     expect(result).toContain("tarefa"); // SDD sempre menciona tarefas
+  });
+
+  it("observed partial com tokens > 0 → frase contém tokens + '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 2_100_000 }),
+    });
+    const result = buildStory(spec);
+    expect(result).toMatch(/2[.,]1M/);
+    expect(result).toContain("em coleta");
+    expect(result).not.toContain("sem custo ainda");
+  });
+
+  it("observed partial com totalTokens === 0 → frase contém 'sem custo ainda'", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 0 }),
+    });
+    const result = buildStory(spec);
+    expect(result).toContain("sem custo ainda");
   });
 });

@@ -1,6 +1,6 @@
 import type { Spec, CostPhaseBreakdown, SpecStatus } from "../../../src/store/types";
 import { STATUS_LABEL as BADGE_LABEL } from "../components/StatusBadge";
-import { fmtTokens } from "../format";
+import { fmtUsd, fmtTokens } from "../format";
 
 const PHASE_PRIORITY: Array<keyof CostPhaseBreakdown> = [
   "planning",
@@ -47,10 +47,14 @@ export function buildStory(spec: Spec): string {
   if (spec.observed) {
     const obsLabel = BADGE_LABEL[status];
     if (cost.totalCostUsd !== null) {
-      return `${obsLabel} · US$ ${cost.totalCostUsd.toFixed(2)}`;
+      return `${obsLabel} · ${fmtUsd(cost.totalCostUsd)}`;
     }
     if (cost.source === "cost_report") {
       return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens`;
+    }
+    // Fallback partial/empty: se já há tokens, mostrar queima; senão, vazio
+    if (cost.totalTokens > 0) {
+      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens (em coleta)`;
     }
     return `${obsLabel} · sem custo ainda`;
   }

@@ -63,7 +63,10 @@ export function KanbanCard({
           </>
         );
       }
-      // Fallback partial/empty — em coleta
+      // Fallback partial/empty: se já há tokens, mostrar queima; senão, vazio
+      if (totalTokens > 0) {
+        return <span className="cost-empty">{fmtTokens(totalTokens)} tokens (em coleta)</span>;
+      }
       return <span className="cost-empty">sem custo ainda</span>;
     }
 
