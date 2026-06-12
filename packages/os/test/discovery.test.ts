@@ -38,7 +38,7 @@ describe("discoverProjects", () => {
     // FEAT-OK é SDD legado: filtrado do board OBS-only; projeto ainda aparece
     expect(ok.specs).toHaveLength(0);
     const ruim = projects.find((p) => p.name === "projeto-ruim")!;
-    // FEAT-BAD tem YAML inválido mas dir não é OBS-*, portanto null (comportamento legado)
+    // FEAT-RUIM tem YAML inválido mas dir não é OBS-*, portanto null (comportamento legado)
     expect(ruim.specs).toHaveLength(0);
   });
 });

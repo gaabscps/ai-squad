@@ -1,5 +1,5 @@
-import type { SpecWithProject } from "../lib/kanban";
-import { COLUMN_DEFS, bucketByColumn } from "../lib/kanban";
+import type { SpecWithProject } from "../lib/kanbanObserved";
+import { COLUMN_DEFS, bucketByColumn } from "../lib/kanbanObserved";
 import { KanbanColumn } from "./KanbanColumn";
 
 /**

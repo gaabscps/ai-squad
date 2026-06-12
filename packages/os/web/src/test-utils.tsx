@@ -1,4 +1,4 @@
-import type { Project, Spec, Task, CostRollup, Dispatch, DeliveryReport } from "../../src/store/types";
+import type { Project, Spec, Task, CostRollup, Dispatch, DeliveryReport, ObservedMeta } from "../../src/store/types";
 
 export function makeDispatch(over: Partial<Dispatch> = {}): Dispatch {
   return {
@@ -76,4 +76,31 @@ export function makeSpec(over: Partial<Spec> = {}): Spec {
 
 export function makeProject(over: Partial<Project> = {}): Project {
   return { id: "proj-abc", path: "/x/proj", name: "proj", specs: [], hidden: false, ...over };
+}
+
+/** Metadados mínimos de uma sessão observada (campo Spec.observed). */
+export function makeObservedMeta(over: Partial<ObservedMeta> = {}): ObservedMeta {
+  return {
+    intent: "exemplo observado",
+    createdAt: "2026-06-01T10:00:00Z",
+    closedAt: null,
+    attentionKind: null,
+    decisions: [],
+    evidence: [],
+    driftFlags: [],
+    ...over,
+  };
+}
+
+/**
+ * Spec com campo `observed` preenchido e tasks [].
+ * Destinada a testes do modo observado; makeSpec permanece intocado para
+ * proteger os testes SDD legados.
+ */
+export function makeObservedSpec(over: Partial<Spec> = {}): Spec {
+  return makeSpec({
+    tasks: [],
+    observed: makeObservedMeta(),
+    ...over,
+  });
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useProjects } from "../state/projects";
-import { flattenSpecs, matchesQuery, isArchived, type SpecWithProject } from "../lib/kanban";
+import { flattenSpecs, matchesQuery, isArchived, type SpecWithProject } from "../lib/kanbanObserved";
 import { TopBar, type ViewMode } from "./TopBar";
 import { ProjectFilter } from "./ProjectFilter";
 import { KanbanBoard } from "./KanbanBoard";

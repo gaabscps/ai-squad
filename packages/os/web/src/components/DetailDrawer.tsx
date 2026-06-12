@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import type { SpecWithProject } from "../lib/kanban";
-import { attentionReason, columnForSpec } from "../lib/kanban";
+import type { SpecWithProject } from "../lib/kanbanObserved";
+import { attentionReason, columnForSpec } from "../lib/kanbanObserved";
 import { fmtTokens, fmtUsd } from "../format";
 import { PhaseBar } from "./PhaseBar";
 import { PhaseJourney } from "./PhaseJourney";

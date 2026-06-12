@@ -1,6 +1,6 @@
-import type { SpecWithProject } from "../lib/kanban";
+import type { SpecWithProject } from "../lib/kanbanObserved";
 import type { CostPhaseBreakdown } from "../../../src/store/types";
-import { columnForSpec, attentionReason } from "../lib/kanban";
+import { columnForSpec, attentionReason } from "../lib/kanbanObserved";
 import { fmtUsd, fmtRelativeTime } from "../format";
 import { SpecJobIndicator } from "./SpecJobIndicator";
 import { StatusBadge } from "./StatusBadge";
@@ -65,7 +65,7 @@ export function KanbanCard({
         <div className={`kcard-why why-${reason.kind}`}>{reason.label}</div>
       )}
 
-      {(col === "planning" || col === "planned" || col === "running") && spec.phase && (
+      {col === "running" && spec.phase && (
         <div className="kcard-phase">{spec.phase}</div>
       )}
 

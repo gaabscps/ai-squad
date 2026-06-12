@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SpecWithProject } from "../lib/kanban";
+import type { SpecWithProject } from "../lib/kanbanObserved";
 import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
 import { SpecJobIndicator } from "./SpecJobIndicator";
 

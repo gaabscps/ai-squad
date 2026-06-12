@@ -21,6 +21,8 @@
   --audit: #f59e0b;
   --planning: #9ca3af; /* cinza: rascunho, ainda escrevendo */
   --planned: #f59e0b;  /* âmbar: decomposto, aguardando execução */
+  --needs-attention: var(--blocked); /* mesmo peso visual de bloqueio */
+  --abandoned: #9ca3af;
 
   --sdd: #2563eb;
   --discovery: #0d9488;
@@ -78,7 +80,7 @@ a:hover { text-decoration: underline; }
 
 /* ---- Kanban ---- */
 .board-body { padding: 14px 16px; }
-.kboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
+.kboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
 .kcol { background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
 .kcol-head { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #374151; margin-bottom: 10px; }
 .kcol-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--text-mute); }
@@ -106,6 +108,8 @@ a:hover { text-decoration: underline; }
 .why-blocked { color: #b91c1c; background: #fef2f2; }
 .why-escalated { color: #7e22ce; background: #faf5ff; }
 .why-paused, .why-audit { color: #b45309; background: #fffbeb; }
+.why-input { color: #1d4ed8; background: #eff6ff; }
+.why-unreadable { color: #b91c1c; background: #fef2f2; }
 .kcard-phase { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
 .kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .kcard-time { margin-left: auto; }
@@ -126,6 +130,9 @@ a:hover { text-decoration: underline; }
 .status-blocked { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
 .status-done { color: var(--done); background: color-mix(in srgb, var(--done) 16%, transparent); }
 .status-escalated { color: var(--escalated); background: color-mix(in srgb, var(--escalated) 14%, transparent); }
+.status-needs_attention { color: var(--needs-attention); background: color-mix(in srgb, var(--needs-attention) 14%, transparent); }
+.status-abandoned { color: var(--abandoned); background: color-mix(in srgb, var(--abandoned) 16%, transparent); }
+.status-unreadable { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
 .flag-audit { font-size: 11px; font-weight: 600; color: var(--audit); background: color-mix(in srgb, var(--audit) 16%, transparent); padding: 2px 8px; border-radius: 999px; }
 
 /* ---- PhaseBar (reuso) ---- */
