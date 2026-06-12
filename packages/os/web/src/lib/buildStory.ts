@@ -1,5 +1,7 @@
 import type { Spec, CostPhaseBreakdown, SpecStatus } from "../../../src/store/types";
-import { STATUS_LABEL as BADGE_LABEL } from "../components/StatusBadge";
+// BADGE_LABEL = masculino curto (badge); STATUS_LABEL local = feminino narrativo (story).
+// Dualidade intencional — badge diz "bloqueado", prosa diz "bloqueada".
+import { STATUS_LABEL as BADGE_LABEL } from "./statusLabels";
 import { fmtUsd, fmtTokens } from "../format";
 
 const PHASE_PRIORITY: Array<keyof CostPhaseBreakdown> = [

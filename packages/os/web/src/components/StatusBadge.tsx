@@ -1,16 +1,6 @@
 import type { Spec } from "../../../src/store/types";
-
-/** Rótulos pt-BR por status — fonte única usada pelo badge e pela tabela. */
-export const STATUS_LABEL: Record<Spec["status"], string> = {
-  running: "rodando",
-  paused: "pausado",
-  blocked: "bloqueado",
-  done: "concluído",
-  escalated: "escalado",
-  needs_attention: "precisa de você",
-  abandoned: "abandonado",
-  unreadable: "ilegível",
-};
+export { STATUS_LABEL } from "../lib/statusLabels";
+import { STATUS_LABEL } from "../lib/statusLabels";
 
 /**
  * Status colorido (a cor vem da classe status-<status> no CSS) + flag de

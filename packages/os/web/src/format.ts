@@ -15,6 +15,23 @@ export function fmtUsd(v: number | null): string {
 }
 
 /**
+ * Formata um instante ISO como data/hora local no padrão pt-BR curto:
+ * "12/06/2026, 10:00". null ou data inválida viram "—".
+ */
+export function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "—";
+  return new Date(t).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
  * Formata um instante ISO como tempo relativo ao agora: "agora", "há 6 min",
  * "há 3 h", "há 2 dias". null ou data inválida viram "—". `now` é injetável pra
  * teste (default = relógio real). Só leitura de um valor que já existe; nada de
