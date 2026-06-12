@@ -619,12 +619,13 @@ details.delivery-answer:last-of-type { border-bottom: none; }
 .delivery-answer-summary::-webkit-details-marker { display: none; }
 .delivery-answer-summary::before { content: "▸"; color: #9ca3af; font-size: 0.7rem; }
 details.delivery-answer[open] > .delivery-answer-summary::before { content: "▾"; }
-.delivery-answer-title { flex: 1; }
-.delivery-answer-summary .delivery-conf { flex: none; }
+.delivery-answer-title { flex: none; }
+.delivery-answer-summary .delivery-conf { flex: none; margin-left: auto; }
 .delivery-answer .delivery-answer-text { margin: 0 0 0.6rem 1.1rem; }
 .delivery-answer .delivery-evidence { margin-left: 1.1rem; }
 .delivery-answer-teaser { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-dim); margin: 0 8px; }
-.delivery-more > summary { cursor: pointer; font-size: 12px; color: var(--text-dim); padding: 6px 0; }
+.delivery-more > summary { cursor: pointer; list-style: none; font-size: 12px; color: var(--text-dim); padding: 6px 0; }
+.delivery-more > summary::-webkit-details-marker { display: none; }
 button.delivery-ref-btn { border: 0; background: transparent; color: var(--accent); cursor: pointer; padding: 0; font-size: inherit; }
 
 /* seção colapsável dos ACs */

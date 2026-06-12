@@ -16,4 +16,7 @@ describe("firstSentence", () => {
   it("texto sem pontuação final: devolve o que há", () => {
     expect(firstSentence("sem ponto final")).toBe("sem ponto final");
   });
+  it("lista numerada: teaser é o conteúdo do primeiro item, não '1.'", () => {
+    expect(firstSentence("1. Implementou o coletor.\n2. Outra coisa.")).toBe("Implementou o coletor.");
+  });
 });

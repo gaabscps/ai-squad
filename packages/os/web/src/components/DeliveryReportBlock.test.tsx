@@ -27,6 +27,14 @@ const fullReport = makeDeliveryReport({
   })),
 });
 
+// Report sem nenhuma vital (só keys não-vitais).
+const reportWithoutVitals = makeDeliveryReport({
+  answers: [
+    { key: "impacts", answer: "nenhum impacto", confidence: "recorded" as const, evidenceRefs: [] },
+    { key: "out_of_scope", answer: "fora de escopo X", confidence: "recorded" as const, evidenceRefs: [] },
+  ],
+});
+
 // Report com evidenceRefs mistos: um .md absoluto (clicável) e um texto inerte.
 const reportWithRefs = makeDeliveryReport({
   answers: [
@@ -97,10 +105,18 @@ describe("DeliveryReportBlock", () => {
   it("respostas vitais aparecem primeiro, com teaser; demais atrás de 'ler parecer completo'", () => {
     render(<DeliveryReportBlock report={fullReport} onOpenFile={() => {}} />);
     const vitals = screen.getAllByTestId("delivery-vital");
-    expect(vitals.map((v) => v.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("O que foi entregue")]),
-    );
-    expect(screen.getByText(/ler parecer completo/)).toBeTruthy();
+    expect(vitals).toHaveLength(3);
+    // Ordem canônica das vitais: what_was_done → why_this_way → risks_and_pending.
+    const titles = vitals.map((v) => v.querySelector(".delivery-answer-title")?.textContent);
+    expect(titles).toEqual(["O que foi entregue", "Por que assim", "Riscos e pendências"]);
+    // 11 respostas totais − 3 vitais = 8 no colapsável.
+    expect(screen.getByText(/ler parecer completo \(8 respostas\)/)).toBeTruthy();
+  });
+
+  it("report sem nenhuma vital: tudo atrás de 'ler parecer completo', nada quebra", () => {
+    render(<DeliveryReportBlock report={reportWithoutVitals} onOpenFile={() => {}} />);
+    expect(screen.queryAllByTestId("delivery-vital")).toHaveLength(0);
+    expect(screen.getByText(/ler parecer completo \(2 respostas\)/)).toBeTruthy();
   });
 
   it("evidenceRef .md absoluto vira botão; ref texto continua inerte", () => {

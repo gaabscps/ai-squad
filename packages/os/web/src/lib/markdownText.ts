@@ -2,6 +2,7 @@
 export function firstSentence(md: string, max = 140): string {
   const plain = md
     .replace(/```[\s\S]*?```/g, " ")
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
     .replace(/`([^`]*)`/g, "$1")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/[*_#>]/g, "")
