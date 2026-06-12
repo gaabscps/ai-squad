@@ -1,5 +1,6 @@
 .DS_Store
 *.log
+node_modules/
 .agent-session/
 docs/agentops/
 docs/superpowers/
