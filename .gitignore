@@ -18,3 +18,6 @@ __pycache__/
 
 # brainstorm visual companion (temporário)
 .superpowers/
+
+# Local harness/session config (machine-specific, never framework content)
+.claude/
