@@ -241,8 +241,12 @@ export function DetailDrawer({
         {/* DeliveryReportBlock for observed sessions too (null-safe; chronicler is future work) */}
         {obs && (
           <>
-            <h4 className="drawer-section">Parecer de entrega</h4>
-            <DeliveryReportBlock report={spec.deliveryReport} onOpenFile={openFile} />
+            {spec.deliveryReport && (
+              <>
+                <h4 className="drawer-section">Parecer de entrega</h4>
+                <DeliveryReportBlock report={spec.deliveryReport} onOpenFile={openFile} />
+              </>
+            )}
 
             {spec.cost.reportPath && (
               <a

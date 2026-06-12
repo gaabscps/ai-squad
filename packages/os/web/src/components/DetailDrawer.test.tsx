@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DetailDrawer } from "./DetailDrawer";
-import { makeSpec, makeProject, makeCost, makeTask, makeDispatch, makeObservedSpec, makeObservedMeta } from "../test-utils";
+import { makeSpec, makeProject, makeCost, makeTask, makeDispatch, makeObservedSpec, makeObservedMeta, makeDeliveryReport } from "../test-utils";
 import { flattenSpecs } from "../lib/kanban";
 
 function item(spec = makeSpec()) {
@@ -856,9 +856,24 @@ describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () =
     expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("modo observado: bloco de parecer de entrega está presente (estado vazio)", () => {
-    const spec = makeObservedSpec({ deliveryReport: null });
+  it("modo observado COM parecer: bloco de parecer de entrega está presente", () => {
+    const spec = makeObservedSpec({ deliveryReport: makeDeliveryReport() });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("DetailDrawer — modo observado: parecer de entrega condicional", () => {
+  it("observado sem parecer: seção 'Parecer de entrega' não renderiza", () => {
+    const spec = makeObservedSpec({ deliveryReport: null });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.queryByText("Parecer de entrega")).toBeNull();
+    expect(screen.queryByText("sem parecer de entrega ainda")).toBeNull();
+  });
+
+  it("observado COM parecer: seção renderiza", () => {
+    const spec = makeObservedSpec({ deliveryReport: makeDeliveryReport() });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("Parecer de entrega")).toBeTruthy();
   });
 });
