@@ -487,6 +487,8 @@ a:hover { text-decoration: underline; }
 .cost-unreliable { color: var(--blocked); font-size: 10px; }
 /* Hint muted em cards observados onde USD não está disponível mas tokens estão */
 .cost-unpriced { color: var(--text-mute); font-size: 10px; }
+/* Sessão terminal que encerrou sem cost-report — dado existia mas não foi capturado */
+.cost-uncaptured { color: var(--paused); }
 
 /* ── Cost Phase Bar (barra proporcional no card) ──────────────────────── */
 .cost-phase-bar {

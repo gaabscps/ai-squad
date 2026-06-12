@@ -322,6 +322,19 @@ describe("buildStory — manchete narrada (modo observado com contagens)", () =>
     });
     expect(buildStory(spec, NOW)).toBe("abandonado · US$ 0.42");
   });
+
+  it("observado terminal com custo parcial: marca 'custo não capturado'", () => {
+    const spec = makeSpec({ status: "done", observed: obsBase,
+      cost: { ...emptyCost, source: "partial", totalCostUsd: 5.11, totalTokens: 100 } });
+    expect(buildStory(spec, NOW)).toContain("custo não capturado");
+  });
+
+  it("createdAt inválido: omite 'aberto há' em vez de 'aberto —'", () => {
+    const spec = makeSpec({ status: "running",
+      observed: { ...obsBase, createdAt: "data-podre" },
+      cost: { ...emptyCost, source: "empty", totalTokens: 0 } });
+    expect(buildStory(spec, NOW)).not.toContain("aberto");
+  });
 });
 
 describe("buildStory — modo observado", () => {

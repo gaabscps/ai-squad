@@ -42,6 +42,7 @@ export function KanbanCard({
   const reason = attentionReason(spec);
 
   const isObserved = spec.observed != null;
+  const terminal = spec.status === "done" || spec.status === "abandoned";
   const tasksDone = spec.tasks.filter((t) => t.state === "done").length;
   const tasksTotal = spec.tasks.length;
 
@@ -52,11 +53,15 @@ export function KanbanCard({
     // Modo observado: tokens são a métrica primária; USD pode ser nulo por design.
     if (isObserved) {
       if (totalCostUsd !== null) {
-        // source=partial significa contrato ainda aberto (valores acumulando); indica ao usuário.
+        // source=partial: sessão ainda acumulando (não-terminal) ou encerrada sem cost-report (terminal).
         return (
           <>
             {fmtUsd(totalCostUsd)}
-            {source === "partial" && <span className="cost-partial"> (em coleta)</span>}
+            {source === "partial" && (terminal ? (
+              <span className="cost-uncaptured" title="sessão encerrada sem cost-report.json publicado — valor é a soma dos snapshots"> · custo não capturado</span>
+            ) : (
+              <span className="cost-partial"> (em coleta)</span>
+            ))}
           </>
         );
       }
@@ -71,14 +76,18 @@ export function KanbanCard({
       }
       // Fallback partial/empty: se já há tokens, mostrar queima; senão, vazio
       if (totalTokens > 0) {
-        return <span className="cost-empty">{fmtTokens(totalTokens)} tokens (em coleta)</span>;
+        return terminal ? (
+          <span className="cost-uncaptured" title="sessão encerrada sem cost-report.json publicado">{fmtTokens(totalTokens)} tokens · custo não capturado</span>
+        ) : (
+          <span className="cost-empty">{fmtTokens(totalTokens)} tokens (em coleta)</span>
+        );
       }
       return <span className="cost-empty">sem custo ainda</span>;
     }
 
     // Modo SDD legado: comportamento original
     if (source === "empty") {
-      return <span className="cost-empty">em planejamento</span>;
+      return <span className="cost-empty">sem custo registrado</span>;
     }
     if (source === "unreliable") {
       return (

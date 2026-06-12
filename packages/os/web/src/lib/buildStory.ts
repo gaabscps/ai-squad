@@ -53,7 +53,7 @@ export function buildStory(spec: Spec, now: number = Date.now()): string {
     const terminal = status === "done" || status === "abandoned";
     const parts: string[] = [BADGE_LABEL[status]];
 
-    if (!terminal && obs.createdAt) {
+    if (!terminal && obs.createdAt && !Number.isNaN(Date.parse(obs.createdAt))) {
       parts.push(`aberto ${fmtRelativeTime(obs.createdAt, now)}`);
     }
     const nd = visibleDecisions(obs).length;
@@ -63,10 +63,15 @@ export function buildStory(spec: Spec, now: number = Date.now()): string {
 
     if (cost.totalCostUsd !== null) {
       parts.push(fmtUsd(cost.totalCostUsd));
+      if (cost.source === "partial" && terminal) {
+        parts.push("custo não capturado");
+      }
     } else if (cost.source === "cost_report") {
       parts.push(`${fmtTokens(cost.totalTokens)} tokens`);
     } else if (cost.totalTokens > 0) {
-      parts.push(`${fmtTokens(cost.totalTokens)} tokens (em coleta)`);
+      parts.push(terminal
+        ? `${fmtTokens(cost.totalTokens)} tokens · custo não capturado`
+        : `${fmtTokens(cost.totalTokens)} tokens (em coleta)`);
     } else {
       parts.push("sem custo ainda");
     }

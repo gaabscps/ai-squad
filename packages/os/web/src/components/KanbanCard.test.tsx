@@ -55,10 +55,12 @@ describe("KanbanCard", () => {
     expect(screen.getByText(/179\.23/)).toBeInTheDocument();
   });
 
-  it("exibe 'em planejamento' quando source é 'empty'", () => {
-    const spec = makeSpec({ cost: makeCost({ source: "empty", totalCostUsd: null }) });
-    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
-    expect(screen.getByText(/em planejamento/i)).toBeInTheDocument();
+  it("SDD sem custo: 'sem custo registrado' em vez de 'em planejamento'", () => {
+    // fixture SDD: cost.source "empty"
+    const sddEmptyCost = makeSpec({ cost: makeCost({ source: "empty", totalCostUsd: null }) });
+    render(<KanbanCard item={item(sddEmptyCost)} onSelect={() => {}} />);
+    expect(screen.getByText("sem custo registrado")).toBeTruthy();
+    expect(screen.queryByText("em planejamento")).toBeNull();
   });
 
   it("exibe badge '(parcial)' quando source é 'partial' com custo disponível", () => {
@@ -250,5 +252,17 @@ describe("KanbanCard — modo observado", () => {
     render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
     expect(screen.getByText(/22[.,]50/)).toBeInTheDocument();
     expect(screen.queryByText(/em coleta/i)).not.toBeInTheDocument();
+  });
+
+  it("observado TERMINAL sem cost_report: 'custo não capturado' em vez de '(em coleta)'", () => {
+    // fixture observada: status "done", cost.source "partial", totalCostUsd 5.11
+    const doneObservedPartial = makeObservedSpec({
+      id: "OBS-002",
+      status: "done",
+      cost: makeCost({ source: "partial", totalCostUsd: 5.11 }),
+    });
+    render(<KanbanCard item={item(doneObservedPartial)} onSelect={() => {}} />);
+    expect(screen.getByText(/custo não capturado/)).toBeTruthy();
+    expect(screen.queryByText(/em coleta/)).toBeNull();
   });
 });
