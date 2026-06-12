@@ -168,7 +168,7 @@ T4 → complexity=large/alto
 | `low` | Fast, minimal reasoning | Latency-sensitive, trivial. **Não usar em dev** — documentado como anti-pattern. |
 | `medium` | Balances cost and quality | Reviewers procedurais (code-reviewer), QA, audit-agent. |
 | `high` | More internal reasoning | Dev T3/T4, logic-reviewer, qualquer task com julgamento. |
-| `xhigh` | Deep reasoning | blocker-specialist, spec-writer, designer. **Opus 4.7 only.** |
+| `xhigh` | Deep reasoning | blocker-specialist, spec-writer, designer. **Opus 4.8 only.** |
 | `max` | No ceiling on reasoning | Casos extremos. Retorno decrescente documentado — não usar como default. |
 
 ---

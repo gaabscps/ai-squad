@@ -121,6 +121,78 @@ def test_sdd_zero_subagents_still_incomplete(tmp_path):
     assert rep["complete"] is False
 
 
+def test_observed_orphan_session_snapshot_excluded(tmp_path):
+    # Ownership defense on READ: when session.yml carries the observed_sessions
+    # registry, a session-*.json left behind by a foreign chat session (the
+    # pre-fix promiscuous mtime routing, or a stale file) is excluded — and
+    # surfaced, never silently dropped.
+    (tmp_path / "session.yml").write_text(
+        "session_id: OBS-001\nmode: observed   # c\nstatus: in_progress\n"
+        "observed_sessions:\n  - \"s1\"\n",
+        encoding="utf-8")
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    for sid, cost in (("s1", 3.0), ("s2", 20.0)):
+        (costs / f"session-{sid}.json").write_text(json.dumps({
+            "scope": "session",
+            "planning": {"total_cost_usd": cost, "unpriced_models": []},
+            "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+        }))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["total_cost_usd"] == 3.0   # s2 (unregistered) excluded
+    assert rep["excluded_sessions"] == 1
+    assert rep["complete"] is True        # s1 was captured and priced
+    md = cr.render_markdown(rep, "OBS-001")
+    assert "1 out-of-scope session" in md  # surfaced, never silent
+
+
+def test_observed_without_registry_keeps_all_sessions(tmp_path):
+    # Back-compat: pre-fix observed dirs have no registry — keep today's sum.
+    _observed_session(tmp_path)
+    costs = tmp_path / "costs"
+    (costs / "session-s2.json").write_text(json.dumps({
+        "scope": "session",
+        "planning": {"total_cost_usd": 1.0, "unpriced_models": []},
+        "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+    }))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["total_cost_usd"] == 4.69
+    assert rep["excluded_sessions"] == 0
+
+
+def test_observed_agent_scoped_by_registry(tmp_path):
+    # The OBS-005/OBS-006 case: an agent whose parent chat session belongs to a
+    # DIFFERENT observed contract must be excluded here (and the registry — not
+    # just disk cross-validation — is what says so).
+    (tmp_path / "session.yml").write_text(
+        "session_id: OBS-001\nmode: observed\nstatus: in_progress\n"
+        "observed_sessions:\n  - \"s1\"\n",
+        encoding="utf-8")
+    costs = tmp_path / "costs"
+    costs.mkdir()
+    # BOTH parents left session snapshots here (pre-fix promiscuous routing) —
+    # disk cross-validation (present_sessions) would therefore KEEP the foreign
+    # agent; only the registry says sX never belonged to this contract.
+    for sid in ("s1", "sX"):
+        (costs / f"session-{sid}.json").write_text(json.dumps({
+            "scope": "session",
+            "planning": {"total_cost_usd": 3.0, "unpriced_models": []},
+            "orchestration": {"total_cost_usd": 0.0, "unpriced_models": []},
+        }))
+    (costs / "agent-mine.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 2.0, "agent_id": "mine",
+        "transcript_path": "/h/.claude/projects/p/s1/subagents/agent-mine.jsonl",
+        "unpriced_models": []}))
+    (costs / "agent-foreign.json").write_text(json.dumps({
+        "scope": "implementation", "total_cost_usd": 9.0, "agent_id": "foreign",
+        "transcript_path": "/h/.claude/projects/p/sX/subagents/agent-foreign.jsonl",
+        "unpriced_models": []}))
+    rep = cr.build_cost_report(tmp_path)
+    assert rep["implementation_cost_usd"] == 2.0
+    assert rep["subagent_count"] == 1
+    assert rep["excluded_subagents"] == 1
+
+
 def test_observed_markdown_renders_single_session_row(tmp_path):
     _observed_session(tmp_path)
     rep = cr.build_cost_report(tmp_path)
@@ -661,6 +733,7 @@ def test_cost_report_schema_is_valid_and_declares_required_keys():
     assert required == {
         "planning_cost_usd", "orchestration_cost_usd", "implementation_cost_usd",
         "total_cost_usd", "subagent_count", "excluded_subagents",
-        "recovered_subagents", "scoping_suspect", "unpriced_models", "complete",
-        "tokens", "token_cost", "spec_id", "generated_at",
+        "excluded_sessions", "recovered_subagents", "scoping_suspect",
+        "unpriced_models", "complete", "tokens", "token_cost", "spec_id",
+        "generated_at",
     }

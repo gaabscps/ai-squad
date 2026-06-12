@@ -144,6 +144,39 @@ def _read_implementation_sessions(session_dir):
     return ids or None
 
 
+def _read_observed_sessions(session_dir):
+    """Ownership registry of an observed Session dir, or None when absent.
+
+    The Stop-hook router (hook_runtime.resolve_capture_session) adopts each
+    chat session into exactly one observed dir and records it under
+    `observed_sessions:` in session.yml. On read this is the allow-list for
+    BOTH session snapshots and subagents — disk cross-validation can't help
+    here, since pre-fix promiscuous routing left foreign session-*.json files
+    on the same disk it would validate against. None = legacy dir (pre-fix),
+    keep the unfiltered sum. Same cheap block parse as
+    _read_implementation_sessions.
+    """
+    sy = Path(session_dir) / "session.yml"
+    if not sy.exists():
+        return None
+    ids = set()
+    in_block = False
+    for line in sy.read_text(encoding="utf-8", errors="replace").splitlines():
+        if re.match(r"^\s*observed_sessions\s*:", line):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        m = re.match(r"^\s+-\s*[\"']?([^\"'\s]+)[\"']?\s*$", line)
+        if m:
+            ids.add(m.group(1))
+        elif line.strip() == "":
+            continue
+        elif not line.startswith((" ", "\t")):
+            break  # a new top-level key ends the list block
+    return ids or None
+
+
 def _agent_in_scope(parent, allowed, present):
     """Does an agent cost file belong to THIS feature?
 
@@ -243,10 +276,15 @@ def build_cost_report(session_dir):
     session_captures = 0
     excluded_records = []  # (parent_session, cost_obj) for each out-of-scope agent
     unpriced = set()
+    excluded_sessions = 0
+    mode = _read_mode(session_dir)
+    # Ownership registry (observed mode): scope session snapshots AND agents to
+    # the chat sessions this contract adopted. None on legacy dirs (pre-fix).
+    observed_registry = _read_observed_sessions(session_dir) if mode == "observed" else None
     # Read-scoping anchors (Gap A): an authoritative allow-list from session.yml
     # if present, else the set of session ids that actually wrote a session-*.json
     # here (disk cross-validation fallback). See _agent_in_scope.
-    allowed_sessions = _read_implementation_sessions(session_dir)
+    allowed_sessions = _read_implementation_sessions(session_dir) or observed_registry
     present_sessions = set()
     if costs.is_dir():
         for f in costs.glob("session-*.json"):
@@ -322,6 +360,11 @@ def build_cost_report(session_dir):
                 continue
             scope = d.get("scope")
             if scope == "session":
+                if observed_registry is not None:
+                    sm = _SESSION_FILE_RE.search(f.name)
+                    if sm and sm.group(1) not in observed_registry:
+                        excluded_sessions += 1
+                        continue
                 session_captures += 1
                 pc, pu = _phase_cost(d.get("planning"))
                 oc, ou = _phase_cost(d.get("orchestration"))
@@ -369,7 +412,6 @@ def build_cost_report(session_dir):
         else:
             scoping_suspect = True
     excluded = len(excluded_records)
-    mode = _read_mode(session_dir)
     total = round(planning + orchestration + implementation, 6)
     tokens_by_type = _empty_typemap()
     cost_by_type = {t: 0.0 for t in _TOKEN_TYPES}
@@ -391,6 +433,10 @@ def build_cost_report(session_dir):
         # (foreign session/project contamination), ignored on read. Surfaced —
         # never silently dropped.
         "excluded_subagents": excluded,
+        # Session snapshots in costs/ from chat sessions this observed contract
+        # never adopted (pre-fix promiscuous routing / stale files). Always 0
+        # outside observed mode or without the ownership registry.
+        "excluded_sessions": excluded_sessions,
         # Implementation subagents recovered after the sanity floor tripped
         # (Spec B); 0 in the normal path.
         "recovered_subagents": recovered,
@@ -452,6 +498,9 @@ def render_markdown(rep, task_id):
         if not rep["complete"]:
             lines += ["", "> WARNING: cost incomplete "
                           f"(unpriced models or missing capture): {', '.join(rep['unpriced_models'])}"]
+        if rep.get("excluded_sessions"):
+            lines += ["", f"> NOTE: Ignored {rep['excluded_sessions']} out-of-scope session "
+                          "snapshot(s) (chat sessions never adopted by this contract)."]
         return "\n".join(lines)
     impl_cell = "unknown" if rep.get("scoping_suspect") else f"${rep['implementation_cost_usd']:.4f}"
     lines = [

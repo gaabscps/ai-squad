@@ -22,12 +22,18 @@ then runs the audit-agent and asserts the Output Packet.
 - Expect: `status: blocked, blocker_kind: bypass_detected`, one
   `orchestrator_edited_source` finding for `src/secret.ts`. (Anti-fraude intact.)
 
-## Scenario 3 — baseline absent → fail-safe
+## Scenario 3 — baseline absent → non-blocking, ownership unverifiable
 - No `audit-baseline.json`.
 - Working tree: `.gitignore` dirty, no dev packet.
-- Expect: `status: blocked` (whole-tree compare), evidence
-  `note: "baseline absent — whole-tree compare"`. With a human present, Layer 2
-  (orchestrator) can later authorize `.gitignore` — see the Layer 2 scenario doc.
+- Expect: `status: done` (NOT blocked). One consolidated
+  `severity: warning, audit_finding_kind: source_ownership_unverified` finding
+  listing `.gitignore`, plus `kind: absence` evidence
+  `note: "baseline absent — ownership unverifiable, non-blocking"`. The
+  orchestrator surfaces it as a handoff caveat (advise `git diff`), but the
+  pipeline completes — a false block on every baseline-absent run was the worse
+  failure, and with the spec_id baseline-resolution fix this case is now rare.
+  Real fraud signals (`role_mismatch`, missing/orphan packets,
+  `pipeline_stage_skipped`, `ac_not_validated`) still hard-block independently.
 
 ## Scenario 4 — concurrent human edit during the run (NOT in baseline)
 - Baseline: `audit-baseline.json` with `dirty_paths: []` (clean at start).

@@ -32,7 +32,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 from hook_runtime import (  # noqa: E402
     detect_active_skill,
-    find_active_session,
+    resolve_dispatch_session,
     resolve_project_root,
 )
 
@@ -76,7 +76,10 @@ def main() -> int:
     session_id = payload.get("session_id")
     if not session_id:
         return 0
-    session_dir = find_active_session(resolve_project_root(payload))
+    # Resolve by the Work Packet's spec_id, not newest-mtime — the implementation
+    # session id must be recorded against the Session actually being driven, not
+    # whichever sibling dir happens to have the freshest mtime.
+    session_dir = resolve_dispatch_session(payload, resolve_project_root(payload))
     if session_dir is None:
         return 0
     try:

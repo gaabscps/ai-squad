@@ -12,6 +12,7 @@
     "total_cost_usd",
     "subagent_count",
     "excluded_subagents",
+    "excluded_sessions",
     "recovered_subagents",
     "scoping_suspect",
     "unpriced_models",
@@ -51,6 +52,11 @@
       "type": "integer",
       "minimum": 0,
       "description": "Out-of-scope cost files ignored on read (foreign session/project contamination). Surfaced, never silently dropped."
+    },
+    "excluded_sessions": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Session snapshots ignored on read because their chat session was never adopted by this observed contract (observed_sessions registry). Always 0 outside observed mode."
     },
     "recovered_subagents": {
       "type": "integer",

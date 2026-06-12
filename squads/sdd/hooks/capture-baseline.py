@@ -34,7 +34,7 @@ if str(_HOOKS_DIR) not in sys.path:
 import audit_baseline  # noqa: E402
 from hook_runtime import (  # noqa: E402
     detect_active_skill,
-    find_active_session,
+    resolve_dispatch_session,
     resolve_project_root,
 )
 
@@ -49,7 +49,10 @@ def main() -> int:
     if detect_active_skill(payload) != "orchestrator":
         return 0
     project_dir = resolve_project_root(payload)
-    session_dir = find_active_session(project_dir)
+    # Resolve by the Work Packet's spec_id, not newest-mtime: a sibling Session
+    # already carrying a baseline (or one the aiOS observer just touched) must
+    # not steal this dispatch's identity and skip capture for the real Session.
+    session_dir = resolve_dispatch_session(payload, project_dir)
     if session_dir is None:
         return 0
     baseline = session_dir / audit_baseline.BASELINE_FILENAME

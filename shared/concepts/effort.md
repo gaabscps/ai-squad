@@ -18,10 +18,10 @@
 | `low` | Fast, minimal internal reasoning | Latency-sensitive, trivial tasks | All |
 | `medium` | Balances cost and quality | Reasonable default for structured tasks (pattern review, procedural execution) | All |
 | `high` | More internal reasoning; minimum bar for intelligence-sensitive tasks | Tasks needing solid reasoning (implementation, gap analysis) | All |
-| `xhigh` | Deep reasoning; recommended default for Opus 4.7 in agentic tasks | High-stakes decisions, arbitration | **Opus 4.7 only** |
+| `xhigh` | Deep reasoning; recommended default for Opus 4.8 in agentic tasks | High-stakes decisions, arbitration | **Opus 4.8 only** |
 | `max` | No ceiling on reasoning; can show diminishing returns | Extreme cases, architectural debugging | All |
 
-Platform defaults: `xhigh` on Opus 4.7; `high` on Opus 4.6 and Sonnet 4.6.
+Platform defaults: `xhigh` on Opus 4.8; `high` on Opus 4.6 and Sonnet 4.6.
 
 ## How effort interacts with model selection
 

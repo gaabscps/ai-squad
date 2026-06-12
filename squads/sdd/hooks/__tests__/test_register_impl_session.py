@@ -43,13 +43,39 @@ def test_register_skips_unknown_or_empty(tmp_path):
     assert "implementation_sessions" not in sy.read_text()
 
 
-def test_find_active_session_requires_session_yml(tmp_path):
+def test_resolve_dispatch_session_requires_session_yml(tmp_path):
     base = tmp_path / ".agent-session"
     (base / "FEAT-001").mkdir(parents=True)
     (base / "FEAT-001" / "session.yml").write_text("id: FEAT-001\n")
     (base / "stray").mkdir()  # no session.yml -> ignored
-    got = ris.find_active_session(tmp_path)
+    # No Work Packet → falls back to newest-mtime session.yml-bearing dir.
+    got = ris.resolve_dispatch_session({}, tmp_path)
     assert got is not None and got.name == "FEAT-001"
+
+
+def test_main_registers_against_spec_id_not_mtime(tmp_path, monkeypatch):
+    # The implementation session id must land on the Session the dispatch
+    # actually targets (FEAT-002 via its Work Packet), not the mtime-newest
+    # sibling (FEAT-001, e.g. just touched by the aiOS observer).
+    import os
+    a = tmp_path / ".agent-session" / "FEAT-001"
+    a.mkdir(parents=True)
+    (a / "session.yml").write_text("id: FEAT-001\n")
+    b = tmp_path / ".agent-session" / "FEAT-002"
+    b.mkdir(parents=True)
+    (b / "session.yml").write_text("id: FEAT-002\n")
+    os.utime(a, (2_000, 2_000))   # FEAT-001 newest by mtime
+    os.utime(b, (1_000, 1_000))
+    monkeypatch.setattr(ris, "detect_active_skill", lambda p: "orchestrator")
+    monkeypatch.setattr(ris, "resolve_project_root", lambda p: tmp_path)
+    payload = {
+        "session_id": "SESS-2",
+        "tool_input": {"prompt": "WorkPacket:\n```yaml\nspec_id: FEAT-002\n```\n"},
+    }
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert ris.main() == 0
+    assert '- "SESS-2"' in (b / "session.yml").read_text()
+    assert "implementation_sessions" not in (a / "session.yml").read_text()
 
 
 def _wire(monkeypatch, skill, repo_root, session_id="AAA"):

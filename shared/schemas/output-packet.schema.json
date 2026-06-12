@@ -191,6 +191,7 @@
               "pipeline_stage_skipped",
               "ac_not_validated",
               "orchestrator_edited_source",
+              "source_ownership_unverified",
               "warnings_file_corrupt",
               "incomplete_review"
             ],

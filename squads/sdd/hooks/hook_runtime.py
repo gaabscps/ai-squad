@@ -1,9 +1,8 @@
 """
 Shared helpers for ai-squad enforcement hooks.
 
-Single module used by all hook scripts so behavior stays aligned across
-Claude Code and Cursor (IDE / CLI). Cursor sends workspace_roots / cwd on stdin;
-Claude Code sets CLAUDE_PROJECT_DIR.
+Single module used by all hook scripts so behavior stays aligned. Claude Code
+sets CLAUDE_PROJECT_DIR and sends cwd on stdin.
 """
 from __future__ import annotations
 
@@ -23,9 +22,6 @@ def resolve_project_root(payload: Mapping[str, Any] | None) -> Path:
         cwd = payload.get("cwd")
         if cwd:
             return Path(str(cwd)).resolve()
-        roots = payload.get("workspace_roots")
-        if isinstance(roots, list) and roots:
-            return Path(str(roots[0])).resolve()
     return Path(os.getcwd()).resolve()
 
 
@@ -49,6 +45,201 @@ def find_active_session(project_dir: Path) -> Path | None:
     if not candidates:
         return None
     return max(candidates, key=lambda d: d.stat().st_mtime)
+
+
+_WP_FENCED = re.compile(r"WorkPacket:\s*\n```(?:ya?ml)?\s*\n(.*?)```", re.DOTALL)
+_WP_INLINE = re.compile(r"```(?:ya?ml)?\s*\nWorkPacket:\s*\n(.*?)```", re.DOTALL)
+_WP_KV = re.compile(
+    r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*(.*?)[ \t]*$", re.MULTILINE
+)
+_SPEC_ID_RE = re.compile(r"^(?:FEAT|DISC)-\d+$")
+
+
+def parse_work_packet(prompt: str | None) -> dict[str, str]:
+    """Parse the fenced WorkPacket block of a Task dispatch prompt into a flat
+    dict of top-level scalar keys. Mirrors verify-pipeline-completeness so every
+    hook reads the dispatch contract the same way. Returns {} when absent."""
+    if not isinstance(prompt, str) or not prompt:
+        return {}
+    m = _WP_FENCED.search(prompt) or _WP_INLINE.search(prompt)
+    if not m:
+        return {}
+    out: dict[str, str] = {}
+    for km in _WP_KV.finditer(m.group(1)):
+        key, val = km.group(1), km.group(2).strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+        out[key] = val
+    return out
+
+
+def dispatch_spec_id(payload: Mapping[str, Any] | None) -> str | None:
+    """The spec_id (FEAT-NNN / DISC-NNN) a Task dispatch targets, read from its
+    Work Packet — the authoritative identity the orchestrator was launched with.
+    Returns None when the prompt carries no well-formed spec_id (the regex also
+    rejects path-traversal junk, so callers can safely use it as a dir name)."""
+    prompt = tool_input_dict(payload).get("prompt")
+    wp = parse_work_packet(prompt if isinstance(prompt, str) else "")
+    sid = wp.get("spec_id") or wp.get("session_id") or ""
+    return sid if _SPEC_ID_RE.match(sid) else None
+
+
+def resolve_dispatch_session(
+    payload: Mapping[str, Any] | None, project_dir: Path | None = None
+) -> Path | None:
+    """The Session dir a Task dispatch belongs to.
+
+    Prefers the spec_id embedded in the dispatch's Work Packet (deterministic:
+    it echoes the `/orchestrator <spec_id>` the run was launched with), so
+    concurrent Sessions — or an external observer (the aiOS cockpit) touching
+    sibling dirs and bumping their mtime — cannot misroute the lookup. Falls
+    back to newest-mtime (find_active_session) ONLY when the prompt carries no
+    parseable spec_id (non-dispatch payloads).
+
+    This is the fix for the recurring audit false-positive: when find_active_session
+    resolved to the wrong (mtime-newest) sibling that already had a baseline, the
+    idempotent guard skipped capture for the real Session, leaving it baseline-less
+    and tripping the audit's whole-tree fail-safe.
+    """
+    root = Path(project_dir) if project_dir is not None else resolve_project_root(payload)
+    sid = dispatch_spec_id(payload)
+    if sid:
+        cand = root / ".agent-session" / sid
+        if (cand / "session.yml").exists():
+            return cand
+    return find_active_session(root)
+
+
+def read_yaml_scalar(yml_path: Path, key: str) -> str | None:
+    """Top-level scalar from a session.yml, comment/quote-safe, no PyYAML.
+
+    Honors quoted values (a '#' inside quotes is content) and strips inline
+    ` # comments` from bare scalars — /observe sessions copy the skill's
+    example comment onto `mode: observed`, which broke naive splits before.
+    Returns None when the file or key is absent, or the value is empty.
+    """
+    try:
+        text = Path(yml_path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if not re.match(rf"^{re.escape(key)}\s*:", line):
+            continue
+        raw = line.split(":", 1)[1].strip()
+        for q in ('"', "'"):
+            if raw.startswith(q) and q in raw[1:]:
+                return raw[1 : raw.index(q, 1)] or None
+        return raw.split(" #", 1)[0].strip() or None
+    return None
+
+
+def _read_session_id_list(yml_path: Path, key: str) -> set[str]:
+    """Ids listed under a top-level `<key>:` block, e.g. observed_sessions.
+    Same cheap block parse as cost_report._read_implementation_sessions."""
+    try:
+        text = Path(yml_path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    ids: set[str] = set()
+    in_block = False
+    for line in text.splitlines():
+        if re.match(rf"^\s*{re.escape(key)}\s*:", line):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        m = re.match(r"^\s+-\s*[\"']?([^\"'\s]+)[\"']?\s*$", line)
+        if m:
+            ids.add(m.group(1))
+        elif line.strip() == "":
+            continue
+        elif not line.startswith((" ", "\t")):
+            break  # a new top-level key ends the list block
+    return ids
+
+
+_TERMINAL_STATUS = {"done", "abandoned"}
+
+
+def find_owner_session(project_dir: Path, session_id: str | None) -> Path | None:
+    """The Session dir that registered this chat session under
+    `observed_sessions:` — its exclusive owner — or None.
+
+    Ownership survives close: the final Stop of a chat session lands AFTER the
+    contract is closed, and that capture must still reach the owner (window-
+    bounded by closed_at), never a newer sibling.
+    """
+    if not session_id or session_id == "unknown":
+        return None
+    base = Path(project_dir) / ".agent-session"
+    if not base.is_dir():
+        return None
+    for d in sorted(base.iterdir()):
+        yml = d / "session.yml"
+        if yml.exists() and session_id in _read_session_id_list(yml, "observed_sessions"):
+            return d
+    return None
+
+
+def register_observed_session(session_yml: Path, session_id: str) -> bool:
+    """Append session_id under `observed_sessions:` in session.yml (adoption).
+
+    Idempotent; pure text edit like register-impl-session.register_session,
+    2-space list indentation matching the existing blocks.
+    """
+    if not session_id or session_id == "unknown":
+        return False
+    text = session_yml.read_text(encoding="utf-8") if session_yml.exists() else ""
+    if re.search(rf'^\s*-\s*["\']?{re.escape(session_id)}["\']?\s*$', text, re.MULTILINE):
+        return False
+    item = f'  - "{session_id}"'
+    lines = text.splitlines()
+    key_idx = next(
+        (i for i, ln in enumerate(lines) if re.match(r"^\s*observed_sessions\s*:", ln)),
+        None)
+    if key_idx is None:
+        if lines and lines[-1].strip() == "":
+            lines.pop()
+        lines += ["observed_sessions:", item]
+    else:
+        lines.insert(key_idx + 1, item)
+    session_yml.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def resolve_capture_session(project_dir: Path, session_id: str | None) -> Path | None:
+    """The Session dir a Stop/SubagentStop cost capture belongs to.
+
+    Stop hooks carry no Work Packet, so resolve_dispatch_session can't anchor
+    them; this is the observed-mode counterpart. Order:
+      1. The registered owner (observed_sessions) wins — even closed, so the
+         final post-close Stop still lands on the right dir.
+      2. Otherwise route as today (newest-mtime); if that target is an OPEN
+         observed dir and the id is trustworthy, ADOPT the chat session there,
+         making ownership sticky for every later Stop.
+      3. A CLOSED observed target that never owned this chat session gets
+         nothing: unowned work after close is out of contract (the OBS-002
+         25h-window contamination), and a silent wrong attribution is worse
+         than no capture.
+    Non-observed (pipeline) dirs keep today's behavior untouched.
+    """
+    owner = find_owner_session(project_dir, session_id)
+    if owner is not None:
+        return owner
+    target = find_active_session(Path(project_dir))
+    if target is None:
+        return None
+    yml = target / "session.yml"
+    if read_yaml_scalar(yml, "mode") != "observed":
+        return target
+    if (read_yaml_scalar(yml, "status") or "") in _TERMINAL_STATUS:
+        return None
+    if session_id and session_id != "unknown":
+        try:
+            register_observed_session(yml, session_id)
+        except OSError:
+            pass  # fail-open: adoption is provenance, capture still proceeds
+    return target
 
 
 def tool_input_dict(payload: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -175,8 +366,8 @@ def detect_active_subagent(payload: Mapping[str, Any] | None) -> str | None:
 
 def should_run_audit_manifest_verify(session_dir: Path) -> bool:
     """
-    When hooks run globally (e.g. Cursor stop), skip sessions that clearly never
-    entered Phase 4 — avoids blocking unrelated chats while a FEAT folder exists.
+    Skip sessions that clearly never entered Phase 4 — avoids blocking
+    unrelated chats while a FEAT folder exists.
     Caller must only invoke this when dispatch-manifest.json is present.
     """
     yml = session_dir / "session.yml"

@@ -18,7 +18,7 @@ A `.md` file under `skills/{name}/skill.md` with YAML frontmatter. Runs in the *
 A `.md` file under `agents/{name}.md` with YAML frontmatter. Runs in an **isolated context** (does not see the parent's conversation; cannot spawn its own subagents). Invoked by the parent via the `Agent` tool, returns only a final summary. In ai-squad, the 6 Subagents are `dev`, `code-reviewer`, `logic-reviewer`, `qa`, `blocker-specialist`, `audit-agent` — all live in Phase 4. Rich frontmatter (`name`, `description`, `model`, `tools`, `effort`, `fan_out`).
 
 **Effort** `[platform]`
-Reasoning budget per agent: `low | medium | high | xhigh | max`. Set in a Subagent's frontmatter (Skills inherit from the human's session). `xhigh` is Opus 4.7 only. ai-squad calibration: `code-reviewer` / `qa` = sonnet + medium; `dev` = sonnet + high; `logic-reviewer` = **opus** + high; `blocker-specialist` = opus + xhigh; `audit-agent` = haiku + medium (mechanical reconciliation, low quota); the 4 Skills inherit. Override per dispatch via Work Packet's `effort` field. Full reasoning in [`shared/concepts/effort.md`](concepts/effort.md).
+Reasoning budget per agent: `low | medium | high | xhigh | max`. Set in a Subagent's frontmatter (Skills inherit from the human's session). `xhigh` is Opus 4.8 only. ai-squad calibration: `code-reviewer` / `qa` = sonnet + medium; `dev` = sonnet + high; `logic-reviewer` = **opus** + high; `blocker-specialist` = opus + xhigh; `audit-agent` = haiku + medium (mechanical reconciliation, low quota); the 4 Skills inherit. Override per dispatch via Work Packet's `effort` field. Full reasoning in [`shared/concepts/effort.md`](concepts/effort.md).
 
 ---
 

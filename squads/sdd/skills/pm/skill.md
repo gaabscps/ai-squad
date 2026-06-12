@@ -1,6 +1,6 @@
 ---
 name: pm
-description: Autonomous Product Manager entry point for the SDD pipeline. Runs all four phases (Specify → Plan → Tasks → Implementation) end-to-end, replacing every human approval gate with its own judgment and surfacing to the human only on three escalation triggers. Use when running `/pm FEAT-NNN` to drive a Session without human-in-the-loop. Recommended model: Opus 4.7, effort `high`.
+description: Autonomous Product Manager entry point for the SDD pipeline. Runs all four phases (Specify → Plan → Tasks → Implementation) end-to-end, replacing every human approval gate with its own judgment and surfacing to the human only on three escalation triggers. Use when running `/pm FEAT-NNN` to drive a Session without human-in-the-loop. Recommended model: Opus 4.8, effort `high`.
 hooks:
   Stop:
     - matcher: ""

@@ -56,8 +56,12 @@ reports.
 
 ### 4. Close
 When the human declares the work done (or abandoned), set `status: done`
-(or `status: abandoned`) in `session.yml`. The Stop hooks emit the final
-cost-report; `/ship OBS-NNN` cleans up later if wanted.
+(or `status: abandoned`) AND `closed_at: <now, UTC ISO-8601>` (real clock via
+Bash, like created_at) in `session.yml`. `closed_at` is load-bearing: it is the
+window's end bound — the cost capture brackets every snapshot to
+created_at → closed_at, so a chat session that later moves on to another
+contract never leaks its spend back into this one. The Stop hooks emit the
+final cost-report; `/ship OBS-NNN` cleans up later if wanted.
 
 ## Optional governance (à la carte)
 If the human asks for a write fence, record the agreed file list under
@@ -69,3 +73,8 @@ Without that key, no fence: free sessions stay free.
 - Never block or slow the work to maintain the trail — observability is
   best-effort in-flight, mechanical at the edges.
 - One observed Session per piece of work; resume just works (state on disk).
+- Close a contract before opening the next one in the same repo. Each chat
+  session is adopted by ONE open contract (recorded under `observed_sessions:`
+  by the hooks) and its cost is window-sliced to that contract's lifetime;
+  leaving several contracts open makes the adoption of NEW chat sessions
+  ambiguous (newest contract wins).

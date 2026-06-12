@@ -230,6 +230,7 @@ The chronicler writes `delivery-facts.json`, `delivery-report.json`, and `delive
   PY
   ```
   Then emit the report: `python3 .claude/hooks/cost-report.py <spec_id>` (writes `cost-report.json`, prints the planning/orchestration/implementation table). Include the one-line total in the handoff; if the audit raised `cost_capture_incomplete`, OR the report's `complete` is false, OR the report's `scoping_suspect` is true, flag the gap explicitly and do NOT present the total (or the implementation figure) as final — when `scoping_suspect` is true the implementation cost was excluded wholesale and is untrustworthy.
+- **Source-ownership caveat (non-blocking).** If the audit's Output Packet carries a `source_ownership_unverified` finding (baseline absent — only on features predating the baseline hook), surface it as a caveat in the handoff: list the unattributed paths from the finding's `note` and advise a `git diff` glance. This does NOT change the handoff shape — the pipeline still completes with the success/mixed handoff; it only flags that source ownership could not be mechanically verified for those paths.
 - Emit the handoff message (shapes + skeletons in [`handoff.md`](handoff.md)); also save to `.agent-session/<spec_id>/handoff.md`.
 
 ## Output

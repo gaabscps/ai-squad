@@ -18,11 +18,15 @@ if str(_HOOKS_DIR) not in sys.path:
 
 import pricing  # noqa: E402
 import transcript_cost  # noqa: E402
-from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
+from hook_runtime import (  # noqa: E402
+    read_yaml_scalar,
+    resolve_capture_session,
+    resolve_project_root,
+)
 
 
 def capture(session_id, transcript_path, session_dir, pipeline_started_at, prices,
-            implement_started_at=None):
+            implement_started_at=None, window_since=None, window_until=None):
     try:
         session_dir = Path(session_dir)
         out_dir = session_dir / "costs"
@@ -40,13 +44,20 @@ def capture(session_id, transcript_path, session_dir, pipeline_started_at, price
             planning = transcript_cost.extract_transcript_cost(transcript_path, prices, until=pipeline_started_at)
             orchestration = transcript_cost.extract_transcript_cost(transcript_path, prices, since=pipeline_started_at)
         else:
-            planning = transcript_cost.extract_transcript_cost(transcript_path, prices)
+            # Observed (free) sessions have no internal cut marks; the window
+            # brackets the snapshot to the contract's lifetime (created_at →
+            # closed_at) so a chat session crossing several OBS contracts is
+            # never double-counted.
+            planning = transcript_cost.extract_transcript_cost(
+                transcript_path, prices, since=window_since, until=window_until)
             orchestration = {"total_cost_usd": 0.0, "by_model": {}, "unpriced_models": [], "error": None}
         # transcript_path is the pointer the post-hoc analyst (chronicler in
         # observed mode) uses to find the recording — persist it.
         payload = {"session_id": session_id, "scope": "session",
                    "transcript_path": str(transcript_path),
                    "planning": planning, "orchestration": orchestration}
+        if window_since or window_until:
+            payload["window"] = {"since": window_since, "until": window_until}
         if implementation is not None:
             payload["implementation"] = implementation
         out_file = out_dir / f"session-{session_id}.json"
@@ -92,6 +103,17 @@ def _read_implement_start(session_dir: Path):
     return None
 
 
+def _read_observed_window(session_dir: Path):
+    """(created_at, closed_at) bounds for an observed Session dir, else None.
+    The window is what keeps a chat session that outlives this contract from
+    leaking its earlier/later spend into this dir's snapshot."""
+    session_dir = Path(session_dir)
+    yml = session_dir / "session.yml"
+    if read_yaml_scalar(yml, "mode") != "observed":
+        return None
+    return (read_yaml_scalar(yml, "created_at"), read_yaml_scalar(yml, "closed_at"))
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -102,12 +124,17 @@ def main():
     if not transcript_path:
         return 0
     repo_root = Path(resolve_project_root(payload))
-    session_dir = find_active_session(repo_root)
+    # Ownership-aware routing (observed mode): the registered owner wins over
+    # the mtime-newest sibling, an open observed target adopts this chat
+    # session, and a closed unowned observed target gets nothing.
+    session_dir = resolve_capture_session(repo_root, session_id)
     if session_dir is None:
         return 0
+    window = _read_observed_window(session_dir) or (None, None)
     return capture(session_id, transcript_path, session_dir,
                    _read_pipeline_start(session_dir), pricing.load_prices(),
-                   implement_started_at=_read_implement_start(session_dir))
+                   implement_started_at=_read_implement_start(session_dir),
+                   window_since=window[0], window_until=window[1])
 
 
 if __name__ == "__main__":

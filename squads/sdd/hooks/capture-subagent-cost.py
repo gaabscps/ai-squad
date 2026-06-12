@@ -17,7 +17,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 import pricing  # noqa: E402
 import transcript_cost  # noqa: E402
-from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
+from hook_runtime import resolve_capture_session, resolve_project_root  # noqa: E402
 
 
 def _slugify_project(repo_root) -> str:
@@ -78,7 +78,10 @@ def main():
     agent_id = payload.get("agent_id") or "unknown"
     transcript_path = payload.get("agent_transcript_path")
     repo_root = resolve_project_root(payload)
-    session_dir = find_active_session(Path(repo_root))
+    # Route by the parent chat session's registered owner (observed mode) —
+    # the OBS-005 case: an agent whose parent belongs to another contract must
+    # land on that contract, not on the mtime-newest sibling.
+    session_dir = resolve_capture_session(Path(repo_root), payload.get("session_id"))
     if session_dir is None:
         return 0
     # Fallback: if payload lacks the path, glob the newest subagent transcript
