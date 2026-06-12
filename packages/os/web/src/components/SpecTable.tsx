@@ -59,6 +59,8 @@ export function SpecTable({
     { key: "activity", label: "atividade" },
   ];
 
+  const now = Date.now();
+
   return (
     <table className="spec-table">
       <thead>
@@ -87,7 +89,7 @@ export function SpecTable({
               <span className={`status status-${it.spec.status}`}>
                 {STATUS_LABEL[it.spec.status]}
               </span>
-              {isDormant(it.spec, Date.now()) && (
+              {isDormant(it.spec, now) && (
                 <span className="status-dormant" title={`sem atividade há mais de ${DORMANT_AFTER_DAYS} dias`}>
                   dormindo
                 </span>

@@ -44,7 +44,7 @@ export function Board({
     .filter((sp) => filter === null || sp.projectId === filter)
     .filter((sp) => matchesQuery(sp, query));
 
-  // Separação arquivo × ativo em render-time: depende do relógio, não do disco.
+  // Separação arquivo/dormência × ativo em render-time: depende do relógio, não do disco.
   // 'shown' é o que o componente de listagem recebe; 'selectedItem' ainda usa
   // 'all' pra o drawer poder abrir qualquer spec (inclusive arquivadas).
   // Sem timer de propósito: o próximo render (snapshot do WS ou interação) já

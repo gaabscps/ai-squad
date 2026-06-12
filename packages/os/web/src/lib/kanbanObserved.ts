@@ -101,10 +101,12 @@ export const DORMANT_AFTER_DAYS = 3;
  * Sessão dormente = não-terminal, parada há mais que o limite. Sai das colunas
  * ativas por gravidade (ninguém fecha sessão por disciplina); volta sozinha se
  * houver atividade nova. Terminais não dormem — isArchived cuida deles.
+ * Estados de atenção também não dormem — o que espera o humano fica visível.
  * Sem lastActivityAt → conservador, NÃO dorme. Limite exclusivo, como isArchived.
  */
 export function isDormant(spec: Spec, now: number, dormantAfterDays: number = DORMANT_AFTER_DAYS): boolean {
   if (spec.status === "done" || spec.status === "abandoned") return false;
+  if (columnForSpec(spec) === "attention") return false; // dívida com humano não se esconde
   if (spec.lastActivityAt == null) return false;
   const ageDays = (now - Date.parse(spec.lastActivityAt)) / DAY_MS;
   return ageDays > dormantAfterDays;

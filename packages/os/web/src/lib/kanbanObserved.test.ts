@@ -154,6 +154,10 @@ describe("isDormant (observed)", () => {
   it("sem lastActivityAt: conservador, não dorme", () => {
     expect(isDormant(makeSpec({ status: "running", lastActivityAt: null }), NOW)).toBe(false);
   });
+  it("estados de atenção nunca dormem — dívida com humano fica visível", () => {
+    expect(isDormant(makeSpec({ status: "needs_attention", lastActivityAt: daysAgo(30) }), NOW)).toBe(false);
+    expect(isDormant(makeSpec({ status: "blocked", lastActivityAt: daysAgo(30) }), NOW)).toBe(false);
+  });
 });
 
 // ─── bucketByColumn ────────────────────────────────────────────────────────────
