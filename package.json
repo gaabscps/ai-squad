@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "os": "npm run dev -w @ai-squad/os",
     "test": "npm test --workspaces --if-present"
   }
 }
