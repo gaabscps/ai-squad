@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SpecWithProject } from "../lib/kanbanObserved";
+import { isDormant, DORMANT_AFTER_DAYS } from "../lib/kanbanObserved";
 import { fmtTokens, fmtUsd, fmtRelativeTime } from "../format";
 import { SpecJobIndicator } from "./SpecJobIndicator";
 import { STATUS_LABEL } from "../lib/statusLabels";
@@ -86,6 +87,11 @@ export function SpecTable({
               <span className={`status status-${it.spec.status}`}>
                 {STATUS_LABEL[it.spec.status]}
               </span>
+              {isDormant(it.spec, Date.now()) && (
+                <span className="status-dormant" title={`sem atividade há mais de ${DORMANT_AFTER_DAYS} dias`}>
+                  dormindo
+                </span>
+              )}
             </td>
             <td>{it.spec.observed ? "observado" : it.spec.phase}</td>
             <td className="mono">

@@ -3,6 +3,8 @@ import {
   columnForSpec,
   attentionReason,
   isArchived,
+  isDormant,
+  DORMANT_AFTER_DAYS,
   bucketByColumn,
   COLUMN_DEFS,
 } from "./kanbanObserved";
@@ -127,6 +129,30 @@ describe("isArchived (observed)", () => {
     // NOW=2026-06-10, limit=9 dias → 2026-06-01 = exatamente 9 dias → ainda aparece
     const spec = makeSpec({ status: "done", lastActivityAt: "2026-06-01T00:00:00Z" });
     expect(isArchived(spec, NOW, 9)).toBe(false);
+  });
+});
+
+// ─── isDormant ─────────────────────────────────────────────────────────────────
+
+describe("isDormant (observed)", () => {
+  const NOW = Date.parse("2026-06-12T12:00:00Z");
+  const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
+
+  it("running parado há mais de 3 dias dorme", () => {
+    expect(isDormant(makeSpec({ status: "running", lastActivityAt: daysAgo(4) }), NOW)).toBe(true);
+  });
+  it("running ativo recentemente não dorme", () => {
+    expect(isDormant(makeSpec({ status: "running", lastActivityAt: daysAgo(1) }), NOW)).toBe(false);
+  });
+  it("limite exclusivo: exatamente N dias ainda não dorme", () => {
+    expect(isDormant(makeSpec({ status: "running", lastActivityAt: daysAgo(DORMANT_AFTER_DAYS) }), NOW)).toBe(false);
+  });
+  it("terminais nunca dormem (regra de arquivo cuida deles)", () => {
+    expect(isDormant(makeSpec({ status: "done", lastActivityAt: daysAgo(30) }), NOW)).toBe(false);
+    expect(isDormant(makeSpec({ status: "abandoned", lastActivityAt: daysAgo(30) }), NOW)).toBe(false);
+  });
+  it("sem lastActivityAt: conservador, não dorme", () => {
+    expect(isDormant(makeSpec({ status: "running", lastActivityAt: null }), NOW)).toBe(false);
   });
 });
 

@@ -140,6 +140,7 @@ a:hover { text-decoration: underline; }
 .status-needs_attention { color: var(--needs-attention); background: color-mix(in srgb, var(--needs-attention) 14%, transparent); }
 .status-abandoned { color: var(--abandoned); background: color-mix(in srgb, var(--abandoned) 16%, transparent); }
 .status-unreadable { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
+.status-dormant { margin-left: 6px; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-soft); border: 1px solid var(--border); color: var(--text-mute); }
 .flag-audit { font-size: 11px; font-weight: 600; color: var(--audit); background: color-mix(in srgb, var(--audit) 16%, transparent); padding: 2px 8px; border-radius: 999px; }
 
 /* ---- PhaseBar (reuso) ---- */

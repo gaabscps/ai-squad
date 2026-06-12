@@ -120,6 +120,42 @@ describe("Board", () => {
   });
 });
 
+describe("Board — dormência", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-12T12:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // now = 2026-06-12T12:00:00Z; DORMANT_AFTER_DAYS = 3
+  // runningDormente: lastActivityAt 10 dias atrás → dorme
+  // runningAtivo:   lastActivityAt 1 dia atrás → não dorme
+  const runningDormente = () =>
+    makeSpec({ id: "FEAT-SLEEP", status: "running", lastActivityAt: "2026-06-02T12:00:00Z" });
+  const runningAtivo = () =>
+    makeSpec({ id: "FEAT-AWAKE", status: "running", lastActivityAt: "2026-06-11T12:00:00Z" });
+
+  it("kanban esconde sessão dormente", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [runningDormente(), runningAtivo()] }]);
+    expect(screen.queryByText("FEAT-SLEEP")).toBeNull();
+    expect(screen.getByText("FEAT-AWAKE")).toBeInTheDocument();
+  });
+
+  it("aba Arquivadas mostra sessão dormente com chip 'dormindo'", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [runningDormente(), runningAtivo()] }]);
+    fireEvent.click(screen.getByRole("button", { name: /arquivadas/i }));
+    expect(screen.getByText("FEAT-SLEEP")).toBeInTheDocument();
+    expect(screen.queryByText("FEAT-AWAKE")).toBeNull();
+    expect(screen.getByText("dormindo")).toBeInTheDocument();
+  });
+
+  it("aba Arquivadas vazia mostra empty state atualizado", () => {
+    renderBoard([{ id: "a", name: "proj-a", specs: [runningAtivo()] }]);
+    fireEvent.click(screen.getByRole("button", { name: /arquivadas/i }));
+    expect(screen.getByText(/nenhuma feature arquivada ou dormente/i)).toBeInTheDocument();
+  });
+});
+
 describe("Board — arquivamento", () => {
   beforeEach(() => {
     vi.useFakeTimers();

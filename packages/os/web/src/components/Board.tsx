@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useProjects } from "../state/projects";
-import { flattenSpecs, matchesQuery, isArchived, type SpecWithProject } from "../lib/kanbanObserved";
+import { flattenSpecs, matchesQuery, isArchived, isDormant, type SpecWithProject } from "../lib/kanbanObserved";
 import { TopBar, type ViewMode } from "./TopBar";
 import { ProjectFilter } from "./ProjectFilter";
 import { KanbanBoard } from "./KanbanBoard";
@@ -53,8 +53,8 @@ export function Board({
   const now = Date.now();
   const shown = visible.filter((sp) =>
     view === "archived"
-      ? isArchived(sp.spec, now, archiveAfterDays)
-      : !isArchived(sp.spec, now, archiveAfterDays),
+      ? isArchived(sp.spec, now, archiveAfterDays) || isDormant(sp.spec, now)
+      : !isArchived(sp.spec, now, archiveAfterDays) && !isDormant(sp.spec, now),
   );
 
   const selectedItem: SpecWithProject | null =
@@ -107,7 +107,7 @@ export function Board({
         {view === "kanban" ? (
           <KanbanBoard items={shown} onSelect={handleSelect} />
         ) : view === "archived" && shown.length === 0 ? (
-          <p className="empty-archived">Nenhuma feature arquivada.</p>
+          <p className="empty-archived">Nenhuma feature arquivada ou dormente.</p>
         ) : (
           <SpecTable items={shown} onSelect={handleSelect} />
         )}

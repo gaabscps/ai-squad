@@ -66,7 +66,7 @@ export function makeSpec(over: Partial<Spec> = {}): Spec {
     status: "running",
     tasks: [],
     health: { pendingHuman: 0, escalationRate: 0, auditException: false },
-    lastActivityAt: "2026-05-20T10:00:00Z",
+    lastActivityAt: "2026-06-12T10:00:00Z",
     timeline: [],
     cost: makeCost(),
     deliveryReport: null,

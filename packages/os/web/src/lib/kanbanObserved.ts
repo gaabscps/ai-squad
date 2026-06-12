@@ -93,6 +93,23 @@ export function isArchived(spec: Spec, now: number, archiveAfterDays: number): b
   return ageDays > archiveAfterDays;
 }
 
+// ─── Dormência ────────────────────────────────────────────────────────────────
+
+export const DORMANT_AFTER_DAYS = 3;
+
+/**
+ * Sessão dormente = não-terminal, parada há mais que o limite. Sai das colunas
+ * ativas por gravidade (ninguém fecha sessão por disciplina); volta sozinha se
+ * houver atividade nova. Terminais não dormem — isArchived cuida deles.
+ * Sem lastActivityAt → conservador, NÃO dorme. Limite exclusivo, como isArchived.
+ */
+export function isDormant(spec: Spec, now: number, dormantAfterDays: number = DORMANT_AFTER_DAYS): boolean {
+  if (spec.status === "done" || spec.status === "abandoned") return false;
+  if (spec.lastActivityAt == null) return false;
+  const ageDays = (now - Date.parse(spec.lastActivityAt)) / DAY_MS;
+  return ageDays > dormantAfterDays;
+}
+
 // ─── Agrupamento por coluna ───────────────────────────────────────────────────
 
 /**
