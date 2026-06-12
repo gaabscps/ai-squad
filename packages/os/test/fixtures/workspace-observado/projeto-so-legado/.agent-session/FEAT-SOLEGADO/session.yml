@@ -1,0 +1,6 @@
+task_id: "FEAT-SOLEGADO"
+squad: "sdd"
+feature_name: "projeto com apenas sessoes legadas"
+current_phase: "done"
+last_activity_at: "2026-05-15T10:00:00Z"
+planned_phases: ["specify"]
