@@ -52,7 +52,13 @@ export function KanbanCard({
     // Modo observado: tokens são a métrica primária; USD pode ser nulo por design.
     if (isObserved) {
       if (totalCostUsd !== null) {
-        return <>{fmtUsd(totalCostUsd)}</>;
+        // source=partial significa contrato ainda aberto (valores acumulando); indica ao usuário.
+        return (
+          <>
+            {fmtUsd(totalCostUsd)}
+            {source === "partial" && <span className="cost-partial"> (em coleta)</span>}
+          </>
+        );
       }
       if (source === "cost_report") {
         // Report confiável mas sem preço — exibe total de tokens + aviso muted

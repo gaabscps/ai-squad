@@ -39,18 +39,32 @@ export function columnForSpec(spec: Spec): ColumnKey {
 
 // ─── Motivo de atenção ─────────────────────────────────────────────────────────
 
-/** Motivo de atenção; kind restrito à union literal para typecheck exaustivo nos consumers. */
+// kind usa string (não union literal fechada) para permitir passthrough de attentionKind
+// desconhecidos sem quebrar o TypeScript — kinds conhecidos são os 5 listados, mas
+// versões futuras do coletor podem emitir novos valores que o card exibe genericamente.
 export interface AttentionReason {
-  kind: "input" | "unreadable" | "blocked" | "escalated" | "paused";
+  kind: string; // known: "input" | "unreadable" | "blocked" | "escalated" | "paused"
   label: string;
 }
+
+// Rótulos para os kinds de atenção conhecidos; kinds desconhecidos caem no
+// genérico "aguardando você" para compatibilidade futura sem quebrar a UI.
+const ATTENTION_KIND_LABEL: Record<string, string> = {
+  input: "aguardando sua resposta",
+};
 
 /**
  * Motivo de a spec estar em "Precisa de você"; null se não estiver.
  * Kinds novos: input → aguarda resposta do usuário; unreadable → session.yml ilegível.
+ * Para needs_attention, lê spec.observed.attentionKind (fallback "input") e
+ * mapeia para o label correspondente; kinds desconhecidos → "aguardando você".
  */
 export function attentionReason(spec: Spec): AttentionReason | null {
-  if (spec.status === "needs_attention") return { kind: "input",      label: "aguardando sua resposta" };
+  if (spec.status === "needs_attention") {
+    const rawKind = spec.observed?.attentionKind ?? "input";
+    const label = ATTENTION_KIND_LABEL[rawKind] ?? "aguardando você";
+    return { kind: rawKind, label };
+  }
   if (spec.status === "unreadable")      return { kind: "unreadable", label: "session.yml ilegível"    };
   // Mantém compatibilidade de STATUS com statuses SDD que também caem em attention (health.auditException não é consultado aqui)
   if (spec.status === "blocked") {

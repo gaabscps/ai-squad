@@ -231,4 +231,24 @@ describe("KanbanCard — modo observado", () => {
     render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
     expect(screen.getByText(/sem custo ainda/i)).toBeInTheDocument();
   });
+
+  it("custo: observed source=partial + totalCostUsd não-nulo → exibe USD + '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "partial", totalCostUsd: 11.89 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/11[.,]89/)).toBeInTheDocument();
+    expect(screen.getByText(/em coleta/i)).toBeInTheDocument();
+  });
+
+  it("custo: observed source=cost_report + totalCostUsd não-nulo → SEM sufixo '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-001",
+      cost: makeCost({ source: "cost_report", totalCostUsd: 22.50 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={vi.fn()} />);
+    expect(screen.getByText(/22[.,]50/)).toBeInTheDocument();
+    expect(screen.queryByText(/em coleta/i)).not.toBeInTheDocument();
+  });
 });

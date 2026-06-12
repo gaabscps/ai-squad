@@ -76,7 +76,7 @@ export interface CostRollup {
 }
 
 // Flags de inconsistência de ciclo de vida detectadas em sessões observadas.
-// Visíveis no card (badge de drift) — o card nunca some, mas mostra o problema.
+// Exibidas no drawer (badge de drift) — o card nunca some, mas o drawer detalha o problema.
 export type ObservedDriftFlag = "closed_with_open_status" | "unknown_status" | "unreadable_yaml";
 
 // Item de decisão registrado pelo modelo durante a sessão (best-effort, sem required).

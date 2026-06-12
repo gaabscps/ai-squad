@@ -89,9 +89,15 @@ export function SpecTable({
             </td>
             <td>{it.spec.observed ? "observado" : it.spec.phase}</td>
             <td className="mono">
-              {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
-              {it.spec.cost.source === "partial" && (
-                <span className="cost-preliminary"> · prelim.</span>
+              {it.spec.cost.totalCostUsd === null && it.spec.cost.source === "cost_report" ? (
+                <span className="cost-unpriced">$ indisponível</span>
+              ) : (
+                <>
+                  {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
+                  {it.spec.cost.source === "partial" && (
+                    <span className="cost-preliminary"> · (parcial)</span>
+                  )}
+                </>
               )}
             </td>
             <td>{fmtRelativeTime(it.spec.lastActivityAt)}</td>

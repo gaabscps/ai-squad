@@ -7,7 +7,7 @@ import {
   COLUMN_DEFS,
 } from "./kanbanObserved";
 import { flattenSpecs } from "./kanbanObserved";
-import { makeSpec, makeProject, makeObservedSpec, makeTask } from "../test-utils";
+import { makeSpec, makeProject, makeObservedSpec, makeTask, makeObservedMeta } from "../test-utils";
 
 // ─── columnForSpec ─────────────────────────────────────────────────────────────
 
@@ -55,6 +55,36 @@ describe("attentionReason (observed)", () => {
   });
   it("running → null (sem motivo de atenção)", () => {
     expect(attentionReason(makeSpec({ status: "running" }))).toBeNull();
+  });
+
+  it("needs_attention com attentionKind='input' → kind=input, label 'aguardando sua resposta'", () => {
+    const spec = makeObservedSpec({
+      status: "needs_attention",
+      observed: makeObservedMeta({ attentionKind: "input" }),
+    });
+    const r = attentionReason(spec);
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe("input");
+    expect(r!.label).toBe("aguardando sua resposta");
+  });
+
+  it("needs_attention com attentionKind hipotético 'review' → kind=review, label genérico 'aguardando você'", () => {
+    const spec = makeObservedSpec({
+      status: "needs_attention",
+      observed: makeObservedMeta({ attentionKind: "review" }),
+    });
+    const r = attentionReason(spec);
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe("review");
+    expect(r!.label).toBe("aguardando você");
+  });
+
+  it("needs_attention sem observed (spec SDD legada) → fallback kind=input", () => {
+    const spec = makeSpec({ status: "needs_attention" });
+    const r = attentionReason(spec);
+    expect(r).not.toBeNull();
+    expect(r!.kind).toBe("input");
+    expect(r!.label).toBe("aguardando sua resposta");
   });
 
   it("blocked → kind=blocked, label usa o id da task bloqueada", () => {

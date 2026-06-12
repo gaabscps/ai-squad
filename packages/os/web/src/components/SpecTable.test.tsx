@@ -75,4 +75,39 @@ describe("SpecTable", () => {
     expect(screen.getByText("precisa de você")).toBeInTheDocument();
     expect(screen.queryByText("needs_attention")).not.toBeInTheDocument();
   });
+
+  it("custo: source=cost_report + totalCostUsd null → exibe '$ indisponível' muted (não '—')", () => {
+    const obsItems = flattenSpecs(
+      [makeProject({
+        name: "p",
+        specs: [makeObservedSpec({
+          id: "OBS-002",
+          cost: makeCost({ source: "cost_report", totalCostUsd: null }),
+        })],
+      })],
+      false,
+    );
+    render(<SpecTable items={obsItems} onSelect={vi.fn()} />);
+    const hint = screen.getByText(/\$ indisponível/i);
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveClass("cost-unpriced");
+    // não deve exibir o traço solitário como valor de custo
+    expect(hint.textContent).not.toBe("—");
+  });
+
+  it("custo: source=partial com totalCostUsd disponível → exibe '(parcial)'", () => {
+    const partialItems = flattenSpecs(
+      [makeProject({
+        name: "p",
+        specs: [makeSpec({
+          id: "FEAT-P",
+          cost: makeCost({ source: "partial", totalCostUsd: 3.5 }),
+        })],
+      })],
+      false,
+    );
+    render(<SpecTable items={partialItems} onSelect={vi.fn()} />);
+    expect(screen.getByText(/parcial/i)).toBeInTheDocument();
+    expect(screen.getByText(/3[.,]50/)).toBeInTheDocument();
+  });
 });
