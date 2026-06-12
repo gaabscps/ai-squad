@@ -1,0 +1,11 @@
+schema_version: 1
+session_id: "OBS-012"
+mode: observed
+intent: "Revisar permissões de usuário"
+status: needs_attention
+output_locale: pt-BR
+created_at: "2026-06-10T12:00:00Z"
+attention:
+  kind: input
+decisions: []
+evidence: []

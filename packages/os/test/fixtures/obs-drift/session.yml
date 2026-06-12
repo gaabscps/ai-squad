@@ -1,0 +1,10 @@
+schema_version: 1
+session_id: "OBS-014"
+mode: observed
+intent: "Adicionar dark mode ao painel"
+status: in_progress
+output_locale: pt-BR
+created_at: "2026-06-08T09:00:00Z"
+closed_at: "2026-06-08T17:00:00Z"
+decisions: []
+evidence: []

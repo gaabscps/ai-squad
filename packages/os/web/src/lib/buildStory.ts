@@ -12,6 +12,9 @@ const STATUS_LABEL: Record<SpecStatus, string> = {
   blocked: "bloqueada",
   done: "concluída",
   escalated: "escalada",
+  needs_attention: "precisa de você",
+  abandoned: "abandonado",
+  unreadable: "ilegível",
 };
 
 function dominantPhase(byPhase: CostPhaseBreakdown): string | null {

@@ -6,6 +6,9 @@ const STATUS_LABEL: Record<Spec["status"], string> = {
   blocked: "bloqueado",
   done: "concluído",
   escalated: "escalado",
+  needs_attention: "precisa de você",
+  abandoned: "abandonado",
+  unreadable: "ilegível",
 };
 
 /**
