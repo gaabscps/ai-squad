@@ -933,6 +933,28 @@ describe("DetailDrawer — modo observado: faixa obs-facts", () => {
     expect(within(facts).queryByText("preliminar")).toBeNull();
   });
 
+  it("obs-facts: observado TERMINAL (done) + source partial → 'custo não capturado', NÃO 'preliminar'", () => {
+    const spec = makeObservedSpec({
+      status: "done",
+      cost: makeCost({ totalCostUsd: 3.0, totalTokens: 1000, source: "partial" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText("custo não capturado")).toBeInTheDocument();
+    expect(within(facts).queryByText("preliminar")).toBeNull();
+  });
+
+  it("obs-facts: observado ATIVO (running) + source partial → 'preliminar', NÃO 'custo não capturado'", () => {
+    const spec = makeObservedSpec({
+      status: "running",
+      cost: makeCost({ totalCostUsd: 3.0, totalTokens: 1000, source: "partial" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText("preliminar")).toBeInTheDocument();
+    expect(within(facts).queryByText("custo não capturado")).toBeNull();
+  });
+
   it("faixa com reportPath → link 'report.html' aparece UMA vez dentro da faixa", () => {
     const spec = makeObservedSpec({
       cost: makeCost({ reportPath: "/a/.agent-session/OBS-001/report.html", totalCostUsd: 1.0 }),

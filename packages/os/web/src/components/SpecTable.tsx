@@ -102,9 +102,12 @@ export function SpecTable({
               ) : (
                 <>
                   {fmtUsd(it.spec.cost.totalCostUsd)} · {fmtTokens(it.spec.cost.totalTokens)}
-                  {it.spec.cost.source === "partial" && (
-                    <span className="cost-preliminary"> · (parcial)</span>
-                  )}
+                  {it.spec.cost.source === "partial" && (() => {
+                    const rowTerminal = it.spec.status === "done" || it.spec.status === "abandoned";
+                    return rowTerminal
+                      ? <span className="cost-uncaptured"> · custo não capturado</span>
+                      : <span className="cost-preliminary"> · (em coleta)</span>;
+                  })()}
                 </>
               )}
             </td>

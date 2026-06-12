@@ -95,19 +95,36 @@ describe("SpecTable", () => {
     expect(hint.textContent).not.toBe("—");
   });
 
-  it("custo: source=partial com totalCostUsd disponível → exibe '(parcial)'", () => {
+  it("custo: source=partial com totalCostUsd disponível + status running → exibe '(em coleta)'", () => {
     const partialItems = flattenSpecs(
       [makeProject({
         name: "p",
         specs: [makeSpec({
           id: "FEAT-P",
+          status: "running",
           cost: makeCost({ source: "partial", totalCostUsd: 3.5 }),
         })],
       })],
       false,
     );
     render(<SpecTable items={partialItems} onSelect={vi.fn()} />);
-    expect(screen.getByText(/parcial/i)).toBeInTheDocument();
+    expect(screen.getByText(/em coleta/i)).toBeInTheDocument();
     expect(screen.getByText(/3[.,]50/)).toBeInTheDocument();
+  });
+
+  it("custo: source=partial + status done → exibe 'custo não capturado'", () => {
+    const doneItems = flattenSpecs(
+      [makeProject({
+        name: "p",
+        specs: [makeSpec({
+          id: "FEAT-D",
+          status: "done",
+          cost: makeCost({ source: "partial", totalCostUsd: 7.0 }),
+        })],
+      })],
+      false,
+    );
+    render(<SpecTable items={doneItems} onSelect={vi.fn()} />);
+    expect(screen.getByText(/custo não capturado/i)).toBeInTheDocument();
   });
 });

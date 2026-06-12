@@ -349,6 +349,17 @@ describe("buildStory — manchete narrada (modo observado com contagens)", () =>
       cost: { ...emptyCost, source: "partial", totalCostUsd: 2.0, totalTokens: 100 } });
     expect(buildStory(spec, NOW)).toContain("custo não capturado");
   });
+
+  it("observado com source=cost_report + totalCostUsd null: anexa '$ indisponível'", () => {
+    const spec = makeSpec({
+      status: "running",
+      observed: obsBase,
+      cost: { ...emptyCost, source: "cost_report", totalCostUsd: null, totalTokens: 4_000_000 },
+    });
+    const story = buildStory(spec, NOW);
+    expect(story).toContain("$ indisponível");
+    expect(story).toMatch(/4M|4\.0M/);
+  });
 });
 
 describe("buildStory — modo observado", () => {

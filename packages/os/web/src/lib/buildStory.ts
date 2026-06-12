@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<SpecStatus, string> = {
   done: "concluída",
   escalated: "escalada",
   needs_attention: "precisa de você",
-  abandoned: "abandonado",
+  abandoned: "abandonada",
   unreadable: "ilegível",
 };
 
@@ -67,7 +67,7 @@ export function buildStory(spec: Spec, now: number = Date.now()): string {
         parts.push("custo não capturado");
       }
     } else if (cost.source === "cost_report") {
-      parts.push(`${fmtTokens(cost.totalTokens)} tokens`);
+      parts.push(`${fmtTokens(cost.totalTokens)} tokens · $ indisponível`);
     } else if (cost.totalTokens > 0) {
       parts.push(terminal
         ? `${fmtTokens(cost.totalTokens)} tokens · custo não capturado`

@@ -37,6 +37,7 @@ export function DetailDrawer({
   const t = spec.cost.tokens;
   const story = buildStory(spec);
   const obs = spec.observed;
+  const terminal = spec.status === "done" || spec.status === "abandoned";
 
   return (
     <div className="drawer-overlay" onClick={onClose}>
@@ -91,11 +92,11 @@ export function DetailDrawer({
                     ? fmtUsd(spec.cost.totalCostUsd)
                     : `${fmtTokens(spec.cost.totalTokens)} tokens`}
                 </span>
-                {spec.cost.source === "partial" && (
-                  <span className="cost-preliminary" title="soma crua dos costs/*.json — cost-report.json ainda não publicado">
-                    preliminar
-                  </span>
-                )}
+                {spec.cost.source === "partial" && (terminal ? (
+                  <span className="cost-uncaptured" title="sessão encerrada sem cost-report.json publicado — valor é a soma dos snapshots">custo não capturado</span>
+                ) : (
+                  <span className="cost-preliminary" title="soma crua dos costs/*.json — cost-report.json ainda não publicado">preliminar</span>
+                ))}
               </div>
               {spec.cost.totalCostUsd !== null && (
                 <div className="obs-fact">
