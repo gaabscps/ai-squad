@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-BORDA",
+  "actual_dispatches": [
+    {
+      "dispatch_id": "d-T-001-dev-l1",
+      "task_id": "T-001",
+      "role": "dev",
+      "status": "done",
+      "loop": 1,
+      "output_packet_ref": "outputs/packet-corrompido.json",
+      "usage": {
+        "total_tokens": 9999,
+        "tool_uses": 8,
+        "duration_ms": 50000,
+        "model": "claude-sonnet-4-6"
+      }
+    }
+  ]
+}

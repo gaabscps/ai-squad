@@ -1,0 +1,15 @@
+{
+  "agent_id": "aaa",
+  "scope": "implementation",
+  "total_cost_usd": 0.3,
+  "by_model": {
+    "claude-opus-4-8": {
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "cache_read_input_tokens": 1000,
+      "cache_creation_input_tokens": 200,
+      "cost_usd": 0.3
+    }
+  },
+  "unpriced_models": []
+}

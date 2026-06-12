@@ -1,0 +1,26 @@
+task_id: "FEAT-099"
+squad: "sdd"
+feature_name: "exemplo concluido"
+current_phase: "done"
+last_activity_at: "2026-05-20T10:00:00Z"
+audit_exception: false
+planned_phases:
+  - "specify"
+  - "plan"
+  - "tasks"
+  - "implementation"
+task_states:
+  T-001:
+    state: "done"
+    loops: 1
+  T-002:
+    state: "done"
+    loops: 2
+escalation_metrics:
+  pending_human_tasks: 0
+  total_tasks: 2
+  escalation_rate: 0
+notes:
+  - kind: pm_init
+    timestamp: "2026-05-20T09:00:00Z"
+    note: "inicio"

@@ -1,0 +1,11 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "dispatch_id": "d-T-001-dev-l1",
+  "role": "dev",
+  "status": "done",
+  "summary": "Fixture usage null.",
+  "evidence": [],
+  "files_changed": [],
+  "findings": [],
+  "usage": null
+}

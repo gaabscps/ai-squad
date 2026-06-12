@@ -1,0 +1,13 @@
+{
+  "agent_id": "x",
+  "total_cost_usd": 0.1,
+  "by_model": {
+    "some-unpriced-model": {
+      "input_tokens": 10,
+      "output_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0
+    }
+  },
+  "unpriced_models": ["some-unpriced-model"]
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aios",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve"],
+      "port": 4717
+    },
+    {
+      "name": "aios-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve"],
+      "port": 4732,
+      "env": { "AIOS_PORT": "4732" }
+    },
+    {
+      "name": "aios-backend-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:server"],
+      "port": 4717
+    },
+    {
+      "name": "aios-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:web"],
+      "port": 5173
+    }
+  ]
+}

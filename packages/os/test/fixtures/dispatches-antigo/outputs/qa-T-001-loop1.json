@@ -1,0 +1,18 @@
+{
+  "spec_id": "FEAT-003",
+  "dispatch_id": "qa-T-001-loop1",
+  "role": "qa",
+  "status": "done",
+  "summary": "Todos os ACs validados.",
+  "evidence": [
+    {
+      "id": "e-001",
+      "kind": "test",
+      "ref": "python3 squads/sdd/hooks/verify-output-packet.py --check-only fixture.json",
+      "exit": 0,
+      "note": "Exit 0 confirmado"
+    }
+  ],
+  "findings": [],
+  "usage": null
+}

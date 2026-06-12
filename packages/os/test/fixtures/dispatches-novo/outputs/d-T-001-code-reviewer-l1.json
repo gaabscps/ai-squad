@@ -1,0 +1,23 @@
+{
+  "spec_id": "FEAT-004",
+  "dispatch_id": "d-T-001-code-reviewer-l1",
+  "role": "code-reviewer",
+  "status": "done",
+  "summary": "Módulo de hooks PM revisado; design, estilo, nomes e padrões limpos.",
+  "evidence": [
+    { "id": "e-001", "kind": "file", "ref": "squads/sdd/hooks/_pm_shared.py", "line_range": "1-223" }
+  ],
+  "findings": [
+    {
+      "id": "f-001",
+      "severity": "minor",
+      "dimension": "style",
+      "file": "squads/sdd/hooks/_pm_shared.py",
+      "line_start": 223,
+      "line_end": 223,
+      "rationale": "encoding= no lock_fh engana o leitor; conteúdo do lock nunca é lido."
+    }
+  ],
+  "usage": null,
+  "notes": "44 testes limpos; padrão atomic-write espelha capture-subagent-usage.py."
+}

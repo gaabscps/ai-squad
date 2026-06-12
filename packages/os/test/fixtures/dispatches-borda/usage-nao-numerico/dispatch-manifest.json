@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task_id": "FEAT-BORDA",
+  "actual_dispatches": [
+    {
+      "dispatch_id": "d-T-001-dev-l1",
+      "task_id": "T-001",
+      "role": "dev",
+      "status": "done",
+      "loop": 1,
+      "output_packet_ref": "outputs/d-T-001-dev-l1.json",
+      "usage": { "total_tokens": "123" }
+    },
+    {
+      "dispatch_id": "d-T-001-code-reviewer-l1",
+      "task_id": "T-001",
+      "role": "code-reviewer",
+      "status": "done",
+      "loop": 1,
+      "output_packet_ref": "outputs/d-T-001-code-reviewer-l1.json",
+      "usage": { "total_tokens": true }
+    }
+  ]
+}

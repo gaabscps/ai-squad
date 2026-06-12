@@ -1,0 +1,150 @@
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import type { CostRollup, CostPhaseBreakdown } from "../store/types.js";
+import { parseReport } from "./report.js";
+
+interface RawModelUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+interface RawCostFile {
+  total_cost_usd?: number;
+  by_model?: Record<string, RawModelUsage>;
+  unpriced_models?: string[];
+}
+
+interface RawSum {
+  totalCostUsd: number | null;
+  partial: boolean;
+  tokens: { input: number; output: number; cacheRead: number; cacheCreation: number };
+  totalTokens: number;
+  hasData: boolean;
+}
+
+function sumRawCosts(costsDir: string): RawSum {
+  const empty: RawSum = {
+    totalCostUsd: null,
+    partial: false,
+    tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
+    totalTokens: 0,
+    hasData: false,
+  };
+  if (!existsSync(costsDir)) return empty;
+  const files = readdirSync(costsDir).filter((f) => f.endsWith(".json"));
+  if (files.length === 0) return empty;
+
+  let totalCostUsd: number | null = null;
+  let partial = false;
+  const tokens = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+
+  for (const f of files) {
+    let raw: RawCostFile;
+    try {
+      raw = JSON.parse(readFileSync(join(costsDir, f), "utf-8"));
+    } catch {
+      continue;
+    }
+    if (typeof raw.total_cost_usd === "number") totalCostUsd = (totalCostUsd ?? 0) + raw.total_cost_usd;
+    if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0) partial = true;
+    for (const usage of Object.values(raw.by_model ?? {})) {
+      tokens.input += usage.input_tokens ?? 0;
+      tokens.output += usage.output_tokens ?? 0;
+      tokens.cacheRead += usage.cache_read_input_tokens ?? 0;
+      tokens.cacheCreation += usage.cache_creation_input_tokens ?? 0;
+    }
+  }
+
+  const totalTokens = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheCreation;
+  return { totalCostUsd, partial, tokens, totalTokens, hasData: true };
+}
+
+/**
+ * Custo de uma Session. Prioridade: report.html parseado (source="report") >
+ * report.html não-parseável (source="unreliable") > soma crua costs/*.json
+ * (source="partial") > nada (source="empty"). cost-report.json não é mais usado.
+ * Read-only.
+ */
+export function readCostRollup(specDir: string): CostRollup {
+  const reportHtmlPath = join(specDir, "report.html");
+  const reportExists = existsSync(reportHtmlPath);
+  const reportPath = reportExists ? reportHtmlPath : null;
+
+  if (reportExists) {
+    let html: string;
+    try {
+      html = readFileSync(reportHtmlPath, "utf-8");
+    } catch {
+      // File may be mid-write; treat as unreliable rather than crashing
+      const raw = sumRawCosts(join(specDir, "costs"));
+      return {
+        totalCostUsd: raw.totalCostUsd,
+        partial: raw.partial,
+        tokens: raw.tokens,
+        totalTokens: raw.totalTokens,
+        reportPath,
+        source: "unreliable",
+        scopingSuspect: false,
+        excludedSubagents: null,
+        recoveredSubagents: null,
+        byPhase: null,
+        complete: null,
+      };
+    }
+
+    const reportData = parseReport(html);
+
+    if (reportData !== null) {
+      const byPhase: CostPhaseBreakdown = {
+        planning: reportData.byPhase.planning?.dollars ?? null,
+        orchestration: reportData.byPhase.orchestration?.dollars ?? null,
+        implementation: reportData.byPhase.implementation?.dollars ?? null,
+      };
+
+      return {
+        totalCostUsd: reportData.totalDollars,
+        partial: false,
+        tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
+        totalTokens: reportData.totalTokens,
+        reportPath,
+        source: "report",
+        scopingSuspect: false,
+        excludedSubagents: null,
+        recoveredSubagents: null,
+        byPhase,
+        complete: null,
+      };
+    }
+
+    const raw = sumRawCosts(join(specDir, "costs"));
+    return {
+      totalCostUsd: raw.totalCostUsd,
+      partial: raw.partial,
+      tokens: raw.tokens,
+      totalTokens: raw.totalTokens,
+      reportPath,
+      source: "unreliable",
+      scopingSuspect: false,
+      excludedSubagents: null,
+      recoveredSubagents: null,
+      byPhase: null,
+      complete: null,
+    };
+  }
+
+  const raw = sumRawCosts(join(specDir, "costs"));
+  return {
+    totalCostUsd: raw.totalCostUsd,
+    partial: raw.partial,
+    tokens: raw.tokens,
+    totalTokens: raw.totalTokens,
+    reportPath: null,
+    source: raw.hasData ? "partial" : "empty",
+    scopingSuspect: false,
+    excludedSubagents: null,
+    recoveredSubagents: null,
+    byPhase: null,
+    complete: null,
+  };
+}

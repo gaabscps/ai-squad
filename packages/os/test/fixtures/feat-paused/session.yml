@@ -1,0 +1,18 @@
+task_id: "FEAT-100"
+squad: "sdd"
+feature_name: "exemplo pausado"
+current_phase: "implementation"
+last_activity_at: "2026-05-21T10:00:00Z"
+paused_at: "2026-05-21T11:00:00Z"
+paused_reason: "aguardando --resume"
+planned_phases:
+  - "specify"
+  - "implementation"
+task_states:
+  T-001:
+    state: "blocked"
+    loops: 3
+escalation_metrics:
+  pending_human_tasks: 1
+  total_tasks: 1
+  escalation_rate: 1

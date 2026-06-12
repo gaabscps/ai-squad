@@ -1,0 +1,11 @@
+{
+  "spec_id": "FEAT-BORDA",
+  "task_id": "T-001",
+  "dispatch_id": "d-T-001-code-reviewer-l1",
+  "role": "code-reviewer",
+  "status": "done",
+  "summary": "Fixture: total_tokens boolean nao-numerico.",
+  "evidence": [],
+  "files_changed": [],
+  "usage": null
+}
