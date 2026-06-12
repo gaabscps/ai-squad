@@ -13,7 +13,6 @@ export function DecisionCard({
   onOpenRef?: (ref: string) => void;
 }) {
   const { what, why, rejected, ref } = decision;
-  const refOpens = ref !== null && ref.endsWith(".md") && onOpenRef !== undefined;
   return (
     <li className="decision-fork">
       <div className="decision-chosen">
@@ -28,8 +27,8 @@ export function DecisionCard({
       )}
       {why && <p className="decision-why">{why}</p>}
       {ref && (
-        refOpens ? (
-          <button type="button" className="decision-ref mono" onClick={() => onOpenRef!(ref)}>
+        ref.endsWith(".md") && onOpenRef ? (
+          <button type="button" className="decision-ref mono" onClick={() => onOpenRef(ref)}>
             {ref} →
           </button>
         ) : (

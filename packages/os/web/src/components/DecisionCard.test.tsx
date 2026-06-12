@@ -30,6 +30,12 @@ describe("DecisionCard", () => {
     expect(screen.getByText("conversa OBS-003")).toBeTruthy();
   });
 
+  it("ref .md sem onOpenRef: código inerte (sem botão)", () => {
+    render(<ol><DecisionCard decision={full} /></ol>);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("docs/escolha.md")).toBeTruthy();
+  });
+
   it("sem rejected/why/ref: só o escolhido", () => {
     render(<ol><DecisionCard decision={{ what: "Só what", why: null, rejected: null, ref: null }} /></ol>);
     expect(screen.getByText("Só what")).toBeTruthy();

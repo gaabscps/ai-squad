@@ -733,12 +733,12 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 /* Forquilha de decisão: escolhido em destaque, rejeitado esmaecido */
 .decision-fork { margin: 0 0 12px; padding: 10px 12px; background: var(--surface-soft); border: 1px solid var(--border-soft); border-radius: 8px; }
 .decision-chosen { display: flex; gap: 8px; align-items: baseline; }
-.decision-chosen .decision-what { margin: 0; font-weight: 600; }
+.decision-chosen .decision-what { margin: 0; font-weight: 600; font-size: 13px; }
 .decision-rejected { display: flex; gap: 8px; align-items: baseline; opacity: 0.55; margin-top: 4px; }
-.decision-rejected-text { margin: 0; font-size: 12.5px; }
+.decision-rejected-text { margin: 0; font-size: 12px; }
 .decision-mark { flex: none; font-size: 11px; }
-.decision-why { margin: 6px 0 0 19px; font-size: 12.5px; color: var(--text-dim); }
-.decision-ref { display: inline-block; margin: 6px 0 0 19px; font-size: 11px; }
+.decision-why { margin: 6px 0 0 19px; font-size: 12px; color: var(--text-dim); /* 19px = 11px da marca + 8px do gap — alinha com o texto do escolhido */ }
+.decision-ref { display: inline-block; margin: 6px 0 0 19px; font-size: 11px; /* 19px = 11px da marca + 8px do gap — alinha com o texto do escolhido */ }
 button.decision-ref { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 2px 8px; cursor: pointer; color: var(--accent); }
 .obs-trail-sub { margin: 14px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-mute); }
 
