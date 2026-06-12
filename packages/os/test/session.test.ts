@@ -52,10 +52,8 @@ describe("deriveStatus", () => {
   it("escalated quando current_phase é escalated", () => {
     expect(deriveStatus({ current_phase: "escalated" }, [])).toBe("escalated");
   });
-  it("paused quando há paused_at", () => {
-    expect(
-      deriveStatus({ current_phase: "implementation", paused_at: "x" }, [])
-    ).toBe("paused");
+  it("paused quando current_phase é paused (não existe campo paused_at)", () => {
+    expect(deriveStatus({ current_phase: "paused" }, [])).toBe("paused");
   });
   it("blocked quando alguma task está blocked", () => {
     expect(

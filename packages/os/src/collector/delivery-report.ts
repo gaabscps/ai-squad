@@ -7,21 +7,12 @@ import type {
   DeliveryAcceptanceCriterion,
 } from "../store/types.js";
 
-// As 11 chaves canônicas, em ordem de exibição. O parser itera ESTA lista
+import { DELIVERY_ANSWER_KEYS } from "./contracts.js";
+
+// As 11 chaves canônicas, em ordem de exibição — derivadas do schema
+// (delivery-report.schema.json, answers.required). O parser itera ESTA lista
 // (não as chaves cruas do JSON) pra garantir ordem estável e tolerar ausências.
-const CANONICAL_KEYS = [
-  "what_was_done",
-  "how_it_was_done",
-  "why_this_way",
-  "deviations_from_plan",
-  "acceptance_criteria",
-  "evidence",
-  "impacts",
-  "out_of_scope",
-  "risks_and_pending",
-  "how_to_validate",
-  "final_verdict",
-] as const;
+const CANONICAL_KEYS = DELIVERY_ANSWER_KEYS;
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : "";

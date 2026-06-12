@@ -10,20 +10,43 @@ import { collectDispatches } from "./dispatches.js";
 // O objeto bruto tem mais chaves; isto declara apenas o que esta função lê.
 interface RawSession {
   current_phase?: string;
-  paused_at?: string;
 }
 
 /**
  * Deriva o status da Session inteira a partir de campos REAIS do session.yml.
- * Ordem importa: done/escalated (do current_phase) > paused (paused_at) >
- * blocked (alguma task) > running (default).
+ * done/escalated/paused vêm do enum de current_phase (session.schema.json —
+ * não existe campo paused_at separado) > blocked (alguma task) > running (default).
  */
 export function deriveStatus(raw: RawSession, tasks: Task[]): SpecStatus {
   if (raw.current_phase === "done") return "done";
   if (raw.current_phase === "escalated") return "escalated";
-  if (raw.paused_at) return "paused";
+  if (raw.current_phase === "paused") return "paused";
   if (tasks.some((t) => t.state === "blocked")) return "blocked";
   return "running";
+}
+
+/**
+ * Texto humano de um note do session.yml. Usa `note` quando presente (formato
+ * antigo); senão deriva dos campos required do kind no schema (pm_decision,
+ * pm_escalation, audit_override). Kinds desconhecidos sem `note` viram "".
+ */
+function deriveNoteText(nn: Record<string, unknown>): string {
+  if (typeof nn.note === "string" && nn.note !== "") return nn.note;
+  const artifact = typeof nn.artifact_path === "string" ? nn.artifact_path : "";
+  switch (nn.kind) {
+    case "pm_decision":
+      return `${artifact} — gate: ${typeof nn.gate_applied === "string" ? nn.gate_applied : ""}`;
+    case "pm_escalation": {
+      const open = Array.isArray(nn.open_questions) ? nn.open_questions.length : 0;
+      return `${artifact} — ${open} questões abertas`;
+    }
+    case "audit_override":
+      return `${typeof nn.path === "string" ? nn.path : ""} — autorizado por ${
+        typeof nn.authorized_by === "string" ? nn.authorized_by : ""
+      }`;
+    default:
+      return "";
+  }
 }
 
 /**
@@ -64,8 +87,13 @@ export function parseSession(specDir: string, projectRoot?: string): Spec | null
   let timeline: TimelineEntry[];
   if (Array.isArray(raw.notes)) {
     timeline = raw.notes.map((n: unknown) => {
-      const nn = (n ?? {}) as { kind?: string; timestamp?: string; note?: string; phase?: string };
-      return { kind: nn.kind ?? "", timestamp: nn.timestamp ?? "", note: nn.note ?? "", phase: nn.phase };
+      const nn = (n ?? {}) as Record<string, unknown>;
+      return {
+        kind: typeof nn.kind === "string" ? nn.kind : "",
+        timestamp: typeof nn.timestamp === "string" ? nn.timestamp : "",
+        note: deriveNoteText(nn),
+        phase: typeof nn.phase === "string" ? nn.phase : undefined,
+      };
     });
   } else if (typeof raw.notes === "string" && raw.notes.trim() !== "") {
     timeline = [{ kind: "summary", timestamp: "", note: raw.notes }];
@@ -79,9 +107,10 @@ export function parseSession(specDir: string, projectRoot?: string): Spec | null
   const specPath = resolveSpecPath(root, specDir, raw.spec_ref);
 
   return {
-    id: raw.task_id ?? basename(specDir),
+    // spec_id é o campo canônico; task_id é alias presente só em sessions legadas
+    id: raw.spec_id ?? raw.task_id ?? basename(specDir),
     squad: raw.squad === "discovery" ? "discovery" : "sdd",
-    title: raw.feature_name ?? raw.task_id ?? "(sem título)",
+    title: raw.feature_name ?? raw.spec_id ?? raw.task_id ?? "(sem título)",
     phase: raw.current_phase ?? "",
     plannedPhases: Array.isArray(raw.planned_phases) ? raw.planned_phases : [],
     status: deriveStatus(raw, tasks),
@@ -89,7 +118,8 @@ export function parseSession(specDir: string, projectRoot?: string): Spec | null
     health: {
       pendingHuman: em.pending_human_tasks ?? 0,
       escalationRate: em.escalation_rate ?? 0,
-      auditException: raw.audit_exception === true,
+      // auditoria vive em notes[] (kind audit_override) — não há campo top-level
+      auditException: timeline.some((e) => e.kind === "audit_override"),
     },
     lastActivityAt: raw.last_activity_at ?? null,
     timeline,

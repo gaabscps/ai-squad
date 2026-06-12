@@ -5,7 +5,8 @@
  *   - Ler e parsear dispatch-manifest.json de um specDir.
  *   - Resolver cada output_packet_ref relativo a specDir COM verificação de
  *     contenção de path (path traversal → tratado como ausente).
- *   - Filtrar task_id por regex ^T-\d+$ (ignora AUDIT, FEAT-XXX, T-001abc, etc.).
+ *   - Filtrar task_id pelo pattern canônico de output-packet.schema.json
+ *     (^T-\d{3,}$; ignora AUDIT, FEAT-XXX, T-001abc, etc.).
  *   - Resiliência total: manifest ausente/corrompido → mapa vazio;
  *     packet ausente/corrompido/parcial → Dispatch manifest-only.
  *
@@ -22,9 +23,9 @@ import {
   normalizeFindings,
   deriveTestEvidence,
 } from "./dispatch-normalize.js";
-
-/** Regex que valida task_id de tarefa real (exclui AUDIT, FEAT-XXX, T-001abc, etc.) */
-const TASK_ID_RE = /^T-\d+$/;
+// TASK_ID_RE: pattern canônico de task_id (^T-\d{3,}$) derivado de
+// output-packet.schema.json; exclui AUDIT, FEAT-XXX, T-001abc, T-1, etc.
+import { TASK_ID_RE } from "./contracts.js";
 
 /** Formato bruto de um item em actual_dispatches[] */
 interface RawDispatchItem {
@@ -99,7 +100,7 @@ export function resolvePacketSafe(specDir: string, ref: string): RawPacket | nul
 
 /**
  * Lê o dispatch-manifest.json de specDir e retorna um Map<task_id, Dispatch[]>
- * apenas com os itens cujo task_id casa com ^T-\d+$.
+ * apenas com os itens cujo task_id casa com o pattern canônico (TASK_ID_RE).
  *
  * Retorna mapa vazio quando manifest ausente/corrompido.
  * Campos ricos (filesChanged, findings, testEvidence) são normalizados via dispatch-normalize.ts.

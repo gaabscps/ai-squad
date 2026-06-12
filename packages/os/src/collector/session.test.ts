@@ -238,6 +238,87 @@ describe("parseSession — AC-007: specPath no Spec", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Alinhamento ao contrato session.schema.json (campos canônicos, sem fantasmas)
+// ---------------------------------------------------------------------------
+
+describe("parseSession — alinhamento ao session.schema.json", () => {
+  function makeSession(yaml: string): string {
+    const d = mkdtempSync(join(tmpdir(), "aios-sess-contract-"));
+    writeFileSync(join(d, "session.yml"), yaml, "utf-8");
+    return d;
+  }
+
+  it("current_phase: paused → status 'paused' (não existe campo paused_at)", () => {
+    const d = makeSession("spec_id: FEAT-100\ncurrent_phase: paused\n");
+    expect(parseSession(d)!.status).toBe("paused");
+  });
+
+  it("id prefere spec_id (canônico); task_id é alias de sessions legadas", () => {
+    const d = makeSession("spec_id: FEAT-100\ncurrent_phase: implementation\n");
+    expect(parseSession(d)!.id).toBe("FEAT-100");
+    const legacy = makeSession("task_id: FEAT-099\ncurrent_phase: implementation\n");
+    expect(parseSession(legacy)!.id).toBe("FEAT-099");
+  });
+
+  it("auditException deriva de notes[] com kind audit_override (não de campo top-level)", () => {
+    const d = makeSession(
+      [
+        "spec_id: FEAT-100",
+        "current_phase: implementation",
+        "notes:",
+        '  - kind: audit_override',
+        '    timestamp: "2026-06-12T00:00:00Z"',
+        '    path: outputs/d-audit-01.json',
+        '    authorized_by: human',
+        '    audit_dispatch_id: d-audit-01',
+      ].join("\n"),
+    );
+    expect(parseSession(d)!.health.auditException).toBe(true);
+
+    const sem = makeSession("spec_id: FEAT-100\ncurrent_phase: implementation\n");
+    expect(parseSession(sem)!.health.auditException).toBe(false);
+  });
+
+  it("timeline deriva texto legível dos campos required de cada kind de note", () => {
+    const d = makeSession(
+      [
+        "spec_id: FEAT-100",
+        "current_phase: implementation",
+        "notes:",
+        '  - kind: pm_decision',
+        '    timestamp: "2026-06-12T00:00:00Z"',
+        '    phase: specify',
+        '    artifact_path: .agent-session/FEAT-100/spec.md',
+        '    gate_applied: completeness',
+        '  - kind: pm_escalation',
+        '    timestamp: "2026-06-12T00:01:00Z"',
+        '    phase: plan',
+        '    artifact_path: .agent-session/FEAT-100/plan.md',
+        '    open_questions: ["q1", "q2"]',
+      ].join("\n"),
+    );
+    const timeline = parseSession(d)!.timeline;
+    expect(timeline[0].note).toContain("spec.md");
+    expect(timeline[0].note).toContain("completeness");
+    expect(timeline[1].note).toContain("2 questões abertas");
+  });
+
+  it("note explícito (formato antigo) continua tendo precedência sobre a derivação", () => {
+    const d = makeSession(
+      [
+        "spec_id: FEAT-100",
+        "current_phase: implementation",
+        "notes:",
+        '  - kind: pm_decision',
+        '    timestamp: "2026-06-12T00:00:00Z"',
+        '    note: texto legado',
+      ].join("\n"),
+    );
+    expect(parseSession(d)!.timeline[0].note).toBe("texto legado");
+  });
+});
+
 describe("parseSession — delivery-report", () => {
   it("popula spec.deliveryReport quando há delivery-report.json", () => {
     const d = mkdtempSync(join(tmpdir(), "aios-sess-dr-"));
