@@ -28,15 +28,20 @@ import type {
 import { readDeliveryReport } from "./delivery-report.js";
 import { readCostRollup } from "./cost.js"; // Task 3 substituirá pela fonte cost-report.json
 
-// Padrão de nome de diretório OBS-NNN (3 ou mais dígitos)
-const OBS_DIR_RE = /^OBS-\d{3,}$/i;
+// Padrão de nome de diretório OBS-NNN (3 ou mais dígitos) — case-sensitive conforme o schema
+const OBS_DIR_RE = /^OBS-\d{3,}$/;
 
 // Status terminais — presença de closed_at só é drift quando o status NÃO está aqui
 const TERMINAL = new Set<string>(["done", "abandoned"]);
 
-// Enum canônico de status do session.yml (lido do schema via contracts.ts, copiado aqui
-// para não criar acoplamento circular; contracts.ts não é importado em produção)
+// Enum canônico de status do session.yml (copiado aqui para não puxar imports do schema
+// JSON em produção — contracts.ts é exclusivo do caminho de validação/teste)
 const KNOWN_STATUSES = new Set<string>(["in_progress", "needs_attention", "done", "abandoned"]);
+
+/** Retorna a string quando é não-vazia; null caso contrário. */
+function nonEmptyString(v: unknown): string | null {
+  return typeof v === "string" && v !== "" ? v : null;
+}
 
 // Mapeamento do enum do session.yml para o SpecStatus do store
 const STATUS_MAP: Record<string, SpecStatus> = {
@@ -59,7 +64,12 @@ export function readSessionDir(specDir: string, _projectRoot?: string): Spec | n
 
   let raw: Record<string, any>;
   try {
-    raw = (parseYaml(readFileSync(file, "utf-8")) as Record<string, any>) ?? {};
+    const parsed = parseYaml(readFileSync(file, "utf-8"));
+    // YAML raiz não-objeto (null, escalar, array) em dir OBS-* → card degradado
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return OBS_DIR_RE.test(basename(specDir)) ? degradedSpec(specDir) : null;
+    }
+    raw = parsed as Record<string, any>;
   } catch {
     // YAML ilegível: card degradado somente para dirs OBS-*, null para o resto
     return OBS_DIR_RE.test(basename(specDir)) ? degradedSpec(specDir) : null;
@@ -78,9 +88,9 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
 
   const observed: ObservedMeta = {
     intent: typeof raw.intent === "string" ? raw.intent : "",
-    createdAt: typeof raw.created_at === "string" ? raw.created_at : null,
-    closedAt: typeof raw.closed_at === "string" ? raw.closed_at : null,
-    attentionKind: raw.attention?.kind != null ? String(raw.attention.kind) : null,
+    createdAt: nonEmptyString(raw.created_at),
+    closedAt: nonEmptyString(raw.closed_at),
+    attentionKind: typeof raw.attention?.kind === "string" ? raw.attention.kind : null,
     decisions: normalizeDecisions(raw.decisions),
     evidence: normalizeEvidence(raw.evidence),
     driftFlags: drift,
@@ -115,7 +125,7 @@ function deriveObservedStatus(raw: Record<string, any>): {
   drift: ObservedDriftFlag[];
 } {
   const drift: ObservedDriftFlag[] = [];
-  const hasClosed = typeof raw.closed_at === "string" && raw.closed_at !== "";
+  const hasClosed = nonEmptyString(raw.closed_at) !== null;
   const rawStatus = typeof raw.status === "string" ? raw.status : "";
 
   let resolved = rawStatus;
@@ -144,7 +154,8 @@ function pickLatest(a: Date | null, b: Date): Date {
  * Quando aberta usa o mtime mais recente entre session.yml e costs/*.json.
  */
 function lastActivity(specDir: string, raw: Record<string, any>): string | null {
-  if (typeof raw.closed_at === "string" && raw.closed_at !== "") return raw.closed_at;
+  const closed = nonEmptyString(raw.closed_at);
+  if (closed !== null) return closed;
 
   let latest: Date | null = null;
 
@@ -192,13 +203,6 @@ function degradedSpec(specDir: string): Spec {
     driftFlags: ["unreadable_yaml"],
   };
 
-  let lastActivityAt: string | null = null;
-  try {
-    lastActivityAt = statSync(join(specDir, "session.yml")).mtime.toISOString();
-  } catch {
-    // sem acesso ao mtime; permanece null
-  }
-
   return {
     id: basename(specDir),
     squad: "sdd",
@@ -208,7 +212,7 @@ function degradedSpec(specDir: string): Spec {
     status: "unreadable",
     tasks: [],
     health: { pendingHuman: 0, escalationRate: 0, auditException: false },
-    lastActivityAt,
+    lastActivityAt: lastActivity(specDir, {}),
     timeline: [],
     cost: readCostRollup(specDir),
     deliveryReport: null,

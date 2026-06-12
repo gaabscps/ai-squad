@@ -218,3 +218,50 @@ describe("readSessionDir — obs-aberto sem closed_at → lastActivityAt por mti
     expect(spec.lastActivityAt).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 11. OBS-019: YAML raiz é escalar (string solta) → card degradado (Fix 1)
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — OBS-019 (YAML raiz não-objeto)", () => {
+  it("retorna Spec não-nulo (card nunca some do board)", () => {
+    const spec = readSessionDir(fixt("OBS-019"));
+    expect(spec).not.toBeNull();
+  });
+
+  it("status é 'unreadable'", () => {
+    const spec = readSessionDir(fixt("OBS-019"))!;
+    expect(spec.status).toBe("unreadable");
+  });
+
+  it("id é o basename do dir 'OBS-019'", () => {
+    const spec = readSessionDir(fixt("OBS-019"))!;
+    expect(spec.id).toBe("OBS-019");
+  });
+
+  it("driftFlags === ['unreadable_yaml']", () => {
+    const spec = readSessionDir(fixt("OBS-019"))!;
+    expect(spec.observed!.driftFlags).toEqual(["unreadable_yaml"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. obs-closed-vazio (OBS-020): closed_at: "" → tratado como ausente (Fix 2)
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-closed-vazio (OBS-020, closed_at vazio)", () => {
+  it("status é 'running' (empty string = ausente, status in_progress mantido)", () => {
+    const spec = readSessionDir(fixt("obs-closed-vazio"))!;
+    expect(spec.status).toBe("running");
+  });
+
+  it("observed.closedAt é null (string vazia não vaza para closedAt)", () => {
+    const spec = readSessionDir(fixt("obs-closed-vazio"))!;
+    expect(spec.observed!.closedAt).toBeNull();
+  });
+
+  it("driftFlags é [] (closed_at vazio não gera drift)", () => {
+    const spec = readSessionDir(fixt("obs-closed-vazio"))!;
+    expect(spec.observed!.driftFlags).toEqual([]);
+  });
+});
