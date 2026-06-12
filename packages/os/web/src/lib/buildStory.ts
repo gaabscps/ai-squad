@@ -2,7 +2,8 @@ import type { Spec, CostPhaseBreakdown, SpecStatus } from "../../../src/store/ty
 // BADGE_LABEL = masculino curto (badge); STATUS_LABEL local = feminino narrativo (story).
 // Dualidade intencional — badge diz "bloqueado", prosa diz "bloqueada".
 import { STATUS_LABEL as BADGE_LABEL } from "./statusLabels";
-import { fmtUsd, fmtTokens } from "../format";
+import { fmtUsd, fmtTokens, fmtRelativeTime } from "../format";
+import { visibleDecisions, visibleEvidence } from "./observedTrail";
 
 const PHASE_PRIORITY: Array<keyof CostPhaseBreakdown> = [
   "planning",
@@ -41,24 +42,35 @@ function formatCost(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
-export function buildStory(spec: Spec): string {
+export function buildStory(spec: Spec, now: number = Date.now()): string {
   const { cost, tasks, status } = spec;
   const statusLabel = STATUS_LABEL[status];
 
-  // Sessão observada: frase curta pt-BR sem vocabulário SDD
+  // Sessão observada: manchete narrada — janela + contagens da trilha + custo.
+  // O intent NÃO entra (o título do drawer/card já é o intent).
   if (spec.observed) {
-    const obsLabel = BADGE_LABEL[status];
+    const obs = spec.observed;
+    const terminal = status === "done" || status === "abandoned";
+    const parts: string[] = [BADGE_LABEL[status]];
+
+    if (!terminal && obs.createdAt) {
+      parts.push(`aberto ${fmtRelativeTime(obs.createdAt, now)}`);
+    }
+    const nd = visibleDecisions(obs).length;
+    if (nd > 0) parts.push(nd === 1 ? "1 decisão" : `${nd} decisões`);
+    const ne = visibleEvidence(obs).length;
+    if (ne > 0) parts.push(ne === 1 ? "1 verificação" : `${ne} verificações`);
+
     if (cost.totalCostUsd !== null) {
-      return `${obsLabel} · ${fmtUsd(cost.totalCostUsd)}`;
+      parts.push(fmtUsd(cost.totalCostUsd));
+    } else if (cost.source === "cost_report") {
+      parts.push(`${fmtTokens(cost.totalTokens)} tokens`);
+    } else if (cost.totalTokens > 0) {
+      parts.push(`${fmtTokens(cost.totalTokens)} tokens (em coleta)`);
+    } else {
+      parts.push("sem custo ainda");
     }
-    if (cost.source === "cost_report") {
-      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens`;
-    }
-    // Fallback partial/empty: se já há tokens, mostrar queima; senão, vazio
-    if (cost.totalTokens > 0) {
-      return `${obsLabel} · ${fmtTokens(cost.totalTokens)} tokens (em coleta)`;
-    }
-    return `${obsLabel} · sem custo ainda`;
+    return parts.join(" · ");
   }
 
   if (cost.source === "empty") {

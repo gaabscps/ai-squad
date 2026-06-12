@@ -13,6 +13,7 @@ import { SpecSummaryBlock } from "./SpecSummaryBlock";
 import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
+import { visibleDecisions, visibleEvidence } from "../lib/observedTrail";
 import type { ObservedDecision, ObservedEvidence } from "../../../src/store/types";
 
 export function DetailDrawer({
@@ -100,8 +101,8 @@ export function DetailDrawer({
             )}
 
             {(() => {
-              const shownDecisions = obs.decisions.filter((d: ObservedDecision) => d.what || d.why || d.rejected || d.ref);
-              const shownEvidence = obs.evidence.filter((e: ObservedEvidence) => e.cmd || e.result || e.kind);
+              const shownDecisions = visibleDecisions(obs);
+              const shownEvidence = visibleEvidence(obs);
               return (
                 <>
                   <h4 className="drawer-section">Decisões</h4>

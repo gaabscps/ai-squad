@@ -274,6 +274,56 @@ describe("buildStory – AC-008: tarefas bloqueadas e sem tarefas", () => {
   });
 });
 
+describe("buildStory — manchete narrada (modo observado com contagens)", () => {
+  const obsBase = {
+    intent: "melhorar UI", createdAt: "2026-06-12T20:00:00Z", closedAt: null,
+    attentionKind: null, decisions: [], evidence: [], driftFlags: [],
+  };
+  const emptyCost = makeCost({ totalCostUsd: null, totalTokens: 0 });
+  const NOW = Date.parse("2026-06-12T22:00:00Z");
+
+  it("observado aberto: janela + contagens + custo", () => {
+    const spec = makeSpec({
+      status: "running",
+      observed: {
+        ...obsBase,
+        decisions: [
+          { what: "A", why: null, rejected: null, ref: null },
+          { what: "B", why: null, rejected: null, ref: null },
+        ],
+        evidence: [{ cmd: "ls", result: "ok", kind: null }],
+      },
+      cost: { ...emptyCost, source: "partial", totalCostUsd: 5.11, totalTokens: 2_700_000 },
+    });
+    expect(buildStory(spec, NOW)).toBe("rodando · aberto há 2 h · 2 decisões · 1 verificação · US$ 5.11");
+  });
+
+  it("observado fechado: sem 'aberto há', com contagens", () => {
+    const spec = makeSpec({
+      status: "done",
+      observed: { ...obsBase, closedAt: "2026-06-12T21:00:00Z",
+        decisions: [{ what: "A", why: null, rejected: null, ref: null }], evidence: [] },
+      cost: { ...emptyCost, source: "cost_report", totalCostUsd: 110.75, totalTokens: 83_500_000 },
+    });
+    expect(buildStory(spec, NOW)).toBe("concluído · 1 decisão · US$ 110.75");
+  });
+
+  it("observado sem decisões: omite contagens (não mostra '0 decisões')", () => {
+    const spec = makeSpec({ status: "running", observed: obsBase,
+      cost: { ...emptyCost, source: "empty", totalTokens: 0 } });
+    expect(buildStory(spec, NOW)).toBe("rodando · aberto há 2 h · sem custo ainda");
+  });
+
+  it("abandoned é terminal: sem janela temporal", () => {
+    const spec = makeSpec({
+      status: "abandoned",
+      observed: obsBase,
+      cost: { ...emptyCost, source: "cost_report", totalCostUsd: 0.42, totalTokens: 300_000 },
+    });
+    expect(buildStory(spec, NOW)).toBe("abandonado · US$ 0.42");
+  });
+});
+
 describe("buildStory — modo observado", () => {
   it("spec observada com custo: frase contém status label e custo em USD", () => {
     const spec = makeObservedSpec({
