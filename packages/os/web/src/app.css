@@ -81,7 +81,13 @@ a:hover { text-decoration: underline; }
 /* ---- Kanban ---- */
 .board-body { padding: 14px 16px; }
 .kboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
-.kcol { background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.kcol {
+  background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px;
+  /* min-width: 0 — sem isto a trilha 1fr (= minmax(auto,1fr)) não encolhe abaixo
+     do conteúdo mínimo; .kcard-title é nowrap, então a coluna estica até o título
+     inteiro e o board ganha scroll horizontal (blowout). NÃO remover. */
+  min-width: 0;
+}
 .kcol-head { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #374151; margin-bottom: 10px; }
 .kcol-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--text-mute); }
 .kcol[data-col="attention"] .kcol-dot { background: var(--blocked); }
