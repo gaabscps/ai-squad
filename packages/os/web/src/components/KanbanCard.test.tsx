@@ -265,4 +265,15 @@ describe("KanbanCard — modo observado", () => {
     expect(screen.getByText(/custo não capturado/)).toBeTruthy();
     expect(screen.queryByText(/em coleta/)).toBeNull();
   });
+
+  it("observado terminal só com tokens (totalCostUsd null, source partial): 'custo não capturado' sem '(em coleta)'", () => {
+    const spec = makeObservedSpec({
+      id: "OBS-003",
+      status: "done",
+      cost: makeCost({ source: "partial", totalCostUsd: null, totalTokens: 500_000 }),
+    });
+    render(<KanbanCard item={item(spec)} onSelect={() => {}} />);
+    expect(screen.getByText(/custo não capturado/)).toBeTruthy();
+    expect(screen.queryByText(/em coleta/)).toBeNull();
+  });
 });

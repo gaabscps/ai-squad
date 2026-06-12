@@ -396,13 +396,13 @@ describe("AC-011: source empty → graceful, sem dados inventados, sem crash", (
     ).not.toThrow();
   });
 
-  it("frase indica 'em planejamento' quando source é empty", () => {
+  it("frase indica 'sem custo registrado' quando source é empty", () => {
     const spec = makeSpec({
       tasks: [],
       cost: makeCost({ source: "empty", totalCostUsd: null, byPhase: null }),
     });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByTestId("drawer-story")).toHaveTextContent("em planejamento");
+    expect(screen.getByTestId("drawer-story")).toHaveTextContent("sem custo registrado");
   });
 
   it("PhaseJourney mostra 'sem dados de custo' quando source é empty", () => {

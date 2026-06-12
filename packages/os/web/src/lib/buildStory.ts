@@ -79,7 +79,7 @@ export function buildStory(spec: Spec, now: number = Date.now()): string {
   }
 
   if (cost.source === "empty") {
-    return `${statusLabel} · em planejamento`;
+    return `${statusLabel} · sem custo registrado`;
   }
 
   const parts: string[] = [statusLabel];

@@ -3,7 +3,7 @@ import { buildStory } from "./buildStory";
 import { makeSpec, makeTask, makeCost, makeObservedSpec } from "../test-utils";
 
 // AC-008: frase-resumo determinística com nº de tarefas, bloqueios, custo e fase dominante
-// AC-011: source "empty" / sem fases → "em planejamento" (omissão graciosa)
+// AC-011: source "empty" / sem fases → "sem custo registrado" (omissão graciosa)
 // AC-012: source "partial" → rótulo "(parcial)"
 // AC-013: source "unreliable" → sinaliza baixa confiança
 
@@ -129,13 +129,13 @@ describe("buildStory – AC-013: source unreliable (baixa confiança)", () => {
 });
 
 describe("buildStory – AC-011: source empty / sem fases (omissão graciosa)", () => {
-  it("source empty → contém 'em planejamento' (AC-008 também exige status)", () => {
+  it("source empty → contém 'sem custo registrado' (AC-008 também exige status)", () => {
     const spec = makeSpec({
       tasks: [],
       cost: makeCost({ source: "empty", totalCostUsd: null, byPhase: null }),
     });
     const result = buildStory(spec);
-    expect(result).toContain("em planejamento");
+    expect(result).toContain("sem custo registrado");
     expect(result).toContain("em execução");
   });
 
@@ -334,6 +334,20 @@ describe("buildStory — manchete narrada (modo observado com contagens)", () =>
       observed: { ...obsBase, createdAt: "data-podre" },
       cost: { ...emptyCost, source: "empty", totalTokens: 0 } });
     expect(buildStory(spec, NOW)).not.toContain("aberto");
+  });
+
+  it("observado terminal só com tokens: 'custo não capturado' sem '(em coleta)'", () => {
+    const spec = makeSpec({ status: "done", observed: obsBase,
+      cost: { ...emptyCost, source: "partial", totalCostUsd: null, totalTokens: 500_000 } });
+    const story = buildStory(spec, NOW);
+    expect(story).toContain("custo não capturado");
+    expect(story).not.toContain("em coleta");
+  });
+
+  it("observado abandonado com custo parcial: também marca 'custo não capturado'", () => {
+    const spec = makeSpec({ status: "abandoned", observed: obsBase,
+      cost: { ...emptyCost, source: "partial", totalCostUsd: 2.0, totalTokens: 100 } });
+    expect(buildStory(spec, NOW)).toContain("custo não capturado");
   });
 });
 
