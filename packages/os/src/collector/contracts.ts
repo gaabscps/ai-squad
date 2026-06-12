@@ -16,6 +16,7 @@ import costReportSchema from "../../../../shared/schemas/cost-report.schema.json
 import deliveryReportSchema from "../../../../shared/schemas/delivery-report.schema.json";
 import dispatchManifestSchema from "../../../../shared/schemas/dispatch-manifest.schema.json";
 import outputPacketSchema from "../../../../shared/schemas/output-packet.schema.json";
+import observedSessionSchema from "../../../../shared/schemas/observed-session.schema.json";
 
 export {
   sessionSchema,
@@ -23,6 +24,7 @@ export {
   deliveryReportSchema,
   dispatchManifestSchema,
   outputPacketSchema,
+  observedSessionSchema,
 };
 
 /**
@@ -46,3 +48,12 @@ export const TASK_ID_RE = new RegExp(outputPacketSchema.properties.task_id.patte
  */
 export const SESSION_NOTE_KINDS: readonly string[] =
   sessionSchema.properties.notes.items.oneOf.map((b) => b.properties.kind.const);
+
+// Vocabulário derivado do contrato observado (drift quebra aqui, no mesmo PR)
+const obsProps = observedSessionSchema.properties;
+export const OBSERVED_STATUSES: readonly string[] = obsProps.status.enum;
+export const OBSERVED_ATTENTION_KINDS: readonly string[] = obsProps.attention.properties.kind.enum;
+export const OBSERVED_REQUIRED: readonly string[] = observedSessionSchema.required;
+export const OBSERVED_FIELDS: readonly string[] = Object.keys(obsProps);
+export const OBSERVED_DECISION_KEYS: readonly string[] = Object.keys(obsProps.decisions.items.properties);
+export const OBSERVED_EVIDENCE_KEYS: readonly string[] = Object.keys(obsProps.evidence.items.properties);
