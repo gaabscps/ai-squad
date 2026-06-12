@@ -61,11 +61,39 @@ function sumRawCosts(costsDir: string): RawSum {
 }
 
 /**
+ * Fallback de custo exclusivo para sessões observadas: soma crua costs/*.json,
+ * nunca toca report.html — evita que um dir observado stale retorne source="report"
+ * ou source="unreliable" com totais parciais tratados como canônicos.
+ * Preserva o reportPath para o link do drawer quando report.html existe.
+ * Source: "partial" (com dados) | "empty" (sem costs/).
+ */
+export function readRawCostRollup(specDir: string): CostRollup {
+  const reportHtmlPath = join(specDir, "report.html");
+  const reportPath = existsSync(reportHtmlPath) ? reportHtmlPath : null;
+  const raw = sumRawCosts(join(specDir, "costs"));
+  return {
+    totalCostUsd: raw.totalCostUsd,
+    partial: raw.partial,
+    tokens: raw.tokens,
+    totalTokens: raw.totalTokens,
+    reportPath,
+    source: raw.hasData ? "partial" : "empty",
+    scopingSuspect: false,
+    excludedSubagents: null,
+    recoveredSubagents: null,
+    byPhase: null,
+    complete: null,
+  };
+}
+
+/**
  * Custo de uma Session SDD. Prioridade: report.html parseado (source="report") >
  * report.html não-parseável (source="unreliable") > soma crua costs/*.json
  * (source="partial") > nada (source="empty").
  * Sessões observadas usam readObservedCostRollup (cost-report.ts), que consulta
- * cost-report.json como fonte primária e cai aqui como fallback de staleness.
+ * cost-report.json como fonte primária e cai em readRawCostRollup (jamais aqui)
+ * como fallback de staleness — garantindo que report.html nunca seja consultado
+ * para dirs observados.
  * Read-only.
  */
 export function readCostRollup(specDir: string): CostRollup {

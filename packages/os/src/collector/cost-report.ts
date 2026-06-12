@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { CostRollup } from "../store/types.js";
-import { readCostRollup } from "./cost.js";
+import { readRawCostRollup } from "./cost.js";
 
 /**
  * Objeto já normalizado a partir do cost-report.json (artefato canônico/escopado
@@ -44,18 +44,19 @@ const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
 /**
  * Normaliza o bloco tokens de um RawCostReport para o shape usado em CostRollup.
- * Retorna zeros quando o bloco está ausente (seguro para o caminho observado,
- * que expõe tokens como métrica primária mesmo sem custo).
+ * Quando by_type está ausente mas total numérico existe, usa total com breakdown
+ * zerado — preserva o dado disponível em vez de descartá-lo.
+ * Retorna zeros quando o bloco tokens está inteiramente ausente.
  */
 function normalizeTokens(
   raw: RawCostReport,
 ): { tokens: { input: number; output: number; cacheRead: number; cacheCreation: number }; totalTokens: number } {
   const tk = raw.tokens?.by_type;
+  const zeroBreakdown = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
   if (!tk) {
-    return {
-      tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
-      totalTokens: 0,
-    };
+    // Fix 3: se by_type ausente mas tokens.total é numérico, usa total com breakdown zerado
+    const totalTokens = typeof raw.tokens?.total === "number" ? raw.tokens.total : 0;
+    return { tokens: zeroBreakdown, totalTokens };
   }
   const tokens = {
     input: tk.input ?? 0,
@@ -189,10 +190,17 @@ function isStale(specDir: string, generatedAt: string | null): boolean {
  * Custo de um dir observado a partir do cost-report.json contratado.
  * Regras: USD null (nunca 0) sem complete===true ou com unpriced_models;
  * report mais velho que costs/*.json ⇒ fallback à soma crua; todo campo opcional.
+ * Fix 1: fallback via readRawCostRollup — NUNCA readCostRollup, que pode tomar o
+ * branch report.html e retornar totais de dir SDD stale como canônicos.
+ * Fix 2: report sem bloco tokens é esparso demais para a métrica primária →
+ * também cai em readRawCostRollup.
  */
 export function readObservedCostRollup(specDir: string): CostRollup {
   const report = readCostReportTolerant(specDir); // não exige campos: deploy-lag é a norma
-  if (!report || isStale(specDir, report.generatedAt)) return readCostRollup(specDir);
+  if (!report || isStale(specDir, report.generatedAt)) return readRawCostRollup(specDir);
+
+  // Fix 2: report sem bloco tokens é esparso demais — cai pra soma crua
+  if (!report.tokens) return readRawCostRollup(specDir);
 
   const trustUsd = report.complete === true && report.unpricedModels.length === 0;
   const { tokens, totalTokens } = normalizeTokens(report);

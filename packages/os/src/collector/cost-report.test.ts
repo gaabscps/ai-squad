@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readCostReport, readObservedCostRollup } from "./cost-report.js";
@@ -156,7 +156,9 @@ describe("readObservedCostRollup — complete ausente ⇒ totalCostUsd null", ()
 
 describe("readObservedCostRollup — staleness", () => {
   it("cost-report.json mais velho que costs/*.json ⇒ source não é 'cost_report' (fallback)", () => {
-    // Monta dir com cost-report.json completo + costs/session-bbb.json mais novo
+    // isStale lê generated_at do CONTEÚDO do cost-report.json (não do mtime do arquivo).
+    // OBS_REPORT_OK tem generated_at "2026-06-10T18:00:00Z"; costs/session-bbb.json
+    // é gravado agora (mtime atual) → mais novo → isStale=true → fallback.
     const d = obsSpecDirWith(OBS_REPORT_OK, {
       "session-bbb.json": JSON.stringify({
         session_id: "bbb",
@@ -166,11 +168,6 @@ describe("readObservedCostRollup — staleness", () => {
         unpriced_models: [],
       }),
     });
-    // Deixa o cost-report.json com mtime bem no passado
-    const reportPath = join(d, "cost-report.json");
-    const oldDate = new Date("2020-01-01T00:00:00Z");
-    utimesSync(reportPath, oldDate, oldDate);
-    // costs/session-bbb.json tem mtime atual → cost-report.json é stale
     const r = readObservedCostRollup(d);
     expect(r.source).not.toBe("cost_report");
   });
@@ -185,7 +182,8 @@ describe("readObservedCostRollup — staleness", () => {
         unpriced_models: [],
       }),
     });
-    // Deixa o costs/session-bbb.json com mtime no passado; cost-report.json fica com mtime atual
+    // Deixa o costs/session-bbb.json com mtime muito no passado → cost-report
+    // com generated_at "2026-06-10T18:00:00Z" fica mais novo → isStale=false
     const costPath = join(d, "costs", "session-bbb.json");
     const oldDate = new Date("2020-01-01T00:00:00Z");
     utimesSync(costPath, oldDate, oldDate);
@@ -196,13 +194,63 @@ describe("readObservedCostRollup — staleness", () => {
 });
 
 describe("readObservedCostRollup — tolerância a JSON vazio {}", () => {
-  it("{} sem generated_at → não falha; source 'cost_report', usd null, partial true", () => {
-    // {} tem generated_at ausente → isStale retorna false (não dá pra julgar → confia no report)
-    // mas complete ausente (não é true) → totalCostUsd null, partial true
+  it("{} sem generated_at → não falha; report sem bloco tokens é esparso demais — cai pra soma crua", () => {
+    // {} tem generated_at ausente → isStale retorna false (não dá pra julgar)
+    // mas {} não tem bloco tokens → Fix 2: esparso demais → readRawCostRollup
     const r = readObservedCostRollup(obsSpecDirWith("{}"));
-    expect(() => r).not.toThrow();
-    expect(r.source).toBe("cost_report");
+    expect(["partial", "empty"]).toContain(r.source);
     expect(r.totalCostUsd).toBeNull();
-    expect(r.partial).toBe(true);
+  });
+});
+
+describe("readObservedCostRollup — generated_at inválido", () => {
+  it("generated_at 'not-a-date' → não lança; isStale retorna false → report confiado (source 'cost_report')", () => {
+    // isStale: timestamp inválido → NaN → retorna false → confia no report
+    const withBadDate = JSON.stringify({
+      total_cost_usd: 2.0,
+      complete: true,
+      unpriced_models: [],
+      generated_at: "not-a-date",
+      tokens: { total: 1000, by_type: { input: 500, output: 200, cache_read: 200, cache_creation: 100 } },
+    });
+    const r = readObservedCostRollup(obsSpecDirWith(withBadDate));
+    expect(r.source).toBe("cost_report");
+    expect(r.totalCostUsd).toBe(2.0);
+  });
+});
+
+describe("readObservedCostRollup — stale + report.html presente NUNCA retorna source='report'", () => {
+  it("dir observado stale com report.html → source 'partial' ou 'empty' (jamais 'report'/'unreliable')", () => {
+    // Cenário real: producer gravou report.html e cost-report.json no mesmo Stop hook,
+    // depois chegou um novo costs/session-*.json → cost-report.json stale.
+    // O fallback deve usar readRawCostRollup (soma crua), nunca readCostRollup
+    // que poderia tomar o branch report.html e retornar totais stale como canônicos.
+    const d = mkdtempSync(join(tmpdir(), "aios-obs-stale-html-"));
+    dirs.push(d);
+    // cost-report.json com generated_at no passado
+    writeFileSync(
+      join(d, "cost-report.json"),
+      JSON.stringify({
+        total_cost_usd: 9.99,
+        complete: true,
+        unpriced_models: [],
+        generated_at: "2020-01-01T00:00:00Z",
+        tokens: { total: 999, by_type: { input: 500, output: 199, cache_read: 200, cache_creation: 100 } },
+      }),
+    );
+    // report.html mínimo presente (existência é suficiente para disparar o branch errado se houvesse)
+    writeFileSync(join(d, "report.html"), "<html><body>stub</body></html>");
+    // costs/session-new.json gravado agora → mtime atual → isStale=true
+    const costsDir = join(d, "costs");
+    mkdirSync(costsDir);
+    writeFileSync(
+      join(costsDir, "session-new.json"),
+      JSON.stringify({ total_cost_usd: 0.5, by_model: {}, unpriced_models: [] }),
+    );
+    const r = readObservedCostRollup(d);
+    // Prova que o fallback bypassa o parser do report.html
+    expect(r.source).not.toBe("report");
+    expect(r.source).not.toBe("unreliable");
+    expect(["partial", "empty"]).toContain(r.source);
   });
 });

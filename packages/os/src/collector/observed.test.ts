@@ -253,6 +253,10 @@ describe("readSessionDir — OBS-019 (YAML raiz não-objeto)", () => {
 // 13. obs-custo-ok (OBS-018): cost-report.json completo + completo → custo real
 // ---------------------------------------------------------------------------
 
+// obs-custo-ok não tem diretório costs/ por design: um costs/*.json commitado carregaria
+// o mtime do checkout (sempre mais novo que o generated_at "2026-06-10T18:00:00Z" do
+// cost-report.json), fabricando staleness permanente. Staleness é coberto pelos
+// testes de temp-dir em cost-report.test.ts com mtimes controlados.
 describe("readSessionDir — obs-custo-ok (OBS-018, cost-report.json completo)", () => {
   it("cost.totalCostUsd === 1.23 (lido do cost-report.json)", () => {
     const spec = readSessionDir(fixt("obs-custo-ok"))!;
