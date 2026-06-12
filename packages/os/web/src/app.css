@@ -163,7 +163,8 @@ a:hover { text-decoration: underline; }
 .drawer-close:hover { color: var(--text); }
 .drawer-title { font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; margin: 10px 0 14px; }
 .drawer-why { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; }
-.drawer-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); margin: 26px 0 10px; }
+.drawer-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); margin: 26px 0 10px; border-top: 1px solid var(--border-soft); padding-top: 20px; }
+.drawer-section:first-of-type { border-top: 0; padding-top: 0; }
 .drawer-tasks { list-style: none; margin: 0; padding: 0; }
 .drawer-tasks li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
 .drawer-tasks-empty { color: var(--text-mute); }
@@ -510,6 +511,9 @@ a:hover { text-decoration: underline; }
   font-size: 13px; line-height: 1.55; color: var(--text-dim);
 }
 
+/* Medida de leitura: prosa não estica os 1024px do drawer */
+.drawer-story, .decision-what, .decision-why, .decision-rejected-text, .obs-evidence-result, .delivery-answer-text { max-width: 70ch; }
+
 /* ── Phase Journey (jornada de custo por fase no drawer) ─────────────── */
 .phase-journey { margin: 0 0 6px; }
 
@@ -719,13 +723,22 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
   padding: 2px 8px; border-radius: 999px;
 }
 
-/* janela do contrato (aberto em / fechado em) */
+/* janela do contrato (aberto em / fechado em) — mantido para compatibilidade retroativa */
 .obs-window {
   font-size: 12px; color: var(--text-dim);
   margin: 6px 0 12px;
 }
 .obs-window-label { font-weight: 600; }
 .obs-window-date { font-family: var(--mono); }
+
+/* Faixa de fatos-chave do drawer observado: custo/janela/prova sem rolagem */
+.obs-facts { display: flex; align-items: baseline; gap: 22px; flex-wrap: wrap; margin: 14px 0 6px; padding: 14px 16px; background: var(--surface-soft); border: 1px solid var(--border-soft); border-radius: var(--radius); }
+.obs-fact { display: flex; flex-direction: column; gap: 2px; }
+.obs-fact-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); }
+.obs-fact-value { font-size: 13px; color: var(--text); }
+.obs-fact-cost { flex-direction: row; align-items: baseline; gap: 8px; }
+.obs-fact-cost .obs-fact-value { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.obs-fact-report { margin-left: auto; font-size: 12px; align-self: center; }
 
 /* badge de drift — estado inconsistente detectado no session.yml */
 .obs-drift {

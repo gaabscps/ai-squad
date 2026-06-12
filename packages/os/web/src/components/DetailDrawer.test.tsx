@@ -605,16 +605,25 @@ describe("DetailDrawer — modo observado: header", () => {
   });
 });
 
-describe("DetailDrawer — modo observado: janela do contrato", () => {
-  it("exibe 'aberto em' com a data de createdAt", () => {
+describe("DetailDrawer — modo observado: janela do contrato (faixa obs-facts)", () => {
+  it("faixa obs-facts está presente em item observado", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({ createdAt: "2026-06-01T10:00:00Z", closedAt: null }),
     });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText(/aberto em/i)).toBeInTheDocument();
+    expect(screen.getByTestId("obs-facts")).toBeInTheDocument();
   });
 
-  it("exibe 'fechado em' quando closedAt está presente", () => {
+  it("exibe 'aberto em' com a data de createdAt na faixa", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ createdAt: "2026-06-01T10:00:00Z", closedAt: null }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText(/aberto em/i)).toBeInTheDocument();
+  });
+
+  it("exibe 'fechado em' quando closedAt está presente na faixa", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({
         createdAt: "2026-06-01T10:00:00Z",
@@ -622,7 +631,8 @@ describe("DetailDrawer — modo observado: janela do contrato", () => {
       }),
     });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText(/fechado em/i)).toBeInTheDocument();
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText(/fechado em/i)).toBeInTheDocument();
   });
 
   it("NÃO exibe 'fechado em' quando closedAt é null (contrato aberto)", () => {
@@ -875,5 +885,89 @@ describe("DetailDrawer — modo observado: parecer de entrega condicional", () =
     const spec = makeObservedSpec({ deliveryReport: makeDeliveryReport() });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(screen.getByText("Parecer de entrega")).toBeTruthy();
+  });
+});
+
+// ─── obs-facts: faixa de fatos-chave ─────────────────────────────────────────
+
+describe("DetailDrawer — modo observado: faixa obs-facts", () => {
+  it("faixa presente com custo USD → mostra valor formatado de custo e 'aberto em'", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ totalCostUsd: 12.34, totalTokens: 5000, source: "report" }),
+      observed: makeObservedMeta({ createdAt: "2026-06-01T10:00:00Z" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText("US$ 12.34")).toBeInTheDocument();
+    expect(within(facts).getByText(/aberto em/i)).toBeInTheDocument();
+  });
+
+  it("faixa com totalCostUsd null → mostra 'N tokens' como destaque (não USD)", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ totalCostUsd: null, totalTokens: 3500, source: "empty" }),
+      observed: makeObservedMeta({ createdAt: "2026-06-01T10:00:00Z" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    // Quando não há USD, exibe "N tokens" como valor principal da célula de custo
+    expect(within(facts).getByText(/tokens/i)).toBeInTheDocument();
+    // Não deve mostrar "US$" na faixa de custo quando null
+    expect(within(facts).queryByText(/US\$/)).toBeNull();
+  });
+
+  it("faixa com source partial → mostra badge 'preliminar'", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ totalCostUsd: 5.0, totalTokens: 2000, source: "partial" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).getByText("preliminar")).toBeInTheDocument();
+  });
+
+  it("faixa com source != partial → sem badge 'preliminar'", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ totalCostUsd: 5.0, source: "report" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).queryByText("preliminar")).toBeNull();
+  });
+
+  it("faixa com reportPath → link 'report.html' aparece UMA vez dentro da faixa", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ reportPath: "/a/.agent-session/OBS-001/report.html", totalCostUsd: 1.0 }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    const links = within(facts).getAllByRole("link", { name: /report/i });
+    // Link aparece exatamente uma vez — não duplicado
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", expect.stringContaining("report.html"));
+  });
+
+  it("faixa sem reportPath → nenhum link dentro da faixa", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ reportPath: null }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    expect(within(facts).queryByRole("link", { name: /report/i })).toBeNull();
+  });
+
+  it("faixa com totalCostUsd preenchido → linha de tokens separada visível", () => {
+    const spec = makeObservedSpec({
+      cost: makeCost({ totalCostUsd: 8.0, totalTokens: 9500, source: "report" }),
+    });
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const facts = screen.getByTestId("obs-facts");
+    // Linha separada "tokens" (label) com o valor
+    expect(within(facts).getByText("tokens")).toBeInTheDocument();
+    expect(within(facts).getByText("10K")).toBeInTheDocument();
+  });
+
+  it("faixa ausente em item SDD (não observado)", () => {
+    const spec = makeSpec();
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("obs-facts")).toBeNull();
   });
 });

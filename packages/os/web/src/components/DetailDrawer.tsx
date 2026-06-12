@@ -84,15 +84,44 @@ export function DetailDrawer({
         {/* ── Observed-only sections ─────────────────────────────────── */}
         {obs && (
           <>
-            <section className="obs-window">
-              <span className="obs-window-label">aberto em</span>{" "}
-              <span className="obs-window-date">{fmtDate(obs.createdAt)}</span>
+            <section className="obs-facts" data-testid="obs-facts">
+              <div className="obs-fact obs-fact-cost">
+                <span className="obs-fact-value">
+                  {spec.cost.totalCostUsd !== null
+                    ? fmtUsd(spec.cost.totalCostUsd)
+                    : `${fmtTokens(spec.cost.totalTokens)} tokens`}
+                </span>
+                {spec.cost.source === "partial" && (
+                  <span className="cost-preliminary" title="soma crua dos costs/*.json — cost-report.json ainda não publicado">
+                    preliminar
+                  </span>
+                )}
+              </div>
+              {spec.cost.totalCostUsd !== null && (
+                <div className="obs-fact">
+                  <span className="obs-fact-label">tokens</span>
+                  <span className="obs-fact-value mono">{fmtTokens(spec.cost.totalTokens)}</span>
+                </div>
+              )}
+              <div className="obs-fact">
+                <span className="obs-fact-label">aberto em</span>
+                <span className="obs-fact-value mono">{fmtDate(obs.createdAt)}</span>
+              </div>
               {obs.closedAt && (
-                <>
-                  {" · "}
-                  <span className="obs-window-label">fechado em</span>{" "}
-                  <span className="obs-window-date">{fmtDate(obs.closedAt)}</span>
-                </>
+                <div className="obs-fact">
+                  <span className="obs-fact-label">fechado em</span>
+                  <span className="obs-fact-value mono">{fmtDate(obs.closedAt)}</span>
+                </div>
+              )}
+              {spec.cost.reportPath && (
+                <a
+                  className="obs-fact-report"
+                  href={`/file?path=${encodeURIComponent(spec.cost.reportPath)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  report.html →
+                </a>
               )}
             </section>
 
@@ -239,25 +268,10 @@ export function DetailDrawer({
         )}
 
         {/* DeliveryReportBlock for observed sessions too (null-safe; chronicler is future work) */}
-        {obs && (
+        {obs && spec.deliveryReport && (
           <>
-            {spec.deliveryReport && (
-              <>
-                <h4 className="drawer-section">Parecer de entrega</h4>
-                <DeliveryReportBlock report={spec.deliveryReport} onOpenFile={openFile} />
-              </>
-            )}
-
-            {spec.cost.reportPath && (
-              <a
-                className="drawer-cost-report"
-                href={`/file?path=${encodeURIComponent(spec.cost.reportPath)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                report.html →
-              </a>
-            )}
+            <h4 className="drawer-section">Parecer de entrega</h4>
+            <DeliveryReportBlock report={spec.deliveryReport} onOpenFile={openFile} />
           </>
         )}
 
