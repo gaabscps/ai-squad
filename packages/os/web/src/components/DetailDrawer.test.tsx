@@ -691,6 +691,19 @@ describe("DetailDrawer — modo observado: seção Decisões", () => {
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     expect(container.querySelector(".obs-decision-why")).toBeNull();
   });
+
+  it("item degenerado (what vazio + why/rejected/ref null) não renderiza li vazio — cai no estado vazio", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({
+        decisions: [{ what: "", why: null, rejected: null, ref: null }],
+      }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // item degenerado deve ser filtrado — nenhum obs-decision renderizado
+    expect(container.querySelectorAll(".obs-decision")).toHaveLength(0);
+    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
+    expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
+  });
 });
 
 describe("DetailDrawer — modo observado: seção Evidências", () => {
@@ -726,6 +739,8 @@ describe("DetailDrawer — modo observado: seção Evidências", () => {
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     // item degenerado deve ser filtrado — nenhum obs-evidence-item renderizado
     expect(container.querySelectorAll(".obs-evidence-item")).toHaveLength(0);
+    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
+    expect(screen.getByText("nenhuma evidência registrada")).toBeInTheDocument();
   });
 });
 

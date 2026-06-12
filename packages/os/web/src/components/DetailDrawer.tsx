@@ -99,39 +99,47 @@ export function DetailDrawer({
               <p className="obs-drift">⚠ estado inconsistente no session.yml</p>
             )}
 
-            <h4 className="drawer-section">Decisões</h4>
-            {obs.decisions.length === 0 ? (
-              <p className="drawer-empty">nenhuma decisão registrada</p>
-            ) : (
-              <ol className="obs-decisions">
-                {obs.decisions.filter((d: ObservedDecision) => d.what || d.why || d.rejected || d.ref).map((d: ObservedDecision, i: number) => (
-                  <li key={i} className="obs-decision">
-                    {d.what && <p className="obs-decision-what">{d.what}</p>}
-                    {d.why && <p className="obs-decision-why">{d.why}</p>}
-                    {d.rejected && (
-                      <p className="obs-decision-rejected">rejeitado: {d.rejected}</p>
-                    )}
-                    {d.ref && (
-                      <code className="obs-decision-ref">{d.ref}</code>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
+            {(() => {
+              const shownDecisions = obs.decisions.filter((d: ObservedDecision) => d.what || d.why || d.rejected || d.ref);
+              const shownEvidence = obs.evidence.filter((e: ObservedEvidence) => e.cmd || e.result || e.kind);
+              return (
+                <>
+                  <h4 className="drawer-section">Decisões</h4>
+                  {shownDecisions.length === 0 ? (
+                    <p className="drawer-empty">nenhuma decisão registrada</p>
+                  ) : (
+                    <ol className="obs-decisions">
+                      {shownDecisions.map((d: ObservedDecision, i: number) => (
+                        <li key={i} className="obs-decision">
+                          {d.what && <p className="obs-decision-what">{d.what}</p>}
+                          {d.why && <p className="obs-decision-why">{d.why}</p>}
+                          {d.rejected && (
+                            <p className="obs-decision-rejected">rejeitado: {d.rejected}</p>
+                          )}
+                          {d.ref && (
+                            <code className="obs-decision-ref">{d.ref}</code>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
 
-            <h4 className="drawer-section">Evidências</h4>
-            {obs.evidence.length === 0 ? (
-              <p className="drawer-empty">nenhuma evidência registrada</p>
-            ) : (
-              <ol className="obs-evidence">
-                {obs.evidence.filter((e: ObservedEvidence) => e.cmd || e.result || e.kind).map((e: ObservedEvidence, i: number) => (
-                  <li key={i} className="obs-evidence-item">
-                    {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
-                    {e.result && <p className="obs-evidence-result">{e.result}</p>}
-                  </li>
-                ))}
-              </ol>
-            )}
+                  <h4 className="drawer-section">Evidências</h4>
+                  {shownEvidence.length === 0 ? (
+                    <p className="drawer-empty">nenhuma evidência registrada</p>
+                  ) : (
+                    <ol className="obs-evidence">
+                      {shownEvidence.map((e: ObservedEvidence, i: number) => (
+                        <li key={i} className="obs-evidence-item">
+                          {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
+                          {e.result && <p className="obs-evidence-result">{e.result}</p>}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
+              );
+            })()}
           </>
         )}
 
