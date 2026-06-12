@@ -762,3 +762,53 @@ describe("DetailDrawer — modo SDD legado NÃO afetado por observed", () => {
     expect(screen.queryByText("OBSERVADO")).toBeNull();
   });
 });
+
+// ─── Fix 2: section ORDER lock (legacy drawer) ────────────────────────────────
+
+describe("DetailDrawer — ordem das seções no modo SDD legado", () => {
+  it("Tarefas aparece antes de Custo, e Custo antes de Linha do tempo", () => {
+    const spec = makeSpec({ tasks: [makeTask({ id: "T-ORDER-1" })] });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const html = container.innerHTML;
+    const idxTarefas = html.indexOf("Tarefas");
+    const idxCusto = html.indexOf("Custo");
+    const idxLinha = html.indexOf("Linha do tempo");
+    expect(idxTarefas).toBeGreaterThan(-1);
+    expect(idxCusto).toBeGreaterThan(-1);
+    expect(idxLinha).toBeGreaterThan(-1);
+    // Tarefas < Custo < Linha do tempo
+    expect(idxTarefas).toBeLessThan(idxCusto);
+    expect(idxCusto).toBeLessThan(idxLinha);
+  });
+});
+
+// ─── Fix 4: seção Custo e DeliveryReportBlock presentes em AMBOS os modos ─────
+
+describe("DetailDrawer — seção Custo presente em ambos os modos", () => {
+  it("modo SDD: seção Custo está presente", () => {
+    render(<DetailDrawer item={item(makeSpec())} onClose={vi.fn()} />);
+    expect(screen.getByText("Custo")).toBeInTheDocument();
+  });
+
+  it("modo observado: seção Custo está presente", () => {
+    render(<DetailDrawer item={item(makeObservedSpec())} onClose={vi.fn()} />);
+    expect(screen.getByText("Custo")).toBeInTheDocument();
+  });
+});
+
+describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () => {
+  it("modo SDD: bloco de parecer de entrega está presente (estado vazio)", () => {
+    const spec = makeSpec({ deliveryReport: null });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // DeliveryReportBlock renderiza sempre (null-safe); confirma via heading ou container
+    expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
+    expect(container.querySelector(".delivery-report-block, .delivery-report-empty, h4")).not.toBeNull();
+  });
+
+  it("modo observado: bloco de parecer de entrega está presente (estado vazio)", () => {
+    const spec = makeObservedSpec({ deliveryReport: null });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getAllByText("Parecer de entrega").length).toBeGreaterThanOrEqual(1);
+    expect(container.querySelector(".delivery-report-block, .delivery-report-empty, h4")).not.toBeNull();
+  });
+});

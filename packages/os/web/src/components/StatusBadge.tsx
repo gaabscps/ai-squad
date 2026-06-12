@@ -1,5 +1,4 @@
 import type { Spec } from "../../../src/store/types";
-export { STATUS_LABEL } from "../lib/statusLabels";
 import { STATUS_LABEL } from "../lib/statusLabels";
 
 /**

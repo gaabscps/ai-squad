@@ -171,9 +171,6 @@ export function DetailDrawer({
                 <TaskItem key={task.id} task={task} projectId={projectId} specId={spec.id} />
               ))}
             </ul>
-
-            <h4 className="drawer-section">Linha do tempo</h4>
-            <Timeline spec={spec} projectPath={projectPath} onOpenFile={openFile} />
           </>
         )}
 
@@ -225,6 +222,14 @@ export function DetailDrawer({
               <dd>{fmtUsd(spec.cost.byPhase.implementation)}</dd>
             </div>
           </dl>
+        )}
+
+        {/* ── SDD-only: Timeline placed AFTER cost (legacy order) ─────── */}
+        {!obs && (
+          <>
+            <h4 className="drawer-section">Linha do tempo</h4>
+            <Timeline spec={spec} projectPath={projectPath} onOpenFile={openFile} />
+          </>
         )}
 
         {/* DeliveryReportBlock for observed sessions too (null-safe; chronicler is future work) */}

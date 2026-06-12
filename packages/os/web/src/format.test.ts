@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fmtTokens, fmtUsd, fmtRelativeTime } from "./format";
+import { fmtTokens, fmtUsd, fmtDate, fmtRelativeTime } from "./format";
 
 describe("fmtTokens", () => {
   it("milhões com 1 casa", () => {
@@ -19,6 +19,18 @@ describe("fmtUsd", () => {
   });
   it("null vira travessão", () => {
     expect(fmtUsd(null)).toBe("—");
+  });
+});
+
+describe("fmtDate", () => {
+  it("ISO válido retorna string dd/mm/aaaa em pt-BR", () => {
+    expect(fmtDate("2026-06-12T10:00:00Z")).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+  });
+  it("null vira travessão", () => {
+    expect(fmtDate(null)).toBe("—");
+  });
+  it("string inválida vira travessão", () => {
+    expect(fmtDate("nao-e-uma-data")).toBe("—");
   });
 });
 
