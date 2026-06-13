@@ -119,5 +119,59 @@ class TestTrackAttention(unittest.TestCase):
         self.assertEqual(code, 0)
 
 
+    # ------------------------------------------------------------------
+    # Task 7a — blocks.jsonl event appending
+    # ------------------------------------------------------------------
+
+    def test_ask_appends_blocked_event(self):
+        self.session_yml.write_text(OBSERVED_YML, encoding="utf-8")
+        _run_hook(self._ask_payload())
+        blocks_file = self.session_dir / "blocks.jsonl"
+        self.assertTrue(blocks_file.exists(), "blocks.jsonl should have been created")
+        lines = [l for l in blocks_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        self.assertEqual(len(lines), 1, "exactly one event line expected")
+        rec = json.loads(lines[0])
+        self.assertEqual(rec["event"], "blocked")
+        self.assertEqual(rec["kind"], "input")
+        self.assertRegex(rec["at"], r"^\d{4}-\d{2}-\d{2}T")
+
+    def test_prompt_appends_resumed_event(self):
+        self.session_yml.write_text(
+            OBSERVED_YML.replace("status: in_progress",
+                                 "status: needs_attention\nattention:\n  kind: input"),
+            encoding="utf-8",
+        )
+        _run_hook(self._prompt_payload())
+        blocks_file = self.session_dir / "blocks.jsonl"
+        self.assertTrue(blocks_file.exists(), "blocks.jsonl should have been created")
+        lines = [l for l in blocks_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        self.assertEqual(len(lines), 1)
+        rec = json.loads(lines[0])
+        self.assertEqual(rec["event"], "resumed")
+        self.assertNotIn("kind", rec)
+        self.assertRegex(rec["at"], r"^\d{4}-\d{2}-\d{2}T")
+
+    def test_no_block_event_without_flip(self):
+        # Already at needs_attention → ask payload → no flip → no blocks.jsonl
+        already_blocked = OBSERVED_YML.replace(
+            "status: in_progress", "status: needs_attention\nattention:\n  kind: input"
+        )
+        self.session_yml.write_text(already_blocked, encoding="utf-8")
+        _run_hook(self._ask_payload())
+        self.assertFalse(
+            (self.session_dir / "blocks.jsonl").exists(),
+            "blocks.jsonl must NOT be created when there is no flip",
+        )
+
+    def test_sdd_session_writes_no_block(self):
+        sdd = OBSERVED_YML.replace("mode: observed\n", "")
+        self.session_yml.write_text(sdd, encoding="utf-8")
+        _run_hook(self._ask_payload())
+        self.assertFalse(
+            (self.session_dir / "blocks.jsonl").exists(),
+            "SDD sessions must not produce blocks.jsonl",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _HOOKS_DIR = Path(__file__).resolve().parent
@@ -28,6 +29,21 @@ if str(_HOOKS_DIR) not in sys.path:
 from hook_runtime import _TERMINAL_STATUS, find_active_session, resolve_project_root
 
 _STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.M)
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _append_block(session_dir: Path, event: str, kind: str | None) -> None:
+    rec = {"at": _now(), "event": event}
+    if kind:
+        rec["kind"] = kind
+    try:
+        with (session_dir / "blocks.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except OSError:
+        pass  # fail-open; the block trail is best-effort
 
 
 def _read(session_yml: Path) -> str | None:
@@ -107,8 +123,10 @@ def main() -> int:
     try:
         if is_ask and status != "needs_attention":
             _write_atomic(session_yml, _set_status(text, "needs_attention", "input"))
+            _append_block(Path(session_dir), "blocked", "input")
         elif is_prompt and status == "needs_attention":
             _write_atomic(session_yml, _set_status(text, "in_progress", None))
+            _append_block(Path(session_dir), "resumed", None)
     except OSError as exc:
         print(f"track-attention: write failed ({exc})", file=sys.stderr)
     return 0
