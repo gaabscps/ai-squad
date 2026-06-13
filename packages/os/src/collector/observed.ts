@@ -297,17 +297,25 @@ function readBlocks(specDir: string): BlockEvent[] {
 }
 
 /**
- * Recupera o campo `at` cru de cada item antes de normalizar (normalize descarta `at`).
- * Junta o `at` ao objeto normalizado pelo índice de posição.
+ * Recupera o campo `at` cru de cada item antes de normalizar e re-anexa pelo índice.
+ *
+ * Pré-condição de alinhamento: `normalizeDecisions` e `normalizeEvidence` descartam
+ * itens não-objeto (strings, null, arrays). Por isso filtramos `rawArr` com o mesmo
+ * predicado antes do join por índice — sem isso, um item inválido no meio do array
+ * deslocaria todos os `at` seguintes (o item N+1 do normalized receberia o `at` do
+ * item N+2 do raw, ou null quando o raw acabasse antes).
  */
-function withAt<T>(rawArr: unknown, normalized: T[]): (T & { at: string | null })[] {
+export function withAt<T>(rawArr: unknown, normalized: T[]): (T & { at: string | null })[] {
   const arr = Array.isArray(rawArr) ? rawArr : [];
+  // Filtra o raw com o mesmo predicado de normalizeDecisions/normalizeEvidence,
+  // para os índices alinharem depois que itens inválidos são descartados.
+  const valid = arr.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  );
   return normalized.map((n, i) => {
-    const item = arr[i];
-    const at =
-      item && typeof item === "object" && typeof (item as any).at === "string"
-        ? (item as any).at
-        : null;
+    const item = valid[i];
+    const at = item && typeof item.at === "string" ? item.at : null;
     return { ...n, at };
   });
 }

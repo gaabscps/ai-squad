@@ -20,7 +20,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readSessionDir } from "./observed.js";
+import { readSessionDir, withAt } from "./observed.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Caminho até packages/os/test/fixtures/ subindo de src/collector/ → src/ → packages/os/
@@ -376,5 +376,23 @@ describe("readSessionDir — obs-timeline (markers)", () => {
     expect(kinds).not.toContain("edit");
     expect(kinds).not.toContain("block");
     expect(spec.observed!.baseSha).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17. withAt: alinhamento de `at` quando item inválido é descartado pelo meio
+// ---------------------------------------------------------------------------
+
+describe("withAt — alinhamento por índice com itens inválidos no meio", () => {
+  it("withAt alinha at mesmo com item inválido no meio (índices divergentes)", () => {
+    const raw = [
+      { what: "A", at: "2026-06-13T14:05:00Z" },
+      "garbage",
+      { what: "B", at: "2026-06-13T14:25:00Z" },
+    ];
+    const normalized = [{ what: "A" }, { what: "B" }]; // como normalizeDecisions retornaria
+    const out = withAt(raw, normalized as any);
+    expect(out[0].at).toBe("2026-06-13T14:05:00Z");
+    expect(out[1].at).toBe("2026-06-13T14:25:00Z"); // sem o fix, viria null
   });
 });
