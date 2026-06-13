@@ -19,18 +19,22 @@
     },
     "output_locale": { "type": "string", "description": "BCP-47 tag; language of human-facing prose. Absent defaults to en." },
     "created_at": { "type": "string", "description": "ISO 8601 UTC, real clock. Lower bound of the contract's cost window." },
+    "base_sha": {
+      "type": "string",
+      "description": "Git HEAD SHA-1 no momento da abertura da sessão; âncora estável do range de diff (git diff base_sha). Opcional — sessões antigas não têm."
+    },
     "closed_at": { "type": "string", "description": "ISO 8601 UTC. Upper bound of the cost window. Present only on terminal close (done AND abandoned)." },
     "decisions": {
       "type": "array",
       "items": { "type": "object", "additionalProperties": true, "properties": {
-        "what": { "type": "string" }, "why": { "type": "string" }, "rejected": { "type": "string" }, "ref": { "type": "string" }
+        "what": { "type": "string" }, "why": { "type": "string" }, "rejected": { "type": "string" }, "ref": { "type": "string" }, "at": { "type": "string", "description": "ISO-8601 UTC do momento em que a decisão/verificação foi registrada (best-effort; ausência → ordenação por inserção)." }
       } },
       "description": "Best-effort trail appended by the model when a real choice is made. Canonical keys what/why/rejected/ref; items are open (no per-item required) — the trail is best-effort, never load-bearing."
     },
     "evidence": {
       "type": "array",
       "items": { "type": "object", "additionalProperties": true, "properties": {
-        "cmd": { "type": "string" }, "result": { "type": "string" }, "kind": { "type": "string" }
+        "cmd": { "type": "string" }, "result": { "type": "string" }, "kind": { "type": "string" }, "at": { "type": "string", "description": "ISO-8601 UTC do momento em que a decisão/verificação foi registrada (best-effort; ausência → ordenação por inserção)." }
       } },
       "description": "Best-effort verification trail (command + observed result)."
     },
