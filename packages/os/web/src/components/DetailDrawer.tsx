@@ -130,7 +130,11 @@ export function DetailDrawer({
             )}
 
             <h4 className="drawer-section">Linha do tempo</h4>
-            <ObservedTimeline markers={obs.markers} outputLocale={obs.outputLocale} />
+            <ObservedTimeline
+              markers={obs.markers}
+              outputLocale={obs.outputLocale}
+              onOpenRef={(ref) => openFile(`${projectPath}/${ref}`, ref)}
+            />
           </>
         )}
 

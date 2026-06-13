@@ -715,11 +715,11 @@ describe("DetailDrawer — modo observado: timeline (substitui seções Decisõe
     const spec = makeObservedSpec({
       observed: makeObservedMeta({ markers: [] }),
     });
-    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
     // ObservedTimeline renderiza o empty state quando markers é vazio
     expect(screen.queryByTestId("obs-timeline")).toBeNull();
     // a antiga seção 'Decisões' separada não existe mais
-    const h4s = document.querySelectorAll("h4.drawer-section");
+    const h4s = container.querySelectorAll("h4.drawer-section");
     const texts = Array.from(h4s).map((el) => el.textContent);
     expect(texts).not.toContain("Decisões");
     // a nova seção de timeline está presente

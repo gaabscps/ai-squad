@@ -68,9 +68,11 @@ function EditFiles({ files }: { files: ObservedEditFile[] }) {
 export function ObservedTimeline({
   markers,
   outputLocale,
+  onOpenRef,
 }: {
   markers: ObservedMarker[];
   outputLocale: string | null;
+  onOpenRef?: (ref: string) => void;
 }) {
   const L = pickLabels(outputLocale);
   if (markers.length === 0) return <p className="drawer-empty">{L.empty}</p>;
@@ -103,6 +105,15 @@ export function ObservedTimeline({
                 )}
                 {m.decision.why && (
                   <span className="tl-why">{m.decision.why}</span>
+                )}
+                {m.decision.ref && (
+                  <button
+                    type="button"
+                    className="tl-ref mono"
+                    onClick={() => onOpenRef?.(m.decision!.ref!)}
+                  >
+                    {m.decision.ref}
+                  </button>
                 )}
               </>
             )}

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ObservedTimeline } from "./ObservedTimeline";
@@ -235,5 +235,44 @@ describe("ObservedTimeline — campos opcionais por kind", () => {
       <ObservedTimeline markers={[marker]} outputLocale={null} />
     );
     expect(container.querySelector(".tl-loose")).toBeNull();
+  });
+});
+
+describe("ObservedTimeline — decision.ref", () => {
+  it("ref renderiza e clique chama onOpenRef com o valor correto", async () => {
+    const onOpenRef = vi.fn();
+    const marker = makeMarker({
+      kind: "decision",
+      decision: { what: "usar queue", why: "evita bloqueio", rejected: null, ref: "ADR-012" },
+    });
+    render(
+      <ObservedTimeline markers={[marker]} outputLocale={null} onOpenRef={onOpenRef} />
+    );
+    expect(screen.getByText("ADR-012")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("ADR-012"));
+    expect(onOpenRef).toHaveBeenCalledWith("ADR-012");
+  });
+
+  it("why=null: .tl-why não é renderizado, what ainda aparece", () => {
+    const marker = makeMarker({
+      kind: "decision",
+      decision: { what: "usar cache", why: null, rejected: null, ref: null },
+    });
+    const { container } = render(
+      <ObservedTimeline markers={[marker]} outputLocale={null} />
+    );
+    expect(container.querySelector(".tl-why")).toBeNull();
+    expect(screen.getByText("usar cache")).toBeInTheDocument();
+  });
+
+  it("ref=null: .tl-ref não é renderizado", () => {
+    const marker = makeMarker({
+      kind: "decision",
+      decision: { what: "usar queue", why: "evita bloqueio", rejected: null, ref: null },
+    });
+    const { container } = render(
+      <ObservedTimeline markers={[marker]} outputLocale={null} />
+    );
+    expect(container.querySelector(".tl-ref")).toBeNull();
   });
 });
