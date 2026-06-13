@@ -94,6 +94,27 @@ export interface ObservedEvidence {
   kind: string | null;
 }
 
+// Um arquivo dentro de um marco de edição; counts/patch vêm do diff.json (Stop).
+export interface ObservedEditFile {
+  path: string;
+  added: number | null;   // null até o diff.json existir (pré-Stop)
+  removed: number | null;
+  patch: string | null;   // unified diff desde base_sha; null se não materializado
+}
+
+export type ObservedMarkerKind = "open" | "decision" | "edit" | "verify" | "block" | "close";
+
+// Um marco da timeline de execução. Campos por kind são opcionais (discriminados por `kind`).
+export interface ObservedMarker {
+  kind: ObservedMarkerKind;
+  at: string | null;       // ISO-8601; null quando best-effort sem hora
+  exact: boolean;          // true = timestamp mecânico (edit/block/open/close); false = ordem
+  note: string | null;     // rótulo curto (open/close/block)
+  decision: ObservedDecision | null;   // kind === "decision"
+  evidence: ObservedEvidence | null;   // kind === "verify"
+  editFiles: ObservedEditFile[] | null; // kind === "edit"
+}
+
 // Metadados exclusivos do modo observado; presença do campo = card observado.
 export interface ObservedMeta {
   intent: string;
@@ -103,6 +124,9 @@ export interface ObservedMeta {
   decisions: ObservedDecision[];
   evidence: ObservedEvidence[];
   driftFlags: ObservedDriftFlag[];
+  baseSha: string | null;        // git base_sha lido do session.yml (âncora do diff)
+  outputLocale: string | null;   // output_locale da sessão (BCP-47); idioma dos labels da timeline
+  markers: ObservedMarker[];     // a timeline curada (preenchida na Task 8)
 }
 
 export interface TimelineEntry {

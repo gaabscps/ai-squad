@@ -88,6 +88,9 @@ export function makeObservedMeta(over: Partial<ObservedMeta> = {}): ObservedMeta
     decisions: [],
     evidence: [],
     driftFlags: [],
+    baseSha: null,
+    outputLocale: null,
+    markers: [],
     ...over,
   };
 }

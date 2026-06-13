@@ -94,6 +94,9 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     decisions: normalizeDecisions(raw.decisions),
     evidence: normalizeEvidence(raw.evidence),
     driftFlags: drift,
+    baseSha: nonEmptyString(raw.base_sha),
+    outputLocale: nonEmptyString(raw.output_locale),
+    markers: [], // markers: preenchido na Task 8
   };
 
   return {
@@ -201,6 +204,9 @@ function degradedSpec(specDir: string): Spec {
     decisions: [],
     evidence: [],
     driftFlags: ["unreadable_yaml"],
+    baseSha: null,
+    outputLocale: null,
+    markers: [],
   };
 
   return {
