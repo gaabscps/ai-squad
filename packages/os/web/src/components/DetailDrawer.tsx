@@ -13,8 +13,7 @@ import { SpecSummaryBlock } from "./SpecSummaryBlock";
 import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
-import { visibleDecisions, visibleEvidence } from "../lib/observedTrail";
-import { DecisionCard } from "./DecisionCard";
+import { ObservedTimeline } from "./ObservedTimeline";
 
 export function DetailDrawer({
   item,
@@ -130,42 +129,8 @@ export function DetailDrawer({
               <p className="obs-drift">⚠ estado inconsistente no session.yml</p>
             )}
 
-            {(() => {
-              const shownDecisions = visibleDecisions(obs);
-              const shownEvidence = visibleEvidence(obs);
-              const openRef = (ref: string) =>
-                openFile(`${projectPath}/${ref}`, ref);
-              return (
-                <>
-                  <h4 className="drawer-section">Decisões</h4>
-                  {shownDecisions.length === 0 ? (
-                    <p className="drawer-empty">nenhuma decisão registrada</p>
-                  ) : (
-                    <ol className="obs-decisions">
-                      {shownDecisions.map((d, i) => (
-                        <DecisionCard key={i} decision={d} onOpenRef={openRef} />
-                      ))}
-                    </ol>
-                  )}
-
-                  {/* Evidências acopladas à trilha (mesma seção, sub-rótulo — não h4 irmã) */}
-                  {shownEvidence.length > 0 && (
-                    <>
-                      <p className="obs-trail-sub">verificações</p>
-                      <ol className="obs-evidence">
-                        {shownEvidence.map((e, i) => (
-                          <li key={i} className="obs-evidence-item">
-                            <span className="evidence-mark" aria-hidden="true">✓</span>
-                            {e.cmd && <code className="obs-evidence-cmd">{e.cmd}</code>}
-                            {e.result && <span className="obs-evidence-result">→ {e.result}</span>}
-                          </li>
-                        ))}
-                      </ol>
-                    </>
-                  )}
-                </>
-              );
-            })()}
+            <h4 className="drawer-section">Linha do tempo</h4>
+            <ObservedTimeline markers={obs.markers} outputLocale={obs.outputLocale} />
           </>
         )}
 

@@ -644,118 +644,97 @@ describe("DetailDrawer — modo observado: janela do contrato (faixa obs-facts)"
   });
 });
 
-describe("DetailDrawer — modo observado: seção Decisões", () => {
-  it("decisão completa: what, why, rejected, ref em monospace", () => {
+describe("DetailDrawer — modo observado: timeline (substitui seções Decisões + Evidências)", () => {
+  it("obs-timeline está presente quando há markers", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({
-        decisions: [
+        markers: [
           {
-            what: "usar queue em vez de chamada direta",
-            why: "evita bloqueio no request cycle",
-            rejected: "chamada síncrona",
-            ref: "ADR-012",
+            kind: "decision",
+            at: "2026-06-01T10:05:00Z",
+            exact: true,
+            note: null,
+            decision: { what: "usar queue em vez de chamada direta", why: "evita bloqueio no request cycle", rejected: "chamada síncrona", ref: null },
+            evidence: null,
+            editFiles: null,
+            blockMs: null,
           },
         ],
       }),
     });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText("usar queue em vez de chamada direta")).toBeInTheDocument();
-    expect(screen.getByText("evita bloqueio no request cycle")).toBeInTheDocument();
-    // novo: texto rejeitado sem prefixo "rejeitado:" — está dentro de .decision-rejected
-    expect(screen.getByText("chamada síncrona").closest(".decision-rejected")).not.toBeNull();
-    // ref não-.md renderiza como <code> inerte com classe decision-ref
-    const ref = container.querySelector("code.decision-ref");
-    expect(ref).not.toBeNull();
-    expect(ref!.textContent).toBe("ADR-012");
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByTestId("obs-timeline")).toBeInTheDocument();
   });
 
-  it("decisão com what+why apenas: sem linhas de rejected/ref", () => {
+  it("marker decision renderiza what, why e rejected via timeline", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({
-        decisions: [
-          { what: "usar TypeScript strict", why: "detecta erros cedo", rejected: null, ref: null },
+        markers: [
+          {
+            kind: "decision",
+            at: "2026-06-01T10:05:00Z",
+            exact: true,
+            note: null,
+            decision: { what: "usar queue em vez de chamada direta", why: "evita bloqueio no request cycle", rejected: "chamada síncrona", ref: null },
+            evidence: null,
+            editFiles: null,
+            blockMs: null,
+          },
         ],
       }),
-    });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText("usar TypeScript strict")).toBeInTheDocument();
-    expect(screen.getByText("detecta erros cedo")).toBeInTheDocument();
-    expect(container.querySelector(".decision-rejected")).toBeNull();
-    expect(container.querySelector(".decision-ref")).toBeNull();
-  });
-
-  it("lista vazia: exibe estado vazio 'nenhuma decisão registrada'", () => {
-    const spec = makeObservedSpec({
-      observed: makeObservedMeta({ decisions: [] }),
     });
     render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
+    expect(screen.getByText("usar queue em vez de chamada direta")).toBeInTheDocument();
+    expect(screen.getByText("evita bloqueio no request cycle")).toBeInTheDocument();
+    expect(screen.getByText(/chamada síncrona/)).toBeInTheDocument();
   });
 
-  it("decisão com why=null não renderiza parágrafo why vazio", () => {
+  it("marker verify renderiza cmd e result via timeline", () => {
     const spec = makeObservedSpec({
       observed: makeObservedMeta({
-        decisions: [
-          { what: "usar cache em memória", why: null, rejected: null, ref: null },
+        markers: [
+          {
+            kind: "verify",
+            at: "2026-06-01T10:10:00Z",
+            exact: true,
+            note: null,
+            decision: null,
+            evidence: { cmd: "npm test", result: "42 tests passed", kind: null },
+            editFiles: null,
+            blockMs: null,
+          },
         ],
       }),
     });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    expect(container.querySelector(".decision-why")).toBeNull();
-  });
-
-  it("item degenerado (what vazio + why/rejected/ref null) não renderiza li vazio — cai no estado vazio", () => {
-    const spec = makeObservedSpec({
-      observed: makeObservedMeta({
-        decisions: [{ what: "", why: null, rejected: null, ref: null }],
-      }),
-    });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // item degenerado deve ser filtrado — nenhum decision-fork renderizado
-    expect(container.querySelectorAll(".decision-fork")).toHaveLength(0);
-    // array de itens todos degenerados → cai no estado vazio, não em <ol> vazio
-    expect(screen.getByText("nenhuma decisão registrada")).toBeInTheDocument();
-  });
-});
-
-describe("DetailDrawer — modo observado: seção Evidências", () => {
-  it("evidência: cmd em monospace e result como span com seta", () => {
-    const spec = makeObservedSpec({
-      observed: makeObservedMeta({
-        evidence: [
-          { cmd: "npm test", result: "42 tests passed", kind: null },
-        ],
-      }),
-    });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    const cmdEl = container.querySelector("code.obs-evidence-cmd");
-    expect(cmdEl).not.toBeNull();
-    expect(cmdEl!.textContent).toBe("npm test");
-    // result agora renderiza como span com prefixo "→ "
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByText("npm test")).toBeInTheDocument();
     expect(screen.getByText(/42 tests passed/)).toBeInTheDocument();
   });
 
-  it("lista vazia: sub-rótulo 'verificações' NÃO é exibido (sem seção prometida)", () => {
+  it("markers vazio: renderiza empty state (sem h4 'Decisões' separado)", () => {
     const spec = makeObservedSpec({
-      observed: makeObservedMeta({ evidence: [] }),
+      observed: makeObservedMeta({ markers: [] }),
     });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // evidência vazia não renderiza nada — sem sub-rótulo, sem lista, sem empty-state
-    expect(container.querySelector(".obs-trail-sub")).toBeNull();
-    expect(screen.queryByText("nenhuma evidência registrada")).toBeNull();
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // ObservedTimeline renderiza o empty state quando markers é vazio
+    expect(screen.queryByTestId("obs-timeline")).toBeNull();
+    // a antiga seção 'Decisões' separada não existe mais
+    const h4s = document.querySelectorAll("h4.drawer-section");
+    const texts = Array.from(h4s).map((el) => el.textContent);
+    expect(texts).not.toContain("Decisões");
+    // a nova seção de timeline está presente
+    expect(texts).toContain("Linha do tempo");
   });
 
-  it("item degenerado (cmd/result/kind todos null) não renderiza li vazio bordejado", () => {
+  it("seção 'Decisões' como h4 separado NÃO existe mais — a palavra pode aparecer como label da timeline", () => {
     const spec = makeObservedSpec({
-      observed: makeObservedMeta({
-        evidence: [{ cmd: null, result: null, kind: null }],
-      }),
+      observed: makeObservedMeta({ markers: [] }),
     });
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // item degenerado filtrado por visibleEvidence — nenhum obs-evidence-item renderizado
-    expect(container.querySelectorAll(".obs-evidence-item")).toHaveLength(0);
-    // sem evidência visível → sem sub-rótulo nem empty-state
-    expect(container.querySelector(".obs-trail-sub")).toBeNull();
+    // nenhum <h4 class="drawer-section"> com texto "Decisões"
+    const h4s = container.querySelectorAll("h4.drawer-section");
+    const decisoesH4 = Array.from(h4s).find((el) => el.textContent === "Decisões");
+    expect(decisoesH4).toBeUndefined();
   });
 });
 
