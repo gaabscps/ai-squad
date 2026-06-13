@@ -777,6 +777,223 @@ button.decision-ref { border: 1px solid var(--border); background: var(--surface
 /* estado vazio para decisões/evidências */
 .drawer-empty { font-size: 12px; color: var(--text-mute); margin: 0 0 12px; font-style: italic; }
 
+/* ── ObservedTimeline ─────────────────────────────────────────────────────── */
+/* Cores por tipo de marco — não há tokens semânticos pra estes no tema atual;
+   os valores batem com a paleta "Anthropic Studio" warm e o mockup aprovado.
+   Se mais blocos adotarem as mesmas cores, extrair para vars em :root. */
+:root {
+  --tl-decision: #6b8f71;  /* verde discreto — escolha afirmativa */
+  --tl-edit:     #c96442;  /* terracota — mesmo espírito do --accent mas mais saturado */
+  --tl-verify:   #7a8db0;  /* azul acinzentado — verificação técnica */
+  --tl-block:    #d4a72c;  /* âmbar — atenção, pausa forçada */
+  --tl-edge:     #9E9186;  /* cinza quente — marcos de borda (open/close); == --text-mute */
+}
+
+/* <ol> raiz: remove marcadores nativos, cria a espinha vertical com border-left */
+.obs-timeline {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0 0 0 18px;          /* recuo para os dots encostarem na espinha */
+  border-left: 2px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* <li>: posicionamento relativo pra o dot sair da espinha */
+.tl-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.tl-item:last-child { border-bottom: none; }
+
+/* Dot: círculo posicionado sobre a espinha (left negativo compensa o padding do ol) */
+.tl-dot {
+  position: absolute;
+  left: -24px;                  /* 18px recuo + 2px borda + 4px pra centralizar no dot 10px */
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tl-edge);
+  border: 2px solid var(--surface);
+  flex-shrink: 0;
+}
+
+/* Cores do dot por kind — sobreposição de especificidade (0-2-0) */
+.tl-decision .tl-dot { background: var(--tl-decision); }
+.tl-edit      .tl-dot { background: var(--tl-edit); }
+.tl-verify    .tl-dot { background: var(--tl-verify); }
+.tl-block     .tl-dot { background: var(--tl-block); }
+/* .tl-open e .tl-close ficam com --tl-edge (default acima) */
+
+/* Coluna de conteúdo à direita do dot */
+.tl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;                 /* evita blowout em nomes de arquivo longos */
+}
+
+/* Rótulo do kind: compacto, caps-ish — espelha .drawer-section sem ser tão pesado */
+.tl-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+}
+/* Cor do label segue o dot */
+.tl-decision .tl-label { color: var(--tl-decision); }
+.tl-edit      .tl-label { color: var(--tl-edit); }
+.tl-verify    .tl-label { color: var(--tl-verify); }
+.tl-block     .tl-label { color: var(--tl-block); }
+
+/* Duração do bloco (dentro de .tl-label) */
+.tl-dur { font-weight: 400; color: var(--text-mute); }
+
+/* Indicador de hora aproximada — quase invisível, só pra quem procura */
+.tl-loose { opacity: 0.45; }
+
+/* Texto principal da decisão: destaque, não gigante */
+.tl-what {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  max-width: 70ch;
+}
+
+/* Alternativa rejeitada: esmaecida + risco */
+.tl-rej {
+  font-size: 12px;
+  color: var(--text-mute);
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+/* Rationale da decisão: caption muted */
+.tl-why {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+  max-width: 70ch;
+}
+
+/* Bloco de verificação: cmd inline + resultado muted */
+.tl-verify-body {        /* NOTE: o componente usa .tl-verify como className no <span> de evidência,
+                            mas .tl-verify já é o seletor de kind no <li>. O seletor abaixo estiliza
+                            o <span> filho via descendência — sem colisão de especificidade. */
+}
+.tl-item.tl-verify .tl-body > .tl-verify {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+/* code dentro do span .tl-verify (comando) — mono inline */
+.tl-item.tl-verify .tl-body > .tl-verify code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.tl-result {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Lista de ficheiros editados */
+.tl-files {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Container de cada ficheiro */
+.tl-file { display: flex; flex-direction: column; }
+
+/* Linha clicável (botão sem chrome) */
+.tl-file-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+.tl-file-row:hover { background: var(--surface-soft); }
+
+/* Caminho do ficheiro: mono, trunca se muito longo */
+.tl-file-path {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Estatísticas +N/−M */
+.tl-file-stat {
+  font-size: 11px;
+  flex-shrink: 0;
+  display: flex;
+  gap: 5px;
+}
+.tl-file-stat .add { color: #2E8B57; }   /* verde — == --done */
+.tl-file-stat .del { color: #b91c1c; }   /* vermelho — mesmo das findings-error */
+
+/* Hunk de diff: mono compacto, scroll horizontal, altura máxima limitada */
+.tl-patch {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  padding: 6px 10px;
+  margin: 2px 0 4px;
+  overflow-x: auto;
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre;
+  color: var(--text-dim);
+}
+
+/* Botão de referência a decisão (T-XXX / D-NNN) */
+.tl-ref {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tl-ref:hover { opacity: 0.75; }
+
 /* ── Markdown viewer (modal de .md) ─────────────────────────────────────── */
 .md-viewer-overlay {
   position: fixed; inset: 0; z-index: 50;
