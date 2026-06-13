@@ -35,7 +35,7 @@ intent: "<the human's one-liner>"
 status: in_progress
 output_locale: <human's language, BCP-47>
 created_at: <now, UTC ISO-8601>
-base_sha: <git rev-parse HEAD>   # âncora do diff; capture via Bash na abertura
+base_sha: <git rev-parse HEAD>   # diff anchor; capture via Bash at open
 ```
 
 Tell the human the contract is open and what is now captured automatically
