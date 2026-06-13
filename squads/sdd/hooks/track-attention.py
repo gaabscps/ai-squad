@@ -11,7 +11,7 @@ Mechanism: registered under PreToolUse(AskUserQuestion) and UserPromptSubmit
            via claude-hooks.json. Acts ONLY on free/observed sessions
            (`mode: observed` in session.yml, written by /observe) — SDD
            sessions run their own status machine and are never touched.
-           Terminal status (done) is never flipped. Atomic rewrite, fail-open.
+           Terminal statuses (done, abandoned) are never flipped. Atomic rewrite, fail-open.
 
 Pure stdlib. Python 3.8+.
 """
@@ -25,7 +25,7 @@ _HOOKS_DIR = Path(__file__).resolve().parent
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from hook_runtime import find_active_session, resolve_project_root
+from hook_runtime import _TERMINAL_STATUS, find_active_session, resolve_project_root
 
 _STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.M)
 
@@ -101,7 +101,7 @@ def main() -> int:
 
     m = _STATUS_RE.search(text)
     status = (m.group(1).strip("\"'") if m else "")
-    if status == "done":
+    if status in _TERMINAL_STATUS:
         return 0
 
     try:

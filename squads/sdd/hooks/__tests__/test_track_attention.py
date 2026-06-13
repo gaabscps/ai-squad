@@ -107,6 +107,12 @@ class TestTrackAttention(unittest.TestCase):
         _run_hook(self._ask_payload())
         self.assertEqual(self.session_yml.read_text(encoding="utf-8"), done)
 
+    def test_abandoned_session_is_never_flipped(self):
+        abandoned = OBSERVED_YML.replace("status: in_progress", "status: abandoned")
+        self.session_yml.write_text(abandoned, encoding="utf-8")
+        _run_hook(self._ask_payload())
+        self.assertEqual(self.session_yml.read_text(encoding="utf-8"), abandoned)
+
     def test_no_session_dir_is_silent(self):
         self.session_yml.unlink(missing_ok=True)
         code = _run_hook(self._ask_payload())
