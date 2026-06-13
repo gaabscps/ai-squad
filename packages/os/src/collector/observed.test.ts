@@ -337,3 +337,44 @@ describe("readSessionDir — obs-closed-vazio (OBS-020, closed_at vazio)", () =>
     expect(spec.observed!.driftFlags).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 16. obs-timeline (OBS-020): markers com edits/diff/blocks reais
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-timeline (markers)", () => {
+  it("baseSha e outputLocale lidos do session.yml", () => {
+    const spec = readSessionDir(fixt("obs-timeline"))!;
+    expect(spec.observed!.baseSha).toBe("a1b2c3d");
+    expect(spec.observed!.outputLocale).toBe("pt-BR");
+  });
+  it("markers começa com open e contém um edit", () => {
+    const spec = readSessionDir(fixt("obs-timeline"))!;
+    const kinds = spec.observed!.markers.map(m => m.kind);
+    expect(kinds[0]).toBe("open");
+    expect(kinds).toContain("edit");
+  });
+  it("edit marker carrega patch e counts do diff.json", () => {
+    const spec = readSessionDir(fixt("obs-timeline"))!;
+    const edit = spec.observed!.markers.find(m => m.kind === "edit")!;
+    expect(edit.editFiles![0].path).toBe("src/app.ts");
+    expect(edit.editFiles![0].added).toBe(3);
+    expect(edit.editFiles![0].patch).toContain("@@");
+  });
+  it("block marker pareado do blocks.jsonl com duração", () => {
+    const spec = readSessionDir(fixt("obs-timeline"))!;
+    const block = spec.observed!.markers.find(m => m.kind === "block")!;
+    expect(block).toBeDefined();
+    expect(block.blockMs).toBe(900000); // 15 min
+  });
+  it("sessão sem artefatos de arquivo não quebra (sem edit/block; baseSha null)", () => {
+    // obs-aberto não tem edits.jsonl/diff.json/blocks.jsonl nem base_sha.
+    // Mesmo assim buildMarkers não joga erro — produz open + decisions/evidence da sessão.
+    const spec = readSessionDir(fixt("obs-aberto"))!;
+    const kinds = spec.observed!.markers.map(m => m.kind);
+    expect(kinds).toContain("open");
+    expect(kinds).not.toContain("edit");
+    expect(kinds).not.toContain("block");
+    expect(spec.observed!.baseSha).toBeNull();
+  });
+});

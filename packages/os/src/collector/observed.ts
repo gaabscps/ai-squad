@@ -27,6 +27,8 @@ import type {
 } from "../store/types.js";
 import { readDeliveryReport } from "./delivery-report.js";
 import { readObservedCostRollup } from "./cost-report.js";
+import { buildMarkers } from "./observedTimeline.js";
+import type { EditEvent, DiffFile, BlockEvent } from "./observedTimeline.js";
 
 // Padrão de nome de diretório OBS-NNN (3 ou mais dígitos) — case-sensitive conforme o schema
 const OBS_DIR_RE = /^OBS-\d{3,}$/;
@@ -86,17 +88,30 @@ export function readSessionDir(specDir: string, _projectRoot?: string): Spec | n
 function observedSpec(specDir: string, raw: Record<string, any>): Spec {
   const { status, drift } = deriveObservedStatus(raw);
 
+  const decisions = normalizeDecisions(raw.decisions);
+  const evidence = normalizeEvidence(raw.evidence);
+  const markers = buildMarkers({
+    createdAt: nonEmptyString(raw.created_at),
+    closedAt: nonEmptyString(raw.closed_at),
+    decisions: withAt(raw.decisions, decisions),
+    evidence: withAt(raw.evidence, evidence),
+    edits: readEdits(specDir),
+    diffFiles: readDiffFiles(specDir),
+    blocks: readBlocks(specDir),
+    attentionKind: typeof raw.attention?.kind === "string" ? raw.attention.kind : null,
+  });
+
   const observed: ObservedMeta = {
     intent: typeof raw.intent === "string" ? raw.intent : "",
     createdAt: nonEmptyString(raw.created_at),
     closedAt: nonEmptyString(raw.closed_at),
     attentionKind: typeof raw.attention?.kind === "string" ? raw.attention.kind : null,
-    decisions: normalizeDecisions(raw.decisions),
-    evidence: normalizeEvidence(raw.evidence),
+    decisions,
+    evidence,
     driftFlags: drift,
     baseSha: nonEmptyString(raw.base_sha),
     outputLocale: nonEmptyString(raw.output_locale),
-    markers: [], // markers: preenchido na Task 8
+    markers,
   };
 
   return {
@@ -225,6 +240,76 @@ function degradedSpec(specDir: string): Spec {
     specPath: null,
     observed,
   };
+}
+
+/** Lê edits.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */
+function readEdits(specDir: string): EditEvent[] {
+  const file = join(specDir, "edits.jsonl");
+  if (!existsSync(file)) return [];
+  const out: EditEvent[] = [];
+  for (const line of readFileSync(file, "utf-8").split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      const o = JSON.parse(s);
+      if (typeof o?.at === "string" && typeof o?.file === "string") {
+        out.push({ at: o.at, file: o.file });
+      }
+    } catch { /* linha corrompida: ignora */ }
+  }
+  return out;
+}
+
+/** Lê diff.json com tolerância: arquivo ausente/corrompido → []; campo files não-array → []. */
+function readDiffFiles(specDir: string): DiffFile[] {
+  const file = join(specDir, "diff.json");
+  if (!existsSync(file)) return [];
+  try {
+    const o = JSON.parse(readFileSync(file, "utf-8"));
+    if (!Array.isArray(o?.files)) return [];
+    return o.files
+      .filter((f: any) => f && typeof f.path === "string")
+      .map((f: any) => ({
+        path: f.path,
+        added: typeof f.added === "number" ? f.added : null,
+        removed: typeof f.removed === "number" ? f.removed : null,
+        patch: typeof f.patch === "string" ? f.patch : null,
+      }));
+  } catch { return []; }
+}
+
+/** Lê blocks.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */
+function readBlocks(specDir: string): BlockEvent[] {
+  const file = join(specDir, "blocks.jsonl");
+  if (!existsSync(file)) return [];
+  const out: BlockEvent[] = [];
+  for (const line of readFileSync(file, "utf-8").split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      const o = JSON.parse(s);
+      if (typeof o?.at === "string" && typeof o?.event === "string") {
+        out.push({ at: o.at, event: o.event, kind: typeof o.kind === "string" ? o.kind : null });
+      }
+    } catch { /* linha corrompida: ignora */ }
+  }
+  return out;
+}
+
+/**
+ * Recupera o campo `at` cru de cada item antes de normalizar (normalize descarta `at`).
+ * Junta o `at` ao objeto normalizado pelo índice de posição.
+ */
+function withAt<T>(rawArr: unknown, normalized: T[]): (T & { at: string | null })[] {
+  const arr = Array.isArray(rawArr) ? rawArr : [];
+  return normalized.map((n, i) => {
+    const item = arr[i];
+    const at =
+      item && typeof item === "object" && typeof (item as any).at === "string"
+        ? (item as any).at
+        : null;
+    return { ...n, at };
+  });
 }
 
 /**

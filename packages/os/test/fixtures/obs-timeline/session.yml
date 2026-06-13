@@ -1,0 +1,8 @@
+schema_version: 1
+session_id: OBS-020
+mode: observed
+intent: "timeline de teste"
+status: in_progress
+created_at: 2026-06-13T14:00:00Z
+base_sha: a1b2c3d
+output_locale: pt-BR
