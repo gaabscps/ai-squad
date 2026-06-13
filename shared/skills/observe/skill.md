@@ -35,10 +35,13 @@ intent: "<the human's one-liner>"
 status: in_progress
 output_locale: <human's language, BCP-47>
 created_at: <now, UTC ISO-8601>
+base_sha: <git rev-parse HEAD>   # âncora do diff; capture via Bash na abertura
 ```
 
 Tell the human the contract is open and what is now captured automatically
 (cost, time, attention status), then continue with whatever they asked.
+
+Capture `base_sha` too with `git rev-parse HEAD` (Bash) and write it into the session.yml — it is the stable anchor for the session's diff. If the repo is not a git repo (the command fails), omit the field.
 
 ### 2. Work (not this Skill's business)
 No steps here, on purpose. One instrumentation preference (not an opinion on
@@ -49,8 +52,10 @@ flips `needs_attention` mechanically for the aiOS attention column.
 ### 3. Trail enrichment (best effort, not load-bearing)
 While working, when you make a REAL choice between alternatives or reject an
 approach, append it to `decisions[]` in `session.yml` (`what`/`why`/`rejected`
-/`ref`); when you verify, append `evidence[]` (cmd + result). If discipline
-fades in a long session, fine — cost/time/attention stay mechanical, and the
+/`ref`); when you verify, append `evidence[]` (cmd + result). When appending a
+decision or verification, include `at: <UTC ISO-8601>` (best-effort — do not
+block the work to obtain the time; if not at hand, omit it and the aiOS falls
+back to insertion order). If discipline fades in a long session, fine — cost/time/attention stay mechanical, and the
 chronicler mines the transcript afterwards. Never interrupt the work to file
 reports.
 
