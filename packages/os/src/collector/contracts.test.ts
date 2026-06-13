@@ -320,12 +320,12 @@ describe("contrato observed-session.schema", () => {
     expect([...OBSERVED_ATTENTION_KINDS]).toEqual(["input"]);
   });
 
-  it("OBSERVED_DECISION_KEYS é exatamente ['what','why','rejected','ref']", () => {
-    expect([...OBSERVED_DECISION_KEYS]).toEqual(["what", "why", "rejected", "ref"]);
+  it("OBSERVED_DECISION_KEYS é exatamente ['what','why','rejected','ref','at']", () => {
+    expect([...OBSERVED_DECISION_KEYS]).toEqual(["what", "why", "rejected", "ref", "at"]);
   });
 
-  it("OBSERVED_EVIDENCE_KEYS é exatamente ['cmd','result','kind']", () => {
-    expect([...OBSERVED_EVIDENCE_KEYS]).toEqual(["cmd", "result", "kind"]);
+  it("OBSERVED_EVIDENCE_KEYS é exatamente ['cmd','result','kind','at']", () => {
+    expect([...OBSERVED_EVIDENCE_KEYS]).toEqual(["cmd", "result", "kind", "at"]);
   });
 });
 
