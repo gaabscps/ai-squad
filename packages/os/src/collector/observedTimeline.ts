@@ -4,6 +4,7 @@ import type {
 
 export interface EditEvent { at: string; file: string; }
 export interface DiffFile { path: string; added: number | null; removed: number | null; patch: string | null; }
+export interface BlockEvent { at: string; event: string; kind?: string | null; }
 
 export interface MarkerSources {
   createdAt: string | null;
@@ -13,6 +14,7 @@ export interface MarkerSources {
   edits: EditEvent[];
   diffFiles: DiffFile[];
   attentionKind: string | null;
+  blocks: BlockEvent[];
 }
 
 // Edições com gap <= EDIT_GROUP_GAP_MS caem no mesmo marco "Editou".
@@ -50,9 +52,35 @@ function groupEdits(edits: EditEvent[], diff: Map<string, DiffFile>): ObservedMa
     }
     return {
       kind: "edit" as const, at: g[0].at, exact: true, note: null,
-      decision: null, evidence: null, editFiles: files,
+      decision: null, evidence: null, editFiles: files, blockMs: null,
     };
   });
+}
+
+function groupBlocks(blocks: BlockEvent[]): ObservedMarker[] {
+  const sorted = [...blocks].sort((a, b) => a.at.localeCompare(b.at));
+  const markers: ObservedMarker[] = [];
+  let open: BlockEvent | null = null;
+  for (const b of sorted) {
+    if (b.event === "blocked") {
+      open = b;
+    } else if (b.event === "resumed" && open) {
+      const ms = Date.parse(b.at) - Date.parse(open.at);
+      markers.push({
+        kind: "block", at: open.at, exact: true, note: null,
+        decision: null, evidence: null, editFiles: null,
+        blockMs: ms >= 0 ? ms : null,
+      });
+      open = null;
+    }
+  }
+  if (open) {  // bloqueio em aberto: ainda aguardando
+    markers.push({
+      kind: "block", at: open.at, exact: true, note: null,
+      decision: null, evidence: null, editFiles: null, blockMs: null,
+    });
+  }
+  return markers;
 }
 
 /** Une as fontes carimbadas numa timeline ordenada de marcos. */
@@ -62,12 +90,13 @@ export function buildMarkers(s: MarkerSources): ObservedMarker[] {
 
   if (s.createdAt) {
     exact.push({ kind: "open", at: s.createdAt, exact: true, note: "aberto",
-      decision: null, evidence: null, editFiles: null });
+      decision: null, evidence: null, editFiles: null, blockMs: null });
   }
   exact.push(...groupEdits(s.edits, diff));
+  exact.push(...groupBlocks(s.blocks));
   if (s.closedAt) {
     exact.push({ kind: "close", at: s.closedAt, exact: true, note: "fechado",
-      decision: null, evidence: null, editFiles: null });
+      decision: null, evidence: null, editFiles: null, blockMs: null });
   }
 
   // Marcos exatos com timestamp: ordenados por at.
@@ -76,14 +105,14 @@ export function buildMarkers(s: MarkerSources): ObservedMarker[] {
   for (const d of s.decisions) {
     const m: ObservedMarker = {
       kind: "decision", at: d.at ?? null, exact: Boolean(d.at), note: null,
-      decision: d, evidence: null, editFiles: null,
+      decision: d, evidence: null, editFiles: null, blockMs: null,
     };
     (d.at ? withAtDecisions : looseDecisions).push(m);
   }
   for (const e of s.evidence) {
     const m: ObservedMarker = {
       kind: "verify", at: e.at ?? null, exact: Boolean(e.at), note: null,
-      decision: null, evidence: e, editFiles: null,
+      decision: null, evidence: e, editFiles: null, blockMs: null,
     };
     (e.at ? withAtDecisions : looseDecisions).push(m);
   }

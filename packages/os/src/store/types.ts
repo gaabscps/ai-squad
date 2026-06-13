@@ -113,6 +113,7 @@ export interface ObservedMarker {
   decision: ObservedDecision | null;   // kind === "decision"
   evidence: ObservedEvidence | null;   // kind === "verify"
   editFiles: ObservedEditFile[] | null; // kind === "edit"
+  blockMs: number | null;  // duração da espera (kind === "block"); null nos demais ou bloqueio em aberto
 }
 
 // Metadados exclusivos do modo observado; presença do campo = card observado.
