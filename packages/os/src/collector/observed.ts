@@ -28,7 +28,7 @@ import type {
 import { readDeliveryReport } from "./delivery-report.js";
 import { readObservedCostRollup } from "./cost-report.js";
 import { buildMarkers } from "./observedTimeline.js";
-import type { EditEvent, DiffFile, BlockEvent, TrailEvent } from "./observedTimeline.js";
+import type { EditEvent, DiffFile, BlockEvent, TrailItem, TrailDecision } from "./observedTimeline.js";
 
 // Padrão de nome de diretório OBS-NNN (3 ou mais dígitos) — case-sensitive conforme o schema
 const OBS_DIR_RE = /^OBS-\d{3,}$/;
@@ -88,17 +88,32 @@ export function readSessionDir(specDir: string, _projectRoot?: string): Spec | n
 function observedSpec(specDir: string, raw: Record<string, any>): Spec {
   const { status, drift } = deriveObservedStatus(raw);
 
-  const decisions = normalizeDecisions(raw.decisions);
+  const ymlDecisions = normalizeDecisions(raw.decisions);
   const evidence = normalizeEvidence(raw.evidence);
+  const trail = readTrail(specDir);
+
+  // Decisões registradas via trail (C2′) também alimentam o card do drawer,
+  // não só a timeline — senão sessões trail-driven exibiriam um card vazio.
+  // Dedup por `what`: uma sessão que atravessou o deploy pode ter a mesma
+  // decisão no yml (antigo) e no trail (novo); o card não deve contá-la duas vezes.
+  const ymlWhats = new Set(ymlDecisions.map((d) => d.what));
+  const trailDecisions: ObservedDecision[] = trail
+    .filter((t): t is TrailDecision => t.kind === "decision")
+    .filter((t) => !ymlWhats.has(t.what))
+    .map((t) => ({ what: t.what, why: t.why, rejected: t.rejected, ref: t.ref }));
+  const decisions = [...ymlDecisions, ...trailDecisions];
+
   const markers = buildMarkers({
     createdAt: nonEmptyString(raw.created_at),
     closedAt: nonEmptyString(raw.closed_at),
-    decisions: withAt(raw.decisions, decisions),
+    // Só as decisões do YAML entram aqui; as do trail viram markers via s.trail
+    // (evita marcos duplicados).
+    decisions: withAt(raw.decisions, ymlDecisions),
     evidence: withAt(raw.evidence, evidence),
     edits: readEdits(specDir),
     diffFiles: readDiffFiles(specDir),
     blocks: readBlocks(specDir),
-    trail: readTrail(specDir),
+    trail,
     attentionKind: typeof raw.attention?.kind === "string" ? raw.attention.kind : null,
   });
 
@@ -291,18 +306,37 @@ function readDiffFiles(specDir: string): DiffFile[] {
   } catch { return []; }
 }
 
-/** Lê trail.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */
-function readTrail(specDir: string): TrailEvent[] {
+/**
+ * Lê trail.jsonl, um evento por linha, discriminado por `kind`:
+ *   - kind ausente OU "run" → marker de comando Bash (retrocompat: o track-trail
+ *     legado gravava {at,tool,summary} sem kind);
+ *   - kind "decision" → escolha registrada via trail-emit (exige at + what);
+ *   - kind desconhecido → ignorado.
+ * Tolerância: arquivo ausente → []; linha corrompida ou shape inválido → ignorada.
+ */
+function readTrail(specDir: string): TrailItem[] {
   const file = join(specDir, "trail.jsonl");
   if (!existsSync(file)) return [];
-  const out: TrailEvent[] = [];
+  const out: TrailItem[] = [];
   for (const line of readFileSync(file, "utf-8").split("\n")) {
     const s = line.trim();
     if (!s) continue;
     try {
       const o = JSON.parse(s);
-      if (typeof o?.at === "string" && typeof o?.tool === "string" && typeof o?.summary === "string") {
-        out.push({ at: o.at, tool: o.tool, summary: o.summary });
+      const kind = o?.kind;
+      if (kind === "decision") {
+        if (typeof o.at === "string" && typeof o.what === "string") {
+          out.push({
+            kind: "decision", at: o.at, what: o.what,
+            why: typeof o.why === "string" ? o.why : null,
+            rejected: typeof o.rejected === "string" ? o.rejected : null,
+            ref: typeof o.ref === "string" ? o.ref : null,
+          });
+        }
+      } else if (kind === undefined || kind === "run") {
+        if (typeof o.at === "string" && typeof o.tool === "string" && typeof o.summary === "string") {
+          out.push({ kind: "run", at: o.at, tool: o.tool, summary: o.summary });
+        }
       }
     } catch { /* linha corrompida: ignora */ }
   }

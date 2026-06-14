@@ -59,9 +59,26 @@ class TestTrackTrail(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(self.trail.exists())
         ev = json.loads(self.trail.read_text(encoding="utf-8").strip())
+        self.assertEqual(ev["kind"], "run")
         self.assertEqual(ev["tool"], "Bash")
         self.assertEqual(ev["summary"], "npm test")
         self.assertIn("at", ev)
+
+    def test_trail_emit_command_is_suppressed(self):
+        # O helper trail-emit roda como Bash e ja escreveu a linha decision;
+        # o hook NAO deve gravar uma linha run duplicada para esse comando.
+        cmd = 'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/trail-emit.py" decision --what "X"'
+        code = _run_hook(self._bash_payload(cmd))
+        self.assertEqual(code, 0)
+        self.assertFalse(self.trail.exists())
+
+    def test_mention_of_helper_is_not_suppressed(self):
+        # Apenas MENCIONAR o script (sem invocar o subcomando) vira run normal.
+        code = _run_hook(self._bash_payload("cat .claude/hooks/trail-emit.py"))
+        self.assertEqual(code, 0)
+        self.assertTrue(self.trail.exists())
+        ev = json.loads(self.trail.read_text(encoding="utf-8").strip())
+        self.assertEqual(ev["kind"], "run")
 
     def test_read_tool_is_ignored(self):
         payload = {

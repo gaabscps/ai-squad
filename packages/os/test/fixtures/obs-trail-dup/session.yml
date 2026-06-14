@@ -1,0 +1,9 @@
+schema_version: 1
+session_id: OBS-023
+mode: observed
+intent: "decisão em yml e trail"
+status: in_progress
+created_at: 2026-06-13T14:00:00Z
+decisions:
+  - what: "usa JWT"
+    why: "stateless"

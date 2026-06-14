@@ -135,7 +135,7 @@ describe("buildMarkers — markers run (trail)", () => {
       decisions: [], evidence: [],
       edits: [{ at: "2026-06-13T14:30:00Z", file: "a.ts" }],
       diffFiles: [], attentionKind: null, blocks: [],
-      trail: [{ at: "2026-06-13T14:20:00Z", tool: "Bash", summary: "npm test" }],
+      trail: [{ kind: "run", at: "2026-06-13T14:20:00Z", tool: "Bash", summary: "npm test" }],
     });
     expect(markers.map(m => m.kind)).toEqual(["open", "run", "edit", "close"]);
     const run = markers.find(m => m.kind === "run")!;
@@ -150,5 +150,51 @@ describe("buildMarkers — markers run (trail)", () => {
       attentionKind: null, blocks: [],
     });
     expect(markers.map(m => m.kind)).toEqual(["open"]);
+  });
+});
+
+describe("buildMarkers — decisão no trail (C2′, at mecânico)", () => {
+  it("emite marker decision do trail interleaved por timestamp", () => {
+    const markers = buildMarkers({
+      createdAt: "2026-06-13T14:00:00Z", closedAt: "2026-06-13T15:00:00Z",
+      decisions: [], evidence: [],
+      edits: [{ at: "2026-06-13T14:30:00Z", file: "a.ts" }],
+      diffFiles: [], attentionKind: null, blocks: [],
+      trail: [
+        { kind: "decision", at: "2026-06-13T14:20:00Z", what: "usa JWT", why: "stateless", rejected: null, ref: null },
+      ],
+    });
+    expect(markers.map(m => m.kind)).toEqual(["open", "decision", "edit", "close"]);
+    const d = markers.find(m => m.kind === "decision")!;
+    expect(d.decision!.what).toBe("usa JWT");
+    expect(d.exact).toBe(true);
+  });
+
+  it("intercala decision e run do trail por timestamp (cronologia real)", () => {
+    const markers = buildMarkers({
+      createdAt: "2026-06-13T14:00:00Z", closedAt: "2026-06-13T15:00:00Z",
+      decisions: [], evidence: [],
+      edits: [], diffFiles: [], attentionKind: null, blocks: [],
+      trail: [
+        { kind: "decision", at: "2026-06-13T14:10:00Z", what: "A", why: null, rejected: null, ref: null },
+        { kind: "run", at: "2026-06-13T14:20:00Z", tool: "Bash", summary: "npm test" },
+        { kind: "decision", at: "2026-06-13T14:30:00Z", what: "B", why: null, rejected: null, ref: null },
+      ],
+    });
+    expect(markers.map(m => m.kind)).toEqual(["open", "decision", "run", "decision", "close"]);
+  });
+});
+
+describe("buildMarkers — loose legado não agrupa por tipo", () => {
+  it("intercala decisão e verificação sem at por índice (não todas-decisões-depois-todas-verificações)", () => {
+    const markers = buildMarkers({
+      createdAt: "2026-06-13T14:00:00Z", closedAt: "2026-06-13T15:00:00Z",
+      decisions: [dec("d1", null), dec("d2", null)],
+      evidence: [ev("e1", null)],
+      edits: [], diffFiles: [], attentionKind: null, blocks: [],
+    });
+    // Bug antigo: [open, decision, decision, verify, close] (agrupado por tipo).
+    // Fix: intercalado por índice → [open, decision, verify, decision, close].
+    expect(markers.map(m => m.kind)).toEqual(["open", "decision", "verify", "decision", "close"]);
   });
 });
