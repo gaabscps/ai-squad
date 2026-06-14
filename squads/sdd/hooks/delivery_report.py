@@ -48,7 +48,7 @@ def _read_session_scalars(session_dir: Path) -> dict:
             key, val = top.group(1), top.group(2).strip()
             in_metrics = key == "escalation_metrics"
             if key in ("spec_id", "squad", "feature_name", "output_locale",
-                       "started_at", "completed_at",
+                       "started_at", "completed_at", "closed_at",
                        "mode", "session_id", "intent", "status", "created_at"):
                 v = val.strip()
                 if v[:1] in ('"', "'") and v[0] in v[1:]:
@@ -354,7 +354,7 @@ def extract_observed(session_dir: Path) -> dict:
         "gate": {"role": "human", "status": status or "absent"},
         "cost": {"total_usd": None, "complete": False},
         "timeline": {"started_at": scalars.get("created_at", ""),
-                     "completed_at": scalars.get("completed_at", ""),
+                     "completed_at": scalars.get("closed_at") or scalars.get("completed_at", ""),
                      "phases": []},
         "generated_from": {"session_dir": str(session_dir), "extractor": "observed"},
     }

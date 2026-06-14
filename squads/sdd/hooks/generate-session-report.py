@@ -16,7 +16,7 @@ if str(_HOOKS_DIR) not in sys.path:
 
 import session_report  # noqa: E402
 import cost_report  # noqa: E402
-from hook_runtime import find_active_session, resolve_project_root  # noqa: E402
+from hook_runtime import resolve_capture_session, resolve_project_root  # noqa: E402
 
 
 def _git_diff_provider(repo_root):
@@ -56,7 +56,8 @@ def main():
     except Exception:
         return 0
     repo_root = Path(resolve_project_root(payload))
-    session_dir = find_active_session(repo_root)
+    session_id = payload.get("session_id") or "unknown"
+    session_dir = resolve_capture_session(repo_root, session_id)
     if session_dir is None:
         return 0
     return generate(session_dir, _git_diff_provider(repo_root))

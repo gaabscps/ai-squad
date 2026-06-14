@@ -122,6 +122,24 @@ def test_observed_without_transcript_still_emits_facts(tmp_path):
     assert facts["outcome"] == "success"
 
 
+def test_observed_timeline_uses_closed_at(tmp_path):
+    # Observed sessions write `closed_at` (observe skill step 4), NOT `completed_at`.
+    # The extractor must map closed_at → timeline.completed_at so the field is
+    # never blank for a properly-closed OBS session.
+    yml = OBSERVED_YML + 'closed_at: "2026-06-10T13:45:00Z"\n'
+    sdir = _make_session(tmp_path, yml=yml)
+    facts = dr.extract_observed(sdir)
+    assert facts["timeline"]["completed_at"] == "2026-06-10T13:45:00Z"
+
+
+def test_observed_timeline_completed_at_fallback(tmp_path):
+    # When neither closed_at nor completed_at is present, the field must be "".
+    yml = OBSERVED_YML  # baseline has neither closed_at nor completed_at
+    sdir = _make_session(tmp_path, yml=yml)
+    facts = dr.extract_observed(sdir)
+    assert facts["timeline"]["completed_at"] == ""
+
+
 def test_observed_facts_validate_against_schema(tmp_path):
     try:
         import jsonschema
