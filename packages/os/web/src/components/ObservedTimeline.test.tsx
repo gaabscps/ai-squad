@@ -238,6 +238,22 @@ describe("ObservedTimeline — campos opcionais por kind", () => {
   });
 });
 
+describe("ObservedTimeline — marker kind=run", () => {
+  it("renderiza o comando de um marker run com label traduzido", () => {
+    render(
+      <ObservedTimeline
+        outputLocale="pt-BR"
+        markers={[makeMarker({
+          kind: "run", at: "2026-06-13T14:20:00Z", exact: true, note: "npm test",
+          decision: null, evidence: null, editFiles: null, blockMs: null,
+        })]}
+      />,
+    );
+    expect(screen.getByText("npm test")).toBeInTheDocument();
+    expect(screen.getByText("Executou")).toBeInTheDocument();
+  });
+});
+
 describe("ObservedTimeline — decision.ref", () => {
   it("ref renderiza e clique chama onOpenRef com o valor correto", async () => {
     const onOpenRef = vi.fn();
