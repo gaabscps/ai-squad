@@ -5,6 +5,7 @@ import type {
 export interface EditEvent { at: string; file: string; }
 export interface DiffFile { path: string; added: number | null; removed: number | null; patch: string | null; }
 export interface BlockEvent { at: string; event: string; kind?: string | null; }
+export interface TrailEvent { at: string; tool: string; summary: string; }
 
 export interface MarkerSources {
   createdAt: string | null;
@@ -15,6 +16,7 @@ export interface MarkerSources {
   diffFiles: DiffFile[];
   attentionKind: string | null;
   blocks: BlockEvent[];
+  trail?: TrailEvent[];
 }
 
 // Edições com gap <= EDIT_GROUP_GAP_MS caem no mesmo marco "Editou".
@@ -83,6 +85,13 @@ function groupBlocks(blocks: BlockEvent[]): ObservedMarker[] {
   return markers;
 }
 
+function runMarkers(trail: TrailEvent[]): ObservedMarker[] {
+  return trail.map((t) => ({
+    kind: "run" as const, at: t.at, exact: true, note: t.summary,
+    decision: null, evidence: null, editFiles: null, blockMs: null,
+  }));
+}
+
 /** Une as fontes carimbadas numa timeline ordenada de marcos. */
 export function buildMarkers(s: MarkerSources): ObservedMarker[] {
   const diff = diffLookup(s.diffFiles);
@@ -94,6 +103,7 @@ export function buildMarkers(s: MarkerSources): ObservedMarker[] {
   }
   exact.push(...groupEdits(s.edits, diff));
   exact.push(...groupBlocks(s.blocks));
+  exact.push(...runMarkers(s.trail ?? []));
   if (s.closedAt) {
     exact.push({ kind: "close", at: s.closedAt, exact: true, note: "fechado",
       decision: null, evidence: null, editFiles: null, blockMs: null });

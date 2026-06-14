@@ -380,7 +380,19 @@ describe("readSessionDir — obs-timeline (markers)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 17. withAt: alinhamento de `at` quando item inválido é descartado pelo meio
+// 17. obs-trail (OBS-021): trail.jsonl → marker run na timeline
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-trail (OBS-021, trail.jsonl)", () => {
+  it("expõe markers run a partir de trail.jsonl", () => {
+    const spec = readSessionDir(fixt("obs-trail"))!;
+    const run = spec.observed!.markers.find(m => m.kind === "run");
+    expect(run?.note).toBe("npm test");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 18. withAt: alinhamento de `at` quando item inválido é descartado pelo meio
 // ---------------------------------------------------------------------------
 
 describe("withAt — alinhamento por índice com itens inválidos no meio", () => {

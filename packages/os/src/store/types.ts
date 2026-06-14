@@ -102,7 +102,7 @@ export interface ObservedEditFile {
   patch: string | null;   // unified diff desde base_sha; null se não materializado
 }
 
-export type ObservedMarkerKind = "open" | "decision" | "edit" | "verify" | "block" | "close";
+export type ObservedMarkerKind = "open" | "decision" | "edit" | "verify" | "block" | "close" | "run";
 
 // Um marco da timeline de execução. Campos por kind são opcionais (discriminados por `kind`).
 export interface ObservedMarker {
