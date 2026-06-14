@@ -9,6 +9,7 @@ const LABELS: Record<"pt" | "en", Record<string, string>> = {
     edit: "Editou",
     decision: "Decidiu",
     verify: "Verificou",
+    run: "Executou",
     waiting: "aguardando",
     loose: "hora aproximada (ordem de registro)",
     empty: "sem marcos registrados",
@@ -20,6 +21,7 @@ const LABELS: Record<"pt" | "en", Record<string, string>> = {
     edit: "Edited",
     decision: "Decided",
     verify: "Verified",
+    run: "Ran",
     waiting: "waiting",
     loose: "approximate time (recording order)",
     empty: "no markers recorded",
@@ -127,6 +129,9 @@ export function ObservedTimeline({
             )}
             {m.editFiles && m.editFiles.length > 0 && (
               <EditFiles files={m.editFiles} />
+            )}
+            {m.kind === "run" && m.note && (
+              <code className="tl-cmd mono">{m.note}</code>
             )}
           </div>
         </li>
