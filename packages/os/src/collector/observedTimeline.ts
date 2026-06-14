@@ -5,7 +5,15 @@ import type {
 export interface EditEvent { at: string; file: string; }
 export interface DiffFile { path: string; added: number | null; removed: number | null; patch: string | null; }
 export interface BlockEvent { at: string; event: string; kind?: string | null; }
-export interface TrailEvent { at: string; tool: string; summary: string; }
+
+// Evento do trail.jsonl, discriminado por `kind`. `run` = comando Bash mecânico
+// (track-trail); `decision` = escolha registrada via trail-emit (at mecânico).
+export interface TrailRun { kind: "run"; at: string; tool: string; summary: string; }
+export interface TrailDecision {
+  kind: "decision"; at: string;
+  what: string; why: string | null; rejected: string | null; ref: string | null;
+}
+export type TrailItem = TrailRun | TrailDecision;
 
 export interface MarkerSources {
   createdAt: string | null;
@@ -16,7 +24,7 @@ export interface MarkerSources {
   diffFiles: DiffFile[];
   attentionKind: string | null;
   blocks: BlockEvent[];
-  trail?: TrailEvent[];
+  trail?: TrailItem[];
 }
 
 // Edições com gap <= EDIT_GROUP_GAP_MS caem no mesmo marco "Editou".
@@ -85,11 +93,33 @@ function groupBlocks(blocks: BlockEvent[]): ObservedMarker[] {
   return markers;
 }
 
-function runMarkers(trail: TrailEvent[]): ObservedMarker[] {
-  return trail.map((t) => ({
-    kind: "run" as const, at: t.at, exact: true, note: t.summary,
-    decision: null, evidence: null, editFiles: null, blockMs: null,
-  }));
+function trailMarkers(trail: TrailItem[]): ObservedMarker[] {
+  return trail.map((t) => {
+    if (t.kind === "decision") {
+      return {
+        kind: "decision" as const, at: t.at, exact: true, note: null,
+        decision: { what: t.what, why: t.why, rejected: t.rejected, ref: t.ref },
+        evidence: null, editFiles: null, blockMs: null,
+      };
+    }
+    return {
+      kind: "run" as const, at: t.at, exact: true, note: t.summary,
+      decision: null, evidence: null, editFiles: null, blockMs: null,
+    };
+  });
+}
+
+// Intercala dois conjuntos de marcos best-effort (sem `at`) por posição, em vez
+// de concatenar por tipo — evita o agrupamento "todas decisões, depois todas
+// verificações" no fallback de sessões legadas (que não passam pelo trail).
+function interleave(a: ObservedMarker[], b: ObservedMarker[]): ObservedMarker[] {
+  const out: ObservedMarker[] = [];
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
 }
 
 /** Une as fontes carimbadas numa timeline ordenada de marcos. */
@@ -103,29 +133,33 @@ export function buildMarkers(s: MarkerSources): ObservedMarker[] {
   }
   exact.push(...groupEdits(s.edits, diff));
   exact.push(...groupBlocks(s.blocks));
-  exact.push(...runMarkers(s.trail ?? []));
+  exact.push(...trailMarkers(s.trail ?? []));
   if (s.closedAt) {
     exact.push({ kind: "close", at: s.closedAt, exact: true, note: "fechado",
       decision: null, evidence: null, editFiles: null, blockMs: null });
   }
 
-  // Marcos exatos com timestamp: ordenados por at.
+  // Fallback legado (decisions[]/evidence[] no session.yml): itens COM at entram
+  // na ordenação por timestamp; itens SEM at são intercalados por posição (não
+  // agrupados por tipo). Sessões novas registram via trail e nem chegam aqui.
   const withAtDecisions: ObservedMarker[] = [];
-  const looseDecisions: ObservedMarker[] = [];
+  const looseDec: ObservedMarker[] = [];
+  const looseEv: ObservedMarker[] = [];
   for (const d of s.decisions) {
     const m: ObservedMarker = {
       kind: "decision", at: d.at ?? null, exact: Boolean(d.at), note: null,
       decision: d, evidence: null, editFiles: null, blockMs: null,
     };
-    (d.at ? withAtDecisions : looseDecisions).push(m);
+    (d.at ? withAtDecisions : looseDec).push(m);
   }
   for (const e of s.evidence) {
     const m: ObservedMarker = {
       kind: "verify", at: e.at ?? null, exact: Boolean(e.at), note: null,
       decision: null, evidence: e, editFiles: null, blockMs: null,
     };
-    (e.at ? withAtDecisions : looseDecisions).push(m);
+    (e.at ? withAtDecisions : looseEv).push(m);
   }
+  const looseDecisions = interleave(looseDec, looseEv);
 
   const timed = [...exact, ...withAtDecisions]
     .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));

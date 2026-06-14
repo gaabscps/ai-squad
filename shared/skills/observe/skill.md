@@ -51,13 +51,23 @@ flips `needs_attention` mechanically for the aiOS attention column.
 
 ### 3. Trail enrichment (best effort, not load-bearing)
 While working, when you make a REAL choice between alternatives or reject an
-approach, append it to `decisions[]` in `session.yml` (`what`/`why`/`rejected`
-/`ref`); when you verify, append `evidence[]` (cmd + result). When appending a
-decision or verification, include `at: <UTC ISO-8601>` (best-effort — do not
-block the work to obtain the time; if not at hand, omit it and the aiOS falls
-back to insertion order). If discipline fades in a long session, fine — cost/time/attention stay mechanical, and the
-chronicler mines the transcript afterwards. Never interrupt the work to file
-reports.
+approach, record it with the trail-emit helper. It runs as a normal Bash command
+and the deployed hook stamps the time mechanically, appending one chronological
+line to `.agent-session/<id>/trail.jsonl`:
+
+    python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/trail-emit.py" decision \
+      --what "<the choice>" [--why "<reason>"] [--rejected "<alternative>"] [--ref "<file:line>"]
+
+You do NOT supply the time and do NOT edit `session.yml` — the helper builds the
+JSON safely from its arguments, so quotes and accents survive, and aiOS orders
+the trail by the mechanical timestamp. Verifications need no special step: the
+Bash commands you already run are captured mechanically as `run` markers on the
+same trail, in order. This is instrumentation, not an implementation step (like
+preferring AskUserQuestion in step 2) — the Skill still has ZERO opinions about
+HOW you build. If discipline fades in a long session, fine — cost/time/attention
+stay mechanical, and the chronicler mines the transcript afterwards. Never
+interrupt the work to file reports. (Legacy `decisions[]`/`evidence[]` keys in
+`session.yml` are still read as a fallback, but the helper is the path.)
 
 ### 4. Close
 When the human declares the work done (or abandoned), set `status: done`

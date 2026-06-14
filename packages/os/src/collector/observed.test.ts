@@ -391,6 +391,36 @@ describe("readSessionDir — obs-trail (OBS-021, trail.jsonl)", () => {
   });
 });
 
+describe("readSessionDir — obs-trail-decision (OBS-022, decisão no trail)", () => {
+  it("expõe marker decision a partir de linha kind:decision do trail", () => {
+    const spec = readSessionDir(fixt("obs-trail-decision"))!;
+    const d = spec.observed!.markers.find(m => m.kind === "decision");
+    expect(d?.decision?.what).toBe("usa JWT");
+    expect(d?.decision?.rejected).toBe("sessão server-side");
+    expect(d?.exact).toBe(true);
+  });
+
+  it("decisão do trail e run aparecem em ordem cronológica", () => {
+    const spec = readSessionDir(fixt("obs-trail-decision"))!;
+    const kinds = spec.observed!.markers.map(m => m.kind);
+    expect(kinds).toEqual(["open", "decision", "run"]);
+  });
+
+  it("popula observed.decisions a partir do trail (card não fica vazio)", () => {
+    const spec = readSessionDir(fixt("obs-trail-decision"))!;
+    expect(spec.observed!.decisions).toHaveLength(1);
+    expect(spec.observed!.decisions[0].what).toBe("usa JWT");
+  });
+});
+
+describe("readSessionDir — obs-trail-dup (decisão em yml E trail)", () => {
+  it("não duplica no card a mesma decisão presente em yml e trail", () => {
+    const spec = readSessionDir(fixt("obs-trail-dup"))!;
+    const jwt = spec.observed!.decisions.filter(d => d.what === "usa JWT");
+    expect(jwt).toHaveLength(1);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 18. report.md — parecer determinístico
 // ---------------------------------------------------------------------------

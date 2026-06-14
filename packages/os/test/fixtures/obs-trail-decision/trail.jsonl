@@ -1,0 +1,2 @@
+{"at":"2026-06-13T14:10:00Z","kind":"decision","what":"usa JWT","why":"stateless","rejected":"sessão server-side","ref":"src/auth.ts"}
+{"at":"2026-06-13T14:20:00Z","kind":"run","tool":"Bash","summary":"npm test"}
