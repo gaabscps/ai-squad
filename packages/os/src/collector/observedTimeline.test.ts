@@ -127,3 +127,28 @@ describe("buildMarkers — marcos block", () => {
     expect(blockMarkers).toHaveLength(2);
   });
 });
+
+describe("buildMarkers — markers run (trail)", () => {
+  it("emite marker run do trail interleaved por timestamp", () => {
+    const markers = buildMarkers({
+      createdAt: "2026-06-13T14:00:00Z", closedAt: "2026-06-13T15:00:00Z",
+      decisions: [], evidence: [],
+      edits: [{ at: "2026-06-13T14:30:00Z", file: "a.ts" }],
+      diffFiles: [], attentionKind: null, blocks: [],
+      trail: [{ at: "2026-06-13T14:20:00Z", tool: "Bash", summary: "npm test" }],
+    });
+    expect(markers.map(m => m.kind)).toEqual(["open", "run", "edit", "close"]);
+    const run = markers.find(m => m.kind === "run")!;
+    expect(run.note).toBe("npm test");
+    expect(run.exact).toBe(true);
+  });
+
+  it("trail ausente (undefined) não quebra", () => {
+    const markers = buildMarkers({
+      createdAt: "2026-06-13T14:00:00Z", closedAt: null,
+      decisions: [], evidence: [], edits: [], diffFiles: [],
+      attentionKind: null, blocks: [],
+    });
+    expect(markers.map(m => m.kind)).toEqual(["open"]);
+  });
+});

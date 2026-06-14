@@ -28,7 +28,7 @@ import type {
 import { readDeliveryReport } from "./delivery-report.js";
 import { readObservedCostRollup } from "./cost-report.js";
 import { buildMarkers } from "./observedTimeline.js";
-import type { EditEvent, DiffFile, BlockEvent } from "./observedTimeline.js";
+import type { EditEvent, DiffFile, BlockEvent, TrailEvent } from "./observedTimeline.js";
 
 // Padrão de nome de diretório OBS-NNN (3 ou mais dígitos) — case-sensitive conforme o schema
 const OBS_DIR_RE = /^OBS-\d{3,}$/;
@@ -98,6 +98,7 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     edits: readEdits(specDir),
     diffFiles: readDiffFiles(specDir),
     blocks: readBlocks(specDir),
+    trail: readTrail(specDir),
     attentionKind: typeof raw.attention?.kind === "string" ? raw.attention.kind : null,
   });
 
@@ -276,6 +277,24 @@ function readDiffFiles(specDir: string): DiffFile[] {
         patch: typeof f.patch === "string" ? f.patch : null,
       }));
   } catch { return []; }
+}
+
+/** Lê trail.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */
+function readTrail(specDir: string): TrailEvent[] {
+  const file = join(specDir, "trail.jsonl");
+  if (!existsSync(file)) return [];
+  const out: TrailEvent[] = [];
+  for (const line of readFileSync(file, "utf-8").split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      const o = JSON.parse(s);
+      if (typeof o?.at === "string" && typeof o?.tool === "string" && typeof o?.summary === "string") {
+        out.push({ at: o.at, tool: o.tool, summary: o.summary });
+      }
+    } catch { /* linha corrompida: ignora */ }
+  }
+  return out;
 }
 
 /** Lê blocks.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */
