@@ -852,6 +852,30 @@ describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () =
   });
 });
 
+describe("DetailDrawer — modo observado: bloco Parecer (report.md)", () => {
+  it("renderiza o bloco Parecer quando observed.report existe", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ report: "# Parecer\n\n## O que foi feito\n- `a.ts`\n" }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    // o h4.drawer-section "Parecer" deve existir (além do h1 renderizado pelo markdown)
+    const h4s = container.querySelectorAll("h4.drawer-section");
+    const parecerH4 = Array.from(h4s).find((el) => el.textContent === "Parecer");
+    expect(parecerH4).toBeDefined();
+    expect(screen.getByText("O que foi feito")).toBeInTheDocument();
+  });
+
+  it("NÃO renderiza o bloco Parecer quando observed.report é null", () => {
+    const spec = makeObservedSpec({
+      observed: makeObservedMeta({ report: null }),
+    });
+    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    const h4s = container.querySelectorAll("h4.drawer-section");
+    const parecer = Array.from(h4s).find((el) => el.textContent === "Parecer");
+    expect(parecer).toBeUndefined();
+  });
+});
+
 describe("DetailDrawer — modo observado: parecer de entrega condicional", () => {
   it("observado sem parecer: seção 'Parecer de entrega' não renderiza", () => {
     const spec = makeObservedSpec({ deliveryReport: null });
