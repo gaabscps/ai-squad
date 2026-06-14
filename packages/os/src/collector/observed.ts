@@ -113,6 +113,7 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     baseSha: nonEmptyString(raw.base_sha),
     outputLocale: nonEmptyString(raw.output_locale),
     markers,
+    report: readReport(specDir),
   };
 
   return {
@@ -223,6 +224,7 @@ function degradedSpec(specDir: string): Spec {
     baseSha: null,
     outputLocale: null,
     markers: [],
+    report: null,
   };
 
   return {
@@ -241,6 +243,16 @@ function degradedSpec(specDir: string): Spec {
     specPath: null,
     observed,
   };
+}
+
+/** Lê report.md (parecer determinístico). Ausente/vazio → null. */
+function readReport(specDir: string): string | null {
+  const file = join(specDir, "report.md");
+  if (!existsSync(file)) return null;
+  try {
+    const s = readFileSync(file, "utf-8");
+    return s.trim() ? s : null;
+  } catch { return null; }
 }
 
 /** Lê edits.jsonl com tolerância: arquivo ausente → []; linha corrompida → ignorada. */

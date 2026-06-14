@@ -128,6 +128,7 @@ export interface ObservedMeta {
   baseSha: string | null;        // git base_sha lido do session.yml (âncora do diff)
   outputLocale: string | null;   // output_locale da sessão (BCP-47); idioma dos labels da timeline
   markers: ObservedMarker[];     // a timeline curada (preenchida na Task 8)
+  report: string | null;        // conteúdo de report.md (parecer determinístico); null se ausente
 }
 
 export interface TimelineEntry {

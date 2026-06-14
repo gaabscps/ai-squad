@@ -91,6 +91,7 @@ export function makeObservedMeta(over: Partial<ObservedMeta> = {}): ObservedMeta
     baseSha: null,
     outputLocale: null,
     markers: [],
+    report: null,
     ...over,
   };
 }

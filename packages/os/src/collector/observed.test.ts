@@ -392,7 +392,23 @@ describe("readSessionDir — obs-trail (OBS-021, trail.jsonl)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 18. withAt: alinhamento de `at` quando item inválido é descartado pelo meio
+// 18. report.md — parecer determinístico
+// ---------------------------------------------------------------------------
+
+describe("readSessionDir — obs-com-report (report.md presente)", () => {
+  it("expõe report.md em observed.report quando arquivo existe", () => {
+    const spec = readSessionDir(fixt("obs-com-report"))!;
+    expect(spec.observed!.report).toContain("O que foi feito");
+  });
+
+  it("report ausente → observed.report é null", () => {
+    const spec = readSessionDir(fixt("obs-aberto"))!;
+    expect(spec.observed!.report).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 19. withAt: alinhamento de `at` quando item inválido é descartado pelo meio
 // ---------------------------------------------------------------------------
 
 describe("withAt — alinhamento por índice com itens inválidos no meio", () => {

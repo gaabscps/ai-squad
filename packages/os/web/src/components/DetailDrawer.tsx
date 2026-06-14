@@ -14,6 +14,7 @@ import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
 import { ObservedTimeline } from "./ObservedTimeline";
+import { Markdown } from "./Markdown";
 
 export function DetailDrawer({
   item,
@@ -135,6 +136,12 @@ export function DetailDrawer({
               outputLocale={obs.outputLocale}
               onOpenRef={(ref) => openFile(`${projectPath}/${ref}`, ref)}
             />
+            {obs.report && (
+              <>
+                <h4 className="drawer-section">Parecer</h4>
+                <Markdown className="drawer-parecer">{obs.report}</Markdown>
+              </>
+            )}
           </>
         )}
 
