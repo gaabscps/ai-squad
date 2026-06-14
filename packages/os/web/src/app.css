@@ -741,6 +741,9 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 }
 
 
+/* estado vazio da timeline observada */
+.drawer-empty { font-size: 12px; color: var(--text-mute); margin: 0 0 12px; font-style: italic; }
+
 /* ── ObservedTimeline ─────────────────────────────────────────────────────── */
 /* Cores por tipo de marco — não há tokens semânticos pra estes no tema atual;
    os valores batem com a paleta "Anthropic Studio" warm e o mockup aprovado.
