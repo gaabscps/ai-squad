@@ -105,7 +105,8 @@
           },
           {
             "type": "command",
-            "command": "payload=$(cat); [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\" ] && printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\"; [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\" ] || exit 0; printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\""
+            "command": "payload=$(cat); [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\" ] && printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-session-cost.py\"; [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\" ] && printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-session-report.py\"; [ -f \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-observe-report.py\" ] || exit 0; printf '%s' \"$payload\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/generate-observe-report.py\"",
+            "timeout": 40
           },
           {
             "type": "command",
