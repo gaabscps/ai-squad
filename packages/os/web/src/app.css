@@ -929,22 +929,126 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .tl-file-stat .add { color: #2E8B57; }   /* verde — == --done */
 .tl-file-stat .del { color: #b91c1c; }   /* vermelho — mesmo das findings-error */
 
-/* Hunk de diff: mono compacto, scroll horizontal, altura máxima limitada */
-.tl-patch {
-  font-family: var(--mono);
+/* Diff first-class: linhas coloridas, gutter de número, sinal +/−, colapso */
+.diff-view {
   font-size: 11px;
-  line-height: 1.5;
-  background: var(--surface-soft);
+  line-height: 1.55;
   border: 1px solid var(--border-soft);
-  border-radius: 5px;
-  padding: 6px 10px;
+  border-radius: 6px;
   margin: 2px 0 4px;
-  overflow-x: auto;
-  max-height: 280px;
-  overflow-y: auto;
-  white-space: pre;
-  color: var(--text-dim);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--surface);
 }
+
+/* Cabeçalho do hunk (@@ ... @@ contexto) */
+.diff-hunk {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  background: var(--surface-soft);
+  border-top: 1px solid var(--border-soft);
+  min-width: 100%;
+  width: max-content;
+}
+.diff-hunk-group:first-child .diff-hunk { border-top: 0; }
+.diff-hunk-mark { color: var(--accent); opacity: 0.65; }
+.diff-hunk-ctx { color: var(--text-dim); }
+
+/* Linha do diff: [gutter] [sinal] [conteúdo]; min-width 100% para o fundo
+   colorido cobrir a largura toda mesmo em scroll horizontal */
+.diff-line {
+  display: flex;
+  align-items: flex-start;
+  min-width: 100%;
+  width: max-content;
+}
+.diff-gutter {
+  flex: 0 0 auto;
+  width: 34px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--text-mute);
+  background: var(--surface-soft);
+  user-select: none;
+}
+.diff-sign {
+  flex: 0 0 auto;
+  width: 14px;
+  text-align: center;
+  color: var(--text-mute);
+  user-select: none;
+}
+.diff-content {
+  flex: 1 1 auto;
+  padding-right: 10px;
+  white-space: pre;
+}
+
+.diff-line.add { background: #E4F0E6; }
+.diff-line.del { background: #F4E4E2; }
+.diff-line.add .diff-gutter { background: #D9E9DB; }
+.diff-line.del .diff-gutter { background: #EFDBD8; }
+.diff-line.add .diff-sign { color: var(--done); }
+.diff-line.del .diff-sign { color: var(--blocked); }
+
+/* Realce intra-linha (word-level): tom mais forte sobre o fundo da linha */
+.diff-word { border-radius: 2px; padding: 0 1px; }
+.diff-line.add .diff-word { background: rgba(46, 139, 87, 0.30); }
+.diff-line.del .diff-word { background: rgba(176, 49, 42, 0.26); }
+
+/* Botão de colapso do contexto inalterado */
+.diff-fold {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-soft);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-align: center;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.diff-fold:hover { background: #ECE7DE; color: var(--text); }
+
+/* Tema Dracula: painel escuro embutido (syntax highlighting via Shiki).
+   Cor do texto vem inline de cada token; aqui ficam fundos e cromos. */
+.diff-view.dracula {
+  background: #282a36;
+  border-color: #1d1e26;
+  color: #f8f8f2;
+}
+.diff-view.dracula .diff-hunk {
+  background: #21222c;
+  border-top-color: #1d1e26;
+}
+.diff-view.dracula .diff-hunk-mark { color: #bd93f9; opacity: 1; }
+.diff-view.dracula .diff-hunk-ctx { color: #6272a4; }
+.diff-view.dracula .diff-gutter {
+  background: #21222c;
+  color: #6272a4;
+}
+.diff-view.dracula .diff-sign { color: #6272a4; }
+
+.diff-view.dracula .diff-line.add { background: rgba(80, 250, 123, 0.13); }
+.diff-view.dracula .diff-line.del { background: rgba(255, 85, 85, 0.14); }
+.diff-view.dracula .diff-line.add .diff-gutter { background: rgba(80, 250, 123, 0.10); }
+.diff-view.dracula .diff-line.del .diff-gutter { background: rgba(255, 85, 85, 0.12); }
+.diff-view.dracula .diff-line.add .diff-sign { color: #50fa7b; }
+.diff-view.dracula .diff-line.del .diff-sign { color: #ff5555; }
+
+.diff-view.dracula .diff-line.add .diff-word { background: rgba(80, 250, 123, 0.30); }
+.diff-view.dracula .diff-line.del .diff-word { background: rgba(255, 85, 85, 0.28); }
+
+.diff-view.dracula .diff-fold {
+  background: #21222c;
+  border-color: #1d1e26;
+  color: #6272a4;
+}
+.diff-view.dracula .diff-fold:hover { background: #2a2c3a; color: #f8f8f2; }
 
 /* Botão de referência a decisão (T-XXX / D-NNN) */
 .tl-ref {

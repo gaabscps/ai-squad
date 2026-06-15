@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ObservedMarker, ObservedEditFile } from "../../../src/store/types";
+import { DiffView } from "./DiffView";
 
 const LABELS: Record<"pt" | "en", Record<string, string>> = {
   pt: {
@@ -58,9 +59,7 @@ function EditFiles({ files }: { files: ObservedEditFile[] }) {
               {f.removed !== null && <span className="del">−{f.removed}</span>}
             </span>
           </button>
-          {open === f.path && f.patch && (
-            <pre className="tl-patch mono">{f.patch}</pre>
-          )}
+          {open === f.path && f.patch && <DiffView patch={f.patch} path={f.path} />}
         </li>
       ))}
     </ul>

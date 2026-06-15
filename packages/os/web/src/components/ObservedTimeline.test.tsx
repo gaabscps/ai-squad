@@ -139,9 +139,9 @@ describe("ObservedTimeline — editFiles: hunk sob demanda", () => {
     ],
   });
 
-  // Helper: encontra o elemento <pre class="tl-patch"> dentro do container
+  // Helper: encontra o DiffView (.diff-view) dentro do container
   function getPatchEl(container: HTMLElement): HTMLElement | null {
-    return container.querySelector("pre.tl-patch");
+    return container.querySelector(".diff-view");
   }
 
   it("patch não aparece antes de clicar no arquivo", () => {
@@ -159,7 +159,7 @@ describe("ObservedTimeline — editFiles: hunk sob demanda", () => {
     await userEvent.click(fileRow);
     const pre = getPatchEl(container);
     expect(pre).not.toBeNull();
-    expect(pre!.textContent).toBe(patchText);
+    expect(pre!.textContent).toContain("added line");
   });
 
   it("segundo clique no mesmo arquivo fecha o patch", async () => {
