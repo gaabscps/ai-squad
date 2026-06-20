@@ -42,6 +42,13 @@ function fmtDuration(ms: number): string {
   return m ? `${h}h ${m}min` : `${h}h`;
 }
 
+function fmtClock(iso: string | null): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 function EditFiles({ files }: { files: ObservedEditFile[] }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
@@ -97,6 +104,7 @@ export function ObservedTimeline({
                   ·
                 </span>
               )}
+              {fmtClock(m.at) && <span className="tl-time mono"> · {fmtClock(m.at)}</span>}
             </span>
             {m.decision && (
               <>

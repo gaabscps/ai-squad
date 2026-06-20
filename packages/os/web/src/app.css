@@ -823,6 +823,9 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 /* Duração do bloco (dentro de .tl-label) */
 .tl-dur { font-weight: 400; color: var(--text-mute); }
 
+/* Hora/data do evento (dentro de .tl-label) */
+.tl-time { color: var(--text-mute); font-size: 11px; }
+
 /* Indicador de hora aproximada — quase invisível, só pra quem procura */
 .tl-loose { opacity: 0.45; }
 
