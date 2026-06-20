@@ -852,27 +852,19 @@ describe("DetailDrawer — DeliveryReportBlock presente em ambos os modos", () =
   });
 });
 
-describe("DetailDrawer — modo observado: bloco Parecer (report.md)", () => {
-  it("renderiza o bloco Parecer quando observed.report existe", () => {
-    const spec = makeObservedSpec({
-      observed: makeObservedMeta({ report: "# Parecer\n\n## O que foi feito\n- `a.ts`\n" }),
-    });
+describe("DetailDrawer — modo observado: bloco Apresentação da sessão (SessionNarrative)", () => {
+  it("renderiza o h4 'Apresentação da sessão' no drawer observado", () => {
+    const spec = makeObservedSpec();
     const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    // o h4.drawer-section "Parecer" deve existir (além do h1 renderizado pelo markdown)
     const h4s = container.querySelectorAll("h4.drawer-section");
-    const parecerH4 = Array.from(h4s).find((el) => el.textContent === "Parecer");
-    expect(parecerH4).toBeDefined();
-    expect(screen.getByText("O que foi feito")).toBeInTheDocument();
+    const apresentacaoH4 = Array.from(h4s).find((el) => el.textContent === "Apresentação da sessão");
+    expect(apresentacaoH4).toBeDefined();
   });
 
-  it("NÃO renderiza o bloco Parecer quando observed.report é null", () => {
-    const spec = makeObservedSpec({
-      observed: makeObservedMeta({ report: null }),
-    });
-    const { container } = render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
-    const h4s = container.querySelectorAll("h4.drawer-section");
-    const parecer = Array.from(h4s).find((el) => el.textContent === "Parecer");
-    expect(parecer).toBeUndefined();
+  it("renderiza o SessionNarrative (botão 'gerar apresentação' no estado vazio)", () => {
+    const spec = makeObservedSpec();
+    render(<DetailDrawer item={item(spec)} onClose={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /gerar apresenta/i })).toBeInTheDocument();
   });
 });
 

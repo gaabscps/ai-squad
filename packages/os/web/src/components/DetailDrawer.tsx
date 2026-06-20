@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import type { SpecWithProject } from "../lib/kanbanObserved";
 import { attentionReason, columnForSpec } from "../lib/kanbanObserved";
-import { fmtTokens, fmtUsd, fmtDate } from "../format";
+import { fmtTokens, fmtUsd, fmtDate, fmtDurationBetween } from "../format";
 import { PhaseBar } from "./PhaseBar";
 import { PhaseJourney } from "./PhaseJourney";
 import { StatusBadge } from "./StatusBadge";
@@ -14,7 +14,7 @@ import { DeliveryReportBlock } from "./DeliveryReportBlock";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
 import { ObservedTimeline } from "./ObservedTimeline";
-import { Markdown } from "./Markdown";
+import { SessionNarrative } from "./SessionNarrative";
 
 export function DetailDrawer({
   item,
@@ -114,6 +114,12 @@ export function DetailDrawer({
                   <span className="obs-fact-value mono">{fmtDate(obs.closedAt)}</span>
                 </div>
               )}
+              {fmtDurationBetween(obs.createdAt, obs.closedAt) && (
+                <div className="obs-fact">
+                  <span className="obs-fact-label">duração</span>
+                  <span className="obs-fact-value mono">{fmtDurationBetween(obs.createdAt, obs.closedAt)}</span>
+                </div>
+              )}
               {spec.cost.reportPath && (
                 <a
                   className="obs-fact-report"
@@ -136,12 +142,8 @@ export function DetailDrawer({
               outputLocale={obs.outputLocale}
               onOpenRef={(ref) => openFile(`${projectPath}/${ref}`, ref)}
             />
-            {obs.report && (
-              <>
-                <h4 className="drawer-section">Parecer</h4>
-                <Markdown className="drawer-parecer">{obs.report}</Markdown>
-              </>
-            )}
+            <h4 className="drawer-section">Apresentação da sessão</h4>
+            <SessionNarrative projectId={projectId} specId={spec.id} observed={obs} />
           </>
         )}
 

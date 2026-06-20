@@ -31,6 +31,18 @@ export function fmtDate(iso: string | null): string {
   });
 }
 
+/** Duração entre dois ISO; null se faltar uma ponta ou forem inválidos. */
+export function fmtDurationBetween(startIso: string | null, endIso: string | null): string | null {
+  if (!startIso || !endIso) return null;
+  const a = Date.parse(startIso), b = Date.parse(endIso);
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+  const min = Math.round((b - a) / 60000);
+  if (min < 1) return "<1min";
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}h ${m}min` : `${h}h`;
+}
+
 /**
  * Formata um instante ISO como tempo relativo ao agora: "agora", "há 6 min",
  * "há 3 h", "há 2 dias". null ou data inválida viram "—". `now` é injetável pra
