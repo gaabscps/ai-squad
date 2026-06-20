@@ -1086,3 +1086,21 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .md-viewer-close { background: none; border: none; font-size: 1rem; cursor: pointer; color: var(--text-mute); }
 .md-viewer-body { padding: 1rem 1.25rem; overflow-y: auto; }
 .md-viewer-hint { color: var(--text-mute); font-style: italic; }
+
+/* ── Narrativa de sessão (apresentação dev->tech lead) ───────────────── */
+.narr-empty { margin: 8px 0 16px; }
+.narr-generate, .narr-regen, .narr-retry { font: inherit; cursor: pointer; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+.narr-meta { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-size: 12px; color: var(--text-mute); }
+.narr-tldr { font-size: 15px; font-weight: 500; margin: 8px 0; }
+.narr-why { font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+.narr-section { margin: 14px 0 6px; font-size: 13px; color: var(--text-mute); }
+.narr-change { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.narr-change-head { cursor: pointer; font-weight: 500; }
+.narr-change-body { margin-top: 8px; }
+.narr-verifs { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.narr-verifs li.ok::before { content: "✓ "; color: #2E8B57; }
+.narr-verifs li.fail::before { content: "✕ "; color: #B0312A; }
+.narr-pr { background: var(--surface-soft); border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
+.narr-pr-group { display: flex; flex-direction: column; margin-bottom: 6px; font-size: 12px; }
+.narr-pr-files { color: var(--text-mute); }
+.narr-pr-risk { color: #A8742F; font-size: 12px; margin-top: 8px; }
