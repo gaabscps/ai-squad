@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { SessionNarrative } from "./SessionNarrative";
 import type { NarrativeClient, NarrativeServerMsg } from "../state/narrativeClient";
 import type { ObservedMeta } from "../../../src/store/types";
