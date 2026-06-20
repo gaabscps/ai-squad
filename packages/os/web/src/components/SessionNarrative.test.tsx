@@ -34,9 +34,9 @@ describe("SessionNarrative", () => {
 
   it("renderiza tldr, frente e anexa o diff real do marker", async () => {
     const client = clientThatEmitsOnFetch({ type: "narrative:cached", projectId: "p", specId: "OBS-1", narrative: N, stale: false });
-    render(<SessionNarrative projectId="p" specId="OBS-1" observed={observed()} client={client} />);
+    const { container } = render(<SessionNarrative projectId="p" specId="OBS-1" observed={observed()} client={client} />);
     expect(await screen.findByText("fiz X")).toBeTruthy();
     expect(screen.getByText("Frente 1")).toBeTruthy();
-    expect(screen.getByText(/\+linha/)).toBeTruthy(); // diff real veio do marker, não do LLM
+    expect(container.textContent).toContain("linha"); // diff real veio do marker, não do LLM
   });
 });

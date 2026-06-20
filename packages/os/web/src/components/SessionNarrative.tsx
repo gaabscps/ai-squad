@@ -20,13 +20,7 @@ function ChangeBlock({ change, idx, open }: { change: NarrativeChange; idx: Map<
   const body = (
     <>
       <MarkdownText source={change.prose} />
-      {file?.patch && (
-        <>
-          {/* raw patch como texto acessível para testes e leitores de tela */}
-          <code className="narr-patch-raw" aria-hidden="true" style={{ display: "none" }}>{file.patch}</code>
-          <DiffView patch={file.patch} path={file.path} />
-        </>
-      )}
+      {file?.patch && <DiffView patch={file.patch} path={file.path} />}
     </>
   );
   return (
