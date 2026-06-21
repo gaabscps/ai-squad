@@ -9,6 +9,7 @@ import { makeSummaryHandler } from "../summary/handler.js";
 import { makeSpecSummaryHandler } from "../spec-summary/handler.js";
 import { makeDiagnosisHandler } from "../attention/handler.js";
 import { makeNarrativeHandler } from "../narrative/handler.js";
+import { makeProductHandler } from "../product/handler.js";
 import { listDirs } from "../collector/browse.js";
 
 // pasta do build do Vite (npm run build → dist/web); em dev pode não existir.
@@ -129,6 +130,7 @@ export function createServer(
     const onSpecSummary = makeSpecSummaryHandler(store);
     const onDiagnosis = makeDiagnosisHandler(store);
     const onNarrative = makeNarrativeHandler(store);
+    const onProduct = makeProductHandler(store);
     socket.on("message", (raw) => {
       let msg: { type?: string; id?: string; specId?: string; taskId?: string; force?: boolean };
       try {
@@ -164,6 +166,12 @@ export function createServer(
       }
       if (msg.type === "narrative:fetch" || msg.type === "narrative:generate") {
         onNarrative(msg as never, (data) => {
+          if (socket.readyState === WebSocket.OPEN) socket.send(data);
+        });
+        return;
+      }
+      if (msg.type === "product:fetch" || msg.type === "product:generate") {
+        onProduct(msg as never, (data) => {
           if (socket.readyState === WebSocket.OPEN) socket.send(data);
         });
         return;

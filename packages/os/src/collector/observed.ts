@@ -127,6 +127,7 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     driftFlags: drift,
     baseSha: nonEmptyString(raw.base_sha),
     outputLocale: nonEmptyString(raw.output_locale),
+    workType: nonEmptyString(raw.work_type),
     markers,
     report: readReport(specDir),
   };
@@ -238,6 +239,7 @@ function degradedSpec(specDir: string): Spec {
     driftFlags: ["unreadable_yaml"],
     baseSha: null,
     outputLocale: null,
+    workType: null,
     markers: [],
     report: null,
   };

@@ -18,6 +18,7 @@
       "description": "Present ONLY while status=needs_attention; track-attention strips the block when the human engages."
     },
     "output_locale": { "type": "string", "description": "BCP-47 tag; language of human-facing prose. Absent defaults to en." },
+    "work_type": { "type": "string", "enum": ["dev", "product"], "description": "Persona/tipo de trabalho da sessão. Ausente ou 'dev' = caminho de desenvolvimento (resumo dev→tech lead). 'product' = sessão de produto/design (resumo decidido/em aberto/próximo passo, persona de produto). Aditivo e retrocompatível; ausência defaults a dev. Escrito pela skill /sessao; lido pelo collector observado e pelo módulo product/ do aiOS." },
     "created_at": { "type": "string", "description": "ISO 8601 UTC, real clock. Lower bound of the contract's cost window." },
     "base_sha": {
       "type": "string",
