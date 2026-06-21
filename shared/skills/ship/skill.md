@@ -1,61 +1,100 @@
 ---
 name: ship
-description: Auxiliary cleanup Skill — removes a terminal Session's `.agent-session/<spec_id>/` after human confirmation. Cross-squad (FEAT + DISC); conducts no Phase.
+description: Encerramento de sessão (cross-squad): sela custo, grava estado terminal e gera o report. NÃO apaga o `.agent-session/`.
 ---
 
-# Ship — Session Cleanup (auxiliary)
+# Ship — Encerramento de Sessão (selador)
 
-`/ship <spec_id>` removes a finished Session's runtime trace. It is **not** one of the Phase-conducting Skills — it conducts no Phase, owns no `current_phase`, and writes nothing to `session.yml`. Its whole job: a final read, a confirmation, and `rm -rf .agent-session/<spec_id>/`.
+`/ship <spec_id>` sela uma Sessão concluída: registra a conversa como proprietária, reconstrói o custo, grava o estado terminal em `session.yml` e gera o `cost-report.json`. **Nunca apaga** o `.agent-session/<spec_id>/` — o rastro fica em disco e a limpeza é manual se o humano quiser.
 
-It is **cross-squad**: it cleans both SDD Sessions (`FEAT-NNN`) and Discovery Sessions (`DISC-NNN`), which share the same `.agent-session/` runtime root.
+É **cross-squad**: funciona tanto em Sessões SDD (`FEAT-NNN`) quanto em Sessões Discovery (`DISC-NNN`).
 
-## When to invoke
-- `/ship FEAT-NNN` — remove a terminal SDD Session.
-- `/ship DISC-NNN` — remove a terminal Discovery Session.
-- `/ship` — no argument: list existing Sessions and ask which to clean up.
+## Quando invocar
+- `/ship FEAT-NNN` — encerrar uma Sessão SDD.
+- `/ship DISC-NNN` — encerrar uma Sessão Discovery.
+- `/ship` — sem argumento: listar Sessões existentes e perguntar qual encerrar.
 
 ## Refuse when
-- `<spec_id>` given but no Session exists at `.agent-session/<spec_id>/` → message: `"No Session at .agent-session/<spec_id>/. Nothing to clean up."`
-- Session exists but `current_phase` is NOT terminal (`done | paused | escalated`) → message: `"Session <spec_id> is in <current_phase> (active). /ship only removes terminal Sessions (done | paused | escalated). To abandon an active Session, restart it via its Phase Skill (e.g. /orchestrator <spec_id>), or wait for it to reach a terminal state."`
-- `.agent-session/<spec_id>/session.yml` is unreadable or malformed → message: `"Cannot read .agent-session/<spec_id>/session.yml. Inspect it manually before removing, or delete the directory by hand if you are sure."`
+- `<spec_id>` fornecido mas nenhuma Sessão existe em `.agent-session/<spec_id>/` → mensagem: `"No Session at .agent-session/<spec_id>/. Nothing to seal."`
+- `.agent-session/<spec_id>/session.yml` ilegível ou malformado → mensagem: `"Cannot read .agent-session/<spec_id>/session.yml. Inspect it manually."`
 
-## Inputs (preconditions)
-- Existing `.agent-session/<spec_id>/session.yml` with `current_phase ∈ {done, paused, escalated}`.
+## Inputs (pré-condições)
+- `.agent-session/<spec_id>/session.yml` existente (qualquer estado — selar é o ato que TORNA o estado terminal).
 
 ## Steps
 
-### 1. Resolve `spec_id`
-- Invoked with `FEAT-NNN` / `DISC-NNN`: use it directly.
-- Invoked with no argument: scan `.agent-session/*/`, read each `session.yml`'s `current_phase` and `last_activity_at`, and present the list (id, phase, last activity). Ask the human which to clean up. If none exist → `"No Sessions in .agent-session/. Nothing to clean up."`
+### 1. Resolver `spec_id`
+- Invocado com `FEAT-NNN` / `DISC-NNN`: usar diretamente.
+- Invocado sem argumento: escanear `.agent-session/*/`, ler `current_phase` e `last_activity_at` de cada `session.yml`, apresentar a lista (id, fase, última atividade). Perguntar qual encerrar. Se nenhuma existir → `"No Sessions in .agent-session/. Nothing to seal."`
 
-### 2. Verify terminal state (the only guard)
-- Read `.agent-session/<spec_id>/session.yml`.
-- If `current_phase ∉ {done, paused, escalated}` → refuse per the matrix above. **Do not proceed.** Removing a Session mid-Phase would silently discard in-flight work.
+### 2. Ler `session.yml`
+- Ler `.agent-session/<spec_id>/session.yml`.
+- Se ilegível ou malformado → recusar conforme a matriz acima. **Não prosseguir.**
 
-### 3. Final read — show what will be destroyed
-Before any deletion, surface a summary so the human can extract anything durable first:
+### 3. Descobrir o `session_id` atual
+- O agente que executa `/ship` conhece o ID da conversa atual (disponível no contexto do Claude Code como o identificador da sessão ativa).
+- Se o ID não estiver disponível, usar `"unknown"` (o `seal-session.py` é idempotente e tolerante a isso).
+
+### 4. Rodar `seal-session.py` (registra + backfill + cost-report)
+```bash
+python3 .claude/hooks/seal-session.py <spec_id> <session_id>
 ```
-About to remove .agent-session/<spec_id>/
-  Phase:      <current_phase>
-  Planned:    <planned_phases, joined>
-  Tasks:      <N total — done / blocked / pending, if present in session.yml>
-  Artifacts:  <count of files under outputs/, plus any of spec.md / plan.md / tasks.md / memo.md / report.html present>
+Este script (fail-open):
+- Registra `session_id` em `observed_sessions:` no `session.yml`.
+- Reconstrói `costs/session-<session_id>.json` via backfill na janela da sessão.
+- Regenera `cost-report.json`.
+
+### 5. Gravar estado terminal em `session.yml`
+Usando Bash, acrescentar (ou atualizar) dois escalares no `session.yml`:
+```bash
+# status
+python3 -c "
+import re, sys
+from pathlib import Path
+p = Path('.agent-session/<spec_id>/session.yml')
+t = p.read_text()
+t = re.sub(r'^status:.*$', 'status: done', t, flags=re.MULTILINE)
+if 'status:' not in t:
+    t = t.rstrip() + '\nstatus: done\n'
+p.write_text(t)
+"
+# closed_at (UTC ISO-8601)
+python3 -c "
+from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())
+" | xargs -I{} python3 -c "
+import re, sys
+from pathlib import Path
+ts = sys.argv[1]
+p = Path('.agent-session/<spec_id>/session.yml')
+t = p.read_text()
+t = re.sub(r'^closed_at:.*$', f'closed_at: {ts}', t, flags=re.MULTILINE)
+if 'closed_at:' not in t:
+    t = t.rstrip() + f'\nclosed_at: {ts}\n'
+p.write_text(t)
+" {}
 ```
-Remind: `"These artifacts are gitignored and have no durable copy. If you need a permanent record, capture it in your tracker (Jira / PR description / Confluence) before confirming."`
+Ou escrever os dois de uma vez usando Python inline — o importante é que `status` e `closed_at` fiquem gravados antes de reportar.
 
-### 4. Confirm
-Use `AskUserQuestion` (NOT a free-text gate):
-- `Confirm removal` — proceed to step 5.
-- `Cancel` — exit, no changes: `"Cancelled. .agent-session/<spec_id>/ left untouched."`
+Para Sessões abandonadas (o humano solicitou abandono): usar `status: abandoned` em vez de `done`.
 
-### 5. Remove and suggest next
-- `rm -rf .agent-session/<spec_id>/`. The directory is gitignored, so there is no git impact on the consumer repo.
-- Suggest the next entry point, branched by prefix:
-  - `FEAT-` → `"Session <spec_id> cleaned. To start a new feature: /spec-writer."`
-  - `DISC-` → `"Session <spec_id> cleaned. To start a new opportunity: /discovery-lead."`
+### 6. Gerar o report
+Apresentar ao humano um resumo do que foi selado:
+```
+Sealed .agent-session/<spec_id>/
+  Status:     done
+  Closed at:  <closed_at>
+  Session:    <session_id>
+  Cost:       <total_cost_usd> USD  (<link to cost-report.json if meaningful>)
+```
+Incluir contexto vivido: o que foi feito nesta sessão, decisões relevantes, entregáveis produzidos — narrativa resumida para registro.
 
-## What this Skill never does
-- **Never writes to `session.yml`.** It only reads, then deletes the whole directory.
-- **Never removes a Session in an active Phase** (`specify | plan | tasks | implementation`). That path is Restart, owned by the Phase Skill.
-- **Never creates a backup tarball.** The runtime trace is disposable by design; durable records live in the consumer's external tracker.
-- **Never runs automatically.** Cleanup is always human-initiated — this preserves the human's control over when the trace is discarded (auto-cleanup risks deleting information still needed; see `shared/concepts/phase.md`).
+### 7. Orientar sobre próximos passos
+Baseado no prefixo do `spec_id`:
+- `FEAT-` → `"Session <spec_id> sealed. O rastro permanece em .agent-session/<spec_id>/. Para iniciar uma nova feature: /spec-writer."`
+- `DISC-` → `"Session <spec_id> sealed. O rastro permanece em .agent-session/<spec_id>/. Para iniciar uma nova oportunidade: /discovery-lead."`
+
+## O que esta Skill nunca faz
+- **Nunca apaga** `.agent-session/<spec_id>/` nem qualquer arquivo dentro dele. O rastro (custo, trail, outputs) fica em disco. Limpeza é opcional e manual.
+- **Nunca usa `rm -rf`** em hipótese alguma.
+- **Nunca falha ruidosamente** por causa do custo — `seal-session.py` é fail-open; um erro de captura não bloqueia o encerramento da sessão.
+- **Nunca executa automaticamente** — encerramento é sempre iniciado pelo humano.
