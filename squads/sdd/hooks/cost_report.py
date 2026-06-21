@@ -233,6 +233,43 @@ def _attempt_scope_recovery(excluded_records, session_dir):
     return dominant
 
 
+def _main_transcript_path(session_dir, session_id):
+    """~/.claude/projects/<slug>/<session_id>.jsonl, slug = project root com / -> -."""
+    project_root = Path(session_dir).resolve().parent.parent
+    slug = str(project_root).replace("/", "-")
+    return Path.home() / ".claude" / "projects" / slug / f"{session_id}.jsonl"
+
+
+def backfill_main_session(session_dir, window, prices):
+    """Reconstruct costs/session-<id>.json for each observed_sessions id that
+    has no snapshot on disk, by reading its transcript bracketed to the window.
+    The read-side twin of backfill_missing (subagents). Returns ids backfilled."""
+    from transcript_cost import extract_transcript_cost
+
+    session_dir = Path(session_dir)
+    ids = _read_observed_sessions(session_dir) or set()
+    out_dir = session_dir / "costs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    since, until = window
+    done = []
+    for sid in sorted(ids):
+        out_file = out_dir / f"session-{sid}.json"
+        if out_file.exists():
+            continue
+        tp = _main_transcript_path(session_dir, sid)
+        if not tp.exists():
+            continue
+        planning = extract_transcript_cost(str(tp), prices, since=since, until=until)
+        payload = {"session_id": sid, "scope": "session", "transcript_path": str(tp),
+                   "backfilled": True, "window": {"since": since, "until": until},
+                   "planning": planning,
+                   "orchestration": {"total_cost_usd": 0.0, "by_model": {},
+                                     "unpriced_models": [], "error": None}}
+        out_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        done.append(sid)
+    return done
+
+
 def backfill_missing(session_dir, transcript_paths, prices):
     """Write costs/agent-<id>.json for any subagent transcript lacking one.
 

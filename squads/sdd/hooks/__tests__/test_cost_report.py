@@ -737,3 +737,50 @@ def test_cost_report_schema_is_valid_and_declares_required_keys():
         "unpriced_models", "complete", "tokens", "token_cost", "spec_id",
         "generated_at",
     }
+
+
+# --- backfill_main_session (reconstruct missing session-*.json from transcripts) ---
+
+def test_backfill_main_session_reconstructs_missing_cost(tmp_path, monkeypatch):
+    # Um contrato observado adotou a conversa "chatX" (observed_sessions),
+    # mas o Stop nunca escreveu costs/session-chatX.json. O backfill deve
+    # reler o transcript da janela e escrever o snapshot.
+    project = tmp_path
+    session_dir = project / ".agent-session" / "OBS-009"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session.yml").write_text(
+        "mode: observed\n"
+        "created_at: 2026-06-21T06:00:00Z\n"
+        "closed_at: 2026-06-21T07:00:00Z\n"
+        "observed_sessions:\n  - \"chatX\"\n", encoding="utf-8")
+    # transcript da conversa chatX em ~/.claude/projects/<slug>/chatX.jsonl
+    slug = str(project).replace("/", "-")
+    proj_dir = tmp_path / "home" / ".claude" / "projects" / slug
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "chatX.jsonl").write_text(json.dumps({
+        "type": "assistant", "timestamp": "2026-06-21T06:30:00Z",
+        "message": {"id": "m1", "model": "claude-opus-4-8",
+                    "usage": {"input_tokens": 10, "output_tokens": 5,
+                              "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}}}) + "\n",
+        encoding="utf-8")
+    monkeypatch.setattr(cr.Path, "home", staticmethod(lambda: tmp_path / "home"))
+
+    done = cr.backfill_main_session(session_dir, ("2026-06-21T06:00:00Z", "2026-06-21T07:00:00Z"),
+                                    cr._load_prices_safe())
+    assert done == ["chatX"]
+    written = json.loads((session_dir / "costs" / "session-chatX.json").read_text())
+    assert written["scope"] == "session"
+    assert written["backfilled"] is True
+    assert written["planning"]["by_model"]["claude-opus-4-8"]["messages"] == 1
+
+
+def test_backfill_main_session_skips_existing(tmp_path):
+    session_dir = tmp_path / ".agent-session" / "OBS-009"
+    (session_dir / "costs").mkdir(parents=True)
+    (session_dir / "session.yml").write_text(
+        "mode: observed\nobserved_sessions:\n  - \"chatX\"\n", encoding="utf-8")
+    pre = json.dumps({"scope": "session", "planning": {"total_cost_usd": 9.0}})
+    (session_dir / "costs" / "session-chatX.json").write_text(pre)
+    done = cr.backfill_main_session(session_dir, (None, None), cr._load_prices_safe())
+    assert done == []
+    assert json.loads((session_dir / "costs" / "session-chatX.json").read_text())["planning"]["total_cost_usd"] == 9.0
