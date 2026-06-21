@@ -239,10 +239,12 @@ def resolve_capture_session(project_dir: Path, session_id: str | None) -> Path |
       2. Otherwise route as today (newest-mtime); if that target is an OPEN
          observed dir and the id is trustworthy, ADOPT the chat session there,
          making ownership sticky for every later Stop.
-      3. A CLOSED observed target that never owned this chat session gets
-         nothing: unowned work after close is out of contract (the OBS-002
-         25h-window contamination), and a silent wrong attribution is worse
-         than no capture.
+      3. If the mtime-newest target is a CLOSED observed dir it cannot adopt:
+         rescue the capture to the OPEN observed session when one exists (a
+         newer closed sibling must not steal or discard an open contract's
+         cost). With no observed session open, return nothing — unowned work
+         after close is out of contract (the OBS-002 25h-window contamination),
+         and a silent wrong attribution is worse than no capture.
     Non-observed (pipeline) dirs keep today's behavior untouched.
     """
     owner = find_owner_session(project_dir, session_id)
