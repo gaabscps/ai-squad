@@ -292,3 +292,12 @@ describe("ObservedTimeline — decision.ref", () => {
     expect(container.querySelector(".tl-ref")).toBeNull();
   });
 });
+
+describe("ObservedTimeline — timestamp", () => {
+  it("mostra a hora do marker quando há at", () => {
+    render(<ObservedTimeline outputLocale="pt-BR" markers={[
+      { kind: "run", at: "2026-06-20T17:31:00Z", exact: true, note: "vitest", decision: null, evidence: null, editFiles: null, blockMs: null },
+    ]} />);
+    expect(screen.getByText(/14:31/)).toBeTruthy();
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fmtTokens, fmtUsd, fmtDate, fmtRelativeTime } from "./format";
+import { fmtTokens, fmtUsd, fmtDate, fmtRelativeTime, fmtDurationBetween } from "./format";
 
 describe("fmtTokens", () => {
   it("milhões com 1 casa", () => {
@@ -56,5 +56,14 @@ describe("fmtRelativeTime", () => {
   });
   it("data inválida vira travessão", () => {
     expect(fmtRelativeTime("nao-e-data", now)).toBe("—");
+  });
+});
+
+describe("fmtDurationBetween", () => {
+  it("formata horas e minutos", () => {
+    expect(fmtDurationBetween("2026-06-20T14:00:00Z", "2026-06-20T16:14:00Z")).toBe("2h 14min");
+  });
+  it("null quando falta uma ponta", () => {
+    expect(fmtDurationBetween("2026-06-20T14:00:00Z", null)).toBeNull();
   });
 });
