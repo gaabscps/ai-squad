@@ -854,6 +854,23 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
   max-width: 70ch;
 }
 
+/* Botão "por quê?" da vista de produto: revela why/rejected sob demanda.
+   Sem chrome de botão — parece um link discreto, na cor da decisão. */
+.tl-why-toggle {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tl-decision);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+}
+.tl-why-toggle:hover { text-decoration: underline; }
+.tl-why-toggle[aria-expanded="true"] { opacity: 0.6; }
+
 /* Bloco de verificação: cmd inline + resultado muted */
 .tl-verify-body {        /* NOTE: o componente usa .tl-verify como className no <span> de evidência,
                             mas .tl-verify já é o seletor de kind no <li>. O seletor abaixo estiliza

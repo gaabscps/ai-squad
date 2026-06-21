@@ -301,3 +301,71 @@ describe("ObservedTimeline — timestamp", () => {
     expect(screen.getByText(/14:31/)).toBeTruthy();
   });
 });
+
+describe("ObservedTimeline — vista de produto (work_type:product)", () => {
+  const openMarker = makeMarker({ kind: "open" });
+  const closeMarker = makeMarker({ kind: "close", at: "2026-06-01T11:00:00Z" });
+  const blockMarker = makeMarker({ kind: "block", blockMs: 900000 });
+  const runMarker = makeMarker({ kind: "run", note: "npm test", decision: null });
+  const editMarker = makeMarker({ kind: "edit", editFiles: [{ path: "a.ts", added: 1, removed: 0, patch: null }] });
+  const decisionMarker = makeMarker({
+    kind: "decision",
+    decision: { what: "Usar o transcript real", why: "evita fabricar conteúdo", rejected: "escrever resumo fixo", ref: null },
+  });
+
+  it("re-rotula para o vocabulário de produto em pt-BR (Aberta/Decisão/Fechada)", () => {
+    render(<ObservedTimeline workType="product" outputLocale="pt-BR"
+      markers={[openMarker, decisionMarker, closeMarker]} />);
+    expect(screen.getByText(/Aberta/)).toBeInTheDocument();
+    expect(screen.getByText(/Decisão/)).toBeInTheDocument();
+    expect(screen.getByText(/Fechada/)).toBeInTheDocument();
+    expect(screen.queryByText(/Decidiu/)).toBeNull();
+  });
+
+  it("re-rotula block como 'Pergunta levantada' em pt-BR", () => {
+    render(<ObservedTimeline workType="product" outputLocale="pt-BR" markers={[blockMarker]} />);
+    expect(screen.getByText(/Pergunta levantada/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bloqueou/)).toBeNull();
+  });
+
+  it("vocabulário de produto em inglês (Opened/Decision/Closed)", () => {
+    render(<ObservedTimeline workType="product" outputLocale="en-US"
+      markers={[openMarker, decisionMarker, closeMarker]} />);
+    expect(screen.getByText(/Opened/)).toBeInTheDocument();
+    expect(screen.getByText(/Decision/)).toBeInTheDocument();
+    expect(screen.getByText(/Closed/)).toBeInTheDocument();
+  });
+
+  it("filtra marcos de execução: run/edit/verify não aparecem na vista de produto", () => {
+    render(<ObservedTimeline workType="product" outputLocale="pt-BR"
+      markers={[openMarker, runMarker, editMarker, decisionMarker]} />);
+    expect(screen.queryByText("npm test")).toBeNull();
+    expect(screen.queryByText(/Executou/)).toBeNull();
+    expect(screen.queryByText(/Editou/)).toBeNull();
+    // a decisão de produto permanece
+    expect(screen.getByText(/Decisão/)).toBeInTheDocument();
+    expect(screen.getByText("Usar o transcript real")).toBeInTheDocument();
+  });
+
+  it("progressive disclosure: why/rejected ficam ocultos até clicar em 'por quê?'", async () => {
+    const user = userEvent.setup();
+    render(<ObservedTimeline workType="product" outputLocale="pt-BR" markers={[decisionMarker]} />);
+    // o 'what' (a decisão em si) aparece sempre
+    expect(screen.getByText("Usar o transcript real")).toBeInTheDocument();
+    // o porquê e a alternativa descartada começam ocultos
+    expect(screen.queryByText("evita fabricar conteúdo")).toBeNull();
+    expect(screen.queryByText(/escrever resumo fixo/)).toBeNull();
+    // expande
+    await user.click(screen.getByRole("button", { name: /por quê/i }));
+    expect(screen.getByText("evita fabricar conteúdo")).toBeInTheDocument();
+    expect(screen.getByText(/escrever resumo fixo/)).toBeInTheDocument();
+  });
+
+  it("vista dev (sem workType): mantém 'Decidiu' e exibe run — sem regressão", () => {
+    render(<ObservedTimeline outputLocale="pt-BR" markers={[runMarker, decisionMarker]} />);
+    expect(screen.getByText(/Decidiu/)).toBeInTheDocument();
+    expect(screen.getByText("npm test")).toBeInTheDocument();
+    // na vista dev, why aparece direto (sem disclosure)
+    expect(screen.getByText("evita fabricar conteúdo")).toBeInTheDocument();
+  });
+});

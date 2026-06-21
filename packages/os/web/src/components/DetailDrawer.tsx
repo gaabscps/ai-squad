@@ -141,6 +141,7 @@ export function DetailDrawer({
             <ObservedTimeline
               markers={obs.markers}
               outputLocale={obs.outputLocale}
+              workType={obs.workType}
               onOpenRef={(ref) => openFile(`${projectPath}/${ref}`, ref)}
             />
             {obs.workType === "product" ? (

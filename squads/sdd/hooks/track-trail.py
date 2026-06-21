@@ -61,6 +61,11 @@ def main() -> int:
         return 0
     if (read_yaml_scalar(yml, "status") or "") in _TERMINAL_STATUS:
         return 0
+    # Sessao de produto: a timeline fala a linguagem de produto (decisao,
+    # pergunta, entregavel), nao comandos de shell. O marco run e ruido de
+    # engenharia aqui, entao a trilha de produto nasce limpa na origem.
+    if read_yaml_scalar(yml, "work_type") == "product":
+        return 0
 
     event = {"at": _now(), "kind": "run", "tool": "Bash", "summary": cmd[:_MAX_SUMMARY], "result_ref": None}
     line = json.dumps(event, ensure_ascii=False)
