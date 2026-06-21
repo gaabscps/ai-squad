@@ -32,9 +32,16 @@ cd ai-squad
 ### 2. Instale as skills e os ganchos (a partir do repo local)
 
 ```bash
-# na raiz do repo:
+# na raiz do repo — 1) regenere os componentes da fonte (inclui a /sessao):
+node packages/cli/scripts/sync-components.mjs
+
+# 2) instale skills + agents globais e os ganchos no projeto:
 node packages/cli/bin/cli.js deploy
 ```
+
+> **O passo 1 é obrigatório ao instalar da fonte.** O CLI instala de uma cópia gerada
+> (`packages/cli/components/`); sem rodar o `sync` antes, a `/sessao` não é incluída. E use o
+> CLI **local** (`node packages/cli/bin/cli.js`) — o `ai-squad` global publicado ainda não a tem.
 
 Isso copia as skills (incluindo a nova `/sessao`) para `~/.claude/skills/` e instala os ganchos
 de captura de custo/tempo/atenção em `.claude/hooks/` do projeto. Rode o `deploy` **também dentro
