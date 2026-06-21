@@ -33,7 +33,7 @@ description: Encerramento de sessão (cross-squad): sela custo, grava estado ter
 
 ### 3. Descobrir o `session_id` atual
 - O agente que executa `/ship` conhece o ID da conversa atual (disponível no contexto do Claude Code como o identificador da sessão ativa).
-- Se o ID não estiver disponível, usar `"unknown"` (o `seal-session.py` é idempotente e tolerante a isso).
+- Se o ID não estiver disponível, pular o passo 4 (não executar `seal-session.py`) e prosseguir diretamente para o passo 5 (gravar estado terminal).
 
 ### 4. Rodar `seal-session.py` (registra + backfill + cost-report)
 ```bash

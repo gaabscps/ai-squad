@@ -24,11 +24,17 @@ def main(argv):
         return 1
     try:
         register_observed_session(yml, session_id)
+    except Exception as e:
+        print(f"seal: register: {e}", file=sys.stderr)
+    try:
         window = (read_yaml_scalar(yml, "created_at"), read_yaml_scalar(yml, "closed_at"))
         cost_report.backfill_main_session(session_dir, window, cost_report._load_prices_safe())
+    except Exception as e:
+        print(f"seal: backfill: {e}", file=sys.stderr)
+    try:
         cost_report.write_cost_report_json(session_dir)
-    except Exception as e:  # fail-open
-        print(f"seal: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"seal: cost-report: {e}", file=sys.stderr)
     return 0
 
 
