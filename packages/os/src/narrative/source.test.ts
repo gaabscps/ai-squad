@@ -39,20 +39,49 @@ describe("buildNarrativeSource", () => {
     expect(src.reasoning).toBe(""); // dir inexistente → sem transcript
   });
 
-  it("destila só os blocos de texto do assistente, com teto", () => {
+  it("inclui texto do assistente e turnos humanos, mas descarta tool_result e tool_use", () => {
     const readDirFn = () => ["session-1.json"];
     const files: Record<string, string> = {
       "/s/costs/session-1.json": JSON.stringify({ transcript_path: "/s/t.jsonl" }),
       "/s/t.jsonl": [
-        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "penso que X" }, { type: "tool_use", name: "Bash", input: {} }] } }),
-        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", content: "ruído" }] } }),
-        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "agora Y" }] } }),
+        JSON.stringify({ type: "user", message: { content: "ajusta o espaçamento do step 1" } }),
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "feito, agora bate com o Figma" }, { type: "tool_use", name: "Edit", input: {} }] } }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", content: "saída de comando" }] } }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "agora o step 2" }] } }),
       ].join("\n"),
     };
     const readFileFn = (p: string) => { if (files[p] === undefined) throw new Error("nope"); return files[p]; };
     const src = buildNarrativeSource(obs({}), "/s", { readDirFn, readFileFn });
-    expect(src.reasoning).toContain("penso que X");
-    expect(src.reasoning).toContain("agora Y");
-    expect(src.reasoning).not.toContain("ruído");
+    expect(src.reasoning).toContain("ajusta o espaçamento do step 1"); // turno humano (string)
+    expect(src.reasoning).toContain("feito, agora bate com o Figma");  // texto do assistente
+    expect(src.reasoning).toContain("agora o step 2");                 // turno humano (bloco text)
+    expect(src.reasoning).not.toContain("saída de comando");           // tool_result descartado
+  });
+
+  it("lê o transcript de TODAS as sessões observadas, não só a primeira", () => {
+    const readDirFn = () => ["session-1.json", "session-2.json"];
+    const files: Record<string, string> = {
+      "/s/costs/session-1.json": JSON.stringify({ transcript_path: "/s/t1.jsonl" }),
+      "/s/costs/session-2.json": JSON.stringify({ transcript_path: "/s/t2.jsonl" }),
+      "/s/t1.jsonl": JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "trabalho da sessão um" }] } }),
+      "/s/t2.jsonl": JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "trabalho da sessão dois" }] } }),
+    };
+    const readFileFn = (p: string) => { if (files[p] === undefined) throw new Error("nope"); return files[p]; };
+    const src = buildNarrativeSource(obs({}), "/s", { readDirFn, readFileFn });
+    expect(src.reasoning).toContain("trabalho da sessão um");
+    expect(src.reasoning).toContain("trabalho da sessão dois");
+  });
+
+  it("aplica o teto generoso de caracteres", () => {
+    const big = "x".repeat(200000);
+    const readDirFn = () => ["session-1.json"];
+    const files: Record<string, string> = {
+      "/s/costs/session-1.json": JSON.stringify({ transcript_path: "/s/t.jsonl" }),
+      "/s/t.jsonl": JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: big }] } }),
+    };
+    const readFileFn = (p: string) => { if (files[p] === undefined) throw new Error("nope"); return files[p]; };
+    const src = buildNarrativeSource(obs({}), "/s", { readDirFn, readFileFn });
+    expect(src.reasoning.length).toBeLessThanOrEqual(100000);
+    expect(src.reasoning.length).toBeGreaterThan(12000); // teto subiu além do antigo 12k
   });
 });

@@ -27,4 +27,10 @@ describe("buildNarrativePrompt", () => {
     expect(buildNarrativePrompt(src, "pt-BR")).toMatch(/português|pt-BR/i);
     expect(buildNarrativePrompt(src, "en")).toMatch(/english|en\b/i);
   });
+
+  it("rotula a conversa (usuário+assistente) e instrui cobertura de todas as frentes", () => {
+    const p = buildNarrativePrompt(src, "pt-BR");
+    expect(p.toLowerCase()).toContain("conversa");
+    expect(p).toMatch(/todas as frentes|todos os steps/i);
+  });
 });
