@@ -12,6 +12,7 @@ export interface ProductServerMsg {
   costUsd?: number | null;
   modelId?: string | null;
   stale?: boolean;
+  source?: "sealed" | "generated";
   message?: string;
 }
 type Handler = (msg: ProductServerMsg) => void;

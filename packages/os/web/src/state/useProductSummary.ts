@@ -13,6 +13,7 @@ export interface ObservedProductSummary {
   generatedAt: string | null;
   costUsd: number | null;
   modelId: string | null;
+  source: "sealed" | "generated" | null;
   error: string | null;
   generate: (model?: ModelAlias) => void;
   regenerate: (model?: ModelAlias) => void;
@@ -24,6 +25,7 @@ export function useProductSummary(projectId: string, specId: string, client: Pro
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [costUsd, setCostUsd] = useState<number | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
+  const [source, setSource] = useState<"sealed" | "generated" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export function useProductSummary(projectId: string, specId: string, client: Pro
         setSummary(m.summary ?? null);
         setGeneratedAt(m.generatedAt ?? null);
         setCostUsd(m.costUsd ?? null);
+        setSource(m.source ?? null);
         setState(m.stale ? "stale" : "ready");
       } else if (m.type === "product:generating") {
         setState("loading");
@@ -41,6 +44,7 @@ export function useProductSummary(projectId: string, specId: string, client: Pro
         setGeneratedAt(m.generatedAt ?? null);
         setCostUsd(m.costUsd ?? null);
         setModelId(m.modelId ?? null);
+        setSource("generated");
         setState("ready");
       } else if (m.type === "product:error") {
         setError(m.message ?? "erro ao gerar");
@@ -58,7 +62,7 @@ export function useProductSummary(projectId: string, specId: string, client: Pro
   }, [projectId, specId, client]);
 
   return {
-    state, summary, generatedAt, costUsd, modelId, error,
+    state, summary, generatedAt, costUsd, modelId, source, error,
     generate: (model?: ModelAlias) => start(false, model),
     regenerate: (model?: ModelAlias) => start(true, model),
   };
