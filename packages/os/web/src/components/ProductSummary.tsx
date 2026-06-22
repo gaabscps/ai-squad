@@ -29,6 +29,7 @@ export function ProductSummary({
   return (
     <div className="narr" data-testid="product-summary">
       <div className="narr-meta">
+        {n.source === "sealed" && <span className="narr-sealed">selado</span>}
         {n.state === "stale" && <span className="narr-stale">desatualizado</span>}
         {n.costUsd !== null && <span className="narr-cost">${n.costUsd.toFixed(2)}</span>}
         <button type="button" className="narr-regen" onClick={() => n.regenerate()}>regerar</button>

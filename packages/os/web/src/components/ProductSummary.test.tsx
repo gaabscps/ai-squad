@@ -45,4 +45,18 @@ describe("ProductSummary", () => {
     expect(container.textContent).not.toContain("Verificações");
     expect(container.textContent).not.toContain("revisar a PR");
   });
+
+  it("mostra badge 'selado' quando source é sealed", async () => {
+    const client = clientThatEmitsOnFetch({ type: "product:cached", projectId: "p", specId: "OBS-1", summary: SUMMARY, stale: false, source: "sealed" });
+    render(<ProductSummary projectId="p" specId="OBS-1" client={client} />);
+    await screen.findByText("Definiu o onboarding enxuto");
+    expect(screen.getByText("selado")).toBeTruthy();
+  });
+
+  it("não mostra badge 'selado' quando source é generated", async () => {
+    const client = clientThatEmitsOnFetch({ type: "product:cached", projectId: "p", specId: "OBS-1", summary: SUMMARY, stale: false, source: "generated" });
+    render(<ProductSummary projectId="p" specId="OBS-1" client={client} />);
+    await screen.findByText("Definiu o onboarding enxuto");
+    expect(screen.queryByText("selado")).toBeNull();
+  });
 });
