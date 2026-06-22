@@ -127,6 +127,7 @@ export interface ObservedMeta {
   driftFlags: ObservedDriftFlag[];
   baseSha: string | null;        // git base_sha lido do session.yml (âncora do diff)
   outputLocale: string | null;   // output_locale da sessão (BCP-47); idioma dos labels da timeline
+  workType?: string | null;      // work_type da sessão (dev|product); ausente/null ⇒ tratado como dev. Aditivo (protocolo do schema: opcional na leitura). Roteia o resumo de produto no aiOS.
   markers: ObservedMarker[];     // a timeline curada (preenchida na Task 8)
   report: string | null;        // conteúdo de report.md (parecer determinístico); null se ausente
 }

@@ -96,6 +96,25 @@ class TestTrackTrail(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertFalse(self.trail.exists())
 
+    def test_product_session_suppresses_run(self):
+        # Sessao observada de PRODUTO: a timeline de produto nasce limpa, sem
+        # comandos Bash (ruido de engenharia). O hook nao grava o marco run.
+        (self.session_dir / "session.yml").write_text(
+            OBSERVED_YML + "work_type: product\n", encoding="utf-8")
+        code = _run_hook(self._bash_payload("npm test"))
+        self.assertEqual(code, 0)
+        self.assertFalse(self.trail.exists())
+
+    def test_dev_work_type_still_appends_run(self):
+        # work_type explicito 'dev' (ou ausente) mantem o comportamento: grava run.
+        (self.session_dir / "session.yml").write_text(
+            OBSERVED_YML + "work_type: dev\n", encoding="utf-8")
+        code = _run_hook(self._bash_payload("npm test"))
+        self.assertEqual(code, 0)
+        self.assertTrue(self.trail.exists())
+        ev = json.loads(self.trail.read_text(encoding="utf-8").strip())
+        self.assertEqual(ev["kind"], "run")
+
     def test_empty_command_is_ignored(self):
         code = _run_hook(self._bash_payload(""))
         self.assertEqual(code, 0)

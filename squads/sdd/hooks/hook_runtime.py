@@ -161,6 +161,28 @@ def _read_session_id_list(yml_path: Path, key: str) -> set[str]:
 _TERMINAL_STATUS = {"done", "abandoned"}
 
 
+def find_open_observed_session(project_dir: Path) -> Path | None:
+    """Most-recently-modified OBSERVED Session dir whose status is non-terminal,
+    or None. Rescues capture when find_active_session's mtime-newest dir is a
+    CLOSED observed sibling that would otherwise discard the cost."""
+    base = Path(project_dir) / ".agent-session"
+    if not base.is_dir():
+        return None
+    open_dirs = []
+    for d in base.iterdir():
+        yml = d / "session.yml"
+        if not yml.exists():
+            continue
+        if read_yaml_scalar(yml, "mode") != "observed":
+            continue
+        if (read_yaml_scalar(yml, "status") or "") in _TERMINAL_STATUS:
+            continue
+        open_dirs.append(d)
+    if not open_dirs:
+        return None
+    return max(open_dirs, key=lambda d: d.stat().st_mtime)
+
+
 def find_owner_session(project_dir: Path, session_id: str | None) -> Path | None:
     """The Session dir that registered this chat session under
     `observed_sessions:` — its exclusive owner — or None.
@@ -217,10 +239,12 @@ def resolve_capture_session(project_dir: Path, session_id: str | None) -> Path |
       2. Otherwise route as today (newest-mtime); if that target is an OPEN
          observed dir and the id is trustworthy, ADOPT the chat session there,
          making ownership sticky for every later Stop.
-      3. A CLOSED observed target that never owned this chat session gets
-         nothing: unowned work after close is out of contract (the OBS-002
-         25h-window contamination), and a silent wrong attribution is worse
-         than no capture.
+      3. If the mtime-newest target is a CLOSED observed dir it cannot adopt:
+         rescue the capture to the OPEN observed session when one exists (a
+         newer closed sibling must not steal or discard an open contract's
+         cost). With no observed session open, return nothing — unowned work
+         after close is out of contract (the OBS-002 25h-window contamination),
+         and a silent wrong attribution is worse than no capture.
     Non-observed (pipeline) dirs keep today's behavior untouched.
     """
     owner = find_owner_session(project_dir, session_id)
@@ -233,7 +257,15 @@ def resolve_capture_session(project_dir: Path, session_id: str | None) -> Path |
     if read_yaml_scalar(yml, "mode") != "observed":
         return target
     if (read_yaml_scalar(yml, "status") or "") in _TERMINAL_STATUS:
-        return None
+        # mtime-newest is a CLOSED observed dir — it cannot adopt. If an OPEN
+        # observed session exists, the capture belongs to it (else the cost is
+        # silently discarded). SDD/pipeline dirs are unaffected — they already
+        # returned at the mode!=observed check above.
+        rescue = find_open_observed_session(Path(project_dir))
+        if rescue is None:
+            return None
+        target = rescue
+        yml = target / "session.yml"
     if session_id and session_id != "unknown":
         try:
             register_observed_session(yml, session_id)

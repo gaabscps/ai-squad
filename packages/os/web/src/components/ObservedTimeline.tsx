@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ObservedMarker, ObservedEditFile } from "../../../src/store/types";
+import type { ObservedMarker, ObservedEditFile, ObservedDecision } from "../../../src/store/types";
 import { DiffView } from "./DiffView";
 
 const LABELS: Record<"pt" | "en", Record<string, string>> = {
@@ -29,8 +29,38 @@ const LABELS: Record<"pt" | "en", Record<string, string>> = {
   },
 };
 
-function pickLabels(locale: string | null): Record<string, string> {
-  return locale && locale.toLowerCase().startsWith("pt") ? LABELS.pt : LABELS.en;
+// Vocabulário de PRODUTO: a timeline espelha a linguagem do ProductSummary
+// (Aberta / Decisão / Pergunta / Fechada), não os verbos de execução do dev.
+const LABELS_PRODUCT: Record<"pt" | "en", Record<string, string>> = {
+  pt: {
+    open: "Aberta",
+    close: "Fechada",
+    block: "Pergunta levantada",
+    decision: "Decisão",
+    why: "por quê?",
+    waiting: "aguardando",
+    loose: "hora aproximada (ordem de registro)",
+    empty: "sem marcos registrados",
+  },
+  en: {
+    open: "Opened",
+    close: "Closed",
+    block: "Question raised",
+    decision: "Decision",
+    why: "why?",
+    waiting: "waiting",
+    loose: "approximate time (recording order)",
+    empty: "no markers recorded",
+  },
+};
+
+// Na vista de produto, só os 4 marcos do MVP entram na timeline; run/edit/verify
+// são jargão de execução e ficam de fora (o "Entregável" é Fase 2).
+const PRODUCT_KINDS = new Set(["open", "decision", "block", "close"]);
+
+function pickLabels(locale: string | null, product = false): Record<string, string> {
+  const set = product ? LABELS_PRODUCT : LABELS;
+  return locale && locale.toLowerCase().startsWith("pt") ? set.pt : set.en;
 }
 
 function fmtDuration(ms: number): string {
@@ -73,20 +103,69 @@ function EditFiles({ files }: { files: ObservedEditFile[] }) {
   );
 }
 
+// Corpo da decisão na vista de produto: o `what` aparece sempre; o critério
+// (`why`) e a alternativa descartada (`rejected`) ficam atrás de "por quê?",
+// para a timeline ficar limpa e a pessoa aprofundar sob demanda.
+function ProductDecisionBody({
+  decision,
+  whyLabel,
+  onOpenRef,
+}: {
+  decision: ObservedDecision;
+  whyLabel: string;
+  onOpenRef?: (ref: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = Boolean(decision.why || decision.rejected);
+  return (
+    <>
+      <span className="tl-what">{decision.what}</span>
+      {hasDetail && (
+        <button
+          type="button"
+          className="tl-why-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {whyLabel}
+        </button>
+      )}
+      {open && decision.rejected && (
+        <span className="tl-rej">✕ {decision.rejected}</span>
+      )}
+      {open && decision.why && <span className="tl-why">{decision.why}</span>}
+      {decision.ref && (
+        <button
+          type="button"
+          className="tl-ref mono"
+          onClick={() => onOpenRef?.(decision.ref!)}
+        >
+          {decision.ref}
+        </button>
+      )}
+    </>
+  );
+}
+
 export function ObservedTimeline({
   markers,
   outputLocale,
   onOpenRef,
+  workType,
 }: {
   markers: ObservedMarker[];
   outputLocale: string | null;
   onOpenRef?: (ref: string) => void;
+  workType?: string | null;
 }) {
-  const L = pickLabels(outputLocale);
-  if (markers.length === 0) return <p className="drawer-empty">{L.empty}</p>;
+  const isProduct = workType === "product";
+  const L = pickLabels(outputLocale, isProduct);
+  // Vista de produto: só os 4 marcos do MVP; run/edit/verify ficam de fora.
+  const shown = isProduct ? markers.filter((m) => PRODUCT_KINDS.has(m.kind)) : markers;
+  if (shown.length === 0) return <p className="drawer-empty">{L.empty}</p>;
   return (
     <ol className="obs-timeline" data-testid="obs-timeline">
-      {markers.map((m, i) => (
+      {shown.map((m, i) => (
         <li key={i} className={`tl-item tl-${m.kind}`}>
           <span className="tl-dot" aria-hidden="true" />
           <div className="tl-body">
@@ -106,26 +185,33 @@ export function ObservedTimeline({
               )}
               {fmtClock(m.at) && <span className="tl-time mono"> · {fmtClock(m.at)}</span>}
             </span>
-            {m.decision && (
-              <>
-                <span className="tl-what">{m.decision.what}</span>
-                {m.decision.rejected && (
-                  <span className="tl-rej">✕ {m.decision.rejected}</span>
-                )}
-                {m.decision.why && (
-                  <span className="tl-why">{m.decision.why}</span>
-                )}
-                {m.decision.ref && (
-                  <button
-                    type="button"
-                    className="tl-ref mono"
-                    onClick={() => onOpenRef?.(m.decision!.ref!)}
-                  >
-                    {m.decision.ref}
-                  </button>
-                )}
-              </>
-            )}
+            {m.decision &&
+              (isProduct ? (
+                <ProductDecisionBody
+                  decision={m.decision}
+                  whyLabel={L.why}
+                  onOpenRef={onOpenRef}
+                />
+              ) : (
+                <>
+                  <span className="tl-what">{m.decision.what}</span>
+                  {m.decision.rejected && (
+                    <span className="tl-rej">✕ {m.decision.rejected}</span>
+                  )}
+                  {m.decision.why && (
+                    <span className="tl-why">{m.decision.why}</span>
+                  )}
+                  {m.decision.ref && (
+                    <button
+                      type="button"
+                      className="tl-ref mono"
+                      onClick={() => onOpenRef?.(m.decision!.ref!)}
+                    >
+                      {m.decision.ref}
+                    </button>
+                  )}
+                </>
+              ))}
             {m.evidence && (
               <span className="tl-verify">
                 {m.evidence.cmd && <code>{m.evidence.cmd}</code>}

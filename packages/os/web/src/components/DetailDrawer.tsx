@@ -15,6 +15,7 @@ import { MarkdownViewer } from "./MarkdownViewer";
 import { buildStory } from "../lib/buildStory";
 import { ObservedTimeline } from "./ObservedTimeline";
 import { SessionNarrative } from "./SessionNarrative";
+import { ProductSummary } from "./ProductSummary";
 
 export function DetailDrawer({
   item,
@@ -140,10 +141,20 @@ export function DetailDrawer({
             <ObservedTimeline
               markers={obs.markers}
               outputLocale={obs.outputLocale}
+              workType={obs.workType}
               onOpenRef={(ref) => openFile(`${projectPath}/${ref}`, ref)}
             />
-            <h4 className="drawer-section">Apresentação da sessão</h4>
-            <SessionNarrative projectId={projectId} specId={spec.id} observed={obs} />
+            {obs.workType === "product" ? (
+              <>
+                <h4 className="drawer-section">Resumo da sessão</h4>
+                <ProductSummary projectId={projectId} specId={spec.id} />
+              </>
+            ) : (
+              <>
+                <h4 className="drawer-section">Apresentação da sessão</h4>
+                <SessionNarrative projectId={projectId} specId={spec.id} observed={obs} />
+              </>
+            )}
           </>
         )}
 

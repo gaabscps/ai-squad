@@ -854,6 +854,23 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
   max-width: 70ch;
 }
 
+/* Botão "por quê?" da vista de produto: revela why/rejected sob demanda.
+   Sem chrome de botão — parece um link discreto, na cor da decisão. */
+.tl-why-toggle {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tl-decision);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+}
+.tl-why-toggle:hover { text-decoration: underline; }
+.tl-why-toggle[aria-expanded="true"] { opacity: 0.6; }
+
 /* Bloco de verificação: cmd inline + resultado muted */
 .tl-verify-body {        /* NOTE: o componente usa .tl-verify como className no <span> de evidência,
                             mas .tl-verify já é o seletor de kind no <li>. O seletor abaixo estiliza
@@ -1094,8 +1111,10 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .narr-empty { margin: 8px 0 16px; }
 .narr-generate, .narr-regen, .narr-retry { font: inherit; cursor: pointer; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
 .narr-meta { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-size: 12px; color: var(--text-mute); }
+.narr-sealed { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; color: #2E8B57; font-weight: 500; }
 .narr-tldr { font-size: 15px; font-weight: 500; margin: 8px 0; }
 .narr-why { font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+.narr-inferred { font-size: 12px; font-style: italic; color: var(--text-mute); margin-top: 14px; }
 .narr-section { margin: 14px 0 6px; font-size: 13px; color: var(--text-mute); }
 .narr-change { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
 .narr-change-head { cursor: pointer; font-weight: 500; }
