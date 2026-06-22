@@ -15,6 +15,7 @@ const CONTRACT = `{
 /**
  * Monta o prompt do resumo de PRODUTO: persona de produto + a "receita" validada por
  * red-team (regras anti-invenção, fallback honesto, separação decidido/aberto/próximo).
+ * ESPELHADO em shared/skills/ship/skill.md (sub-seção 6.1) — sincronize as regras ao alterá-las aqui.
  * Reusa a NarrativeSource do OBS — usa intent + reasoning (transcript destilado) como
  * fonte principal; edits/verifications dev são ignorados de propósito.
  */

@@ -88,6 +88,62 @@ Sealed .agent-session/<spec_id>/
 ```
 Incluir contexto vivido: o que foi feito nesta sessão, decisões relevantes, entregáveis produzidos — narrativa resumida para registro.
 
+#### 6.1 — (apenas se `work_type: product`) Gravar `product-summary.json`
+
+> **Gate:** rode este sub-passo SÓ se o `session.yml` lido no passo 2 tiver `work_type: product`. Se ausente ou `dev`, **pule** (sessões SDD e `/observe` puro não geram resumo de produto) e vá para o passo 7.
+
+> Fonte canônica das regras: `packages/os/src/product/{prompt.ts,types.ts,parse.ts}`. **Sincronize este bloco ao alterar a receita lá.** O `parse.ts` descarta em silêncio (decisão sem `what` some; sentinela de "exploratória" exige o travessão `—` exato) — **valide o JSON contra o schema antes de selar.**
+
+Você viveu esta sessão. Componha o resumo a partir do **contexto vivido** — não reinterprete um transcript. Monte o envelope e grave-o.
+
+**Schema do envelope (camelCase, lido pelo aiOS):**
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "product",
+  "sealedAt": "<o MESMO timestamp UTC ISO-8601 gravado em closed_at no passo 5>",
+  "outputLocale": "<output_locale do session.yml; ausente → \"en\">",
+  "summary": {
+    "tldr": "uma frase: o que esta sessão produziu ou explorou",
+    "decided": [{ "what": "a decisão (obrigatório)", "why": "o critério ou null", "rejected": "a alternativa descartada ou null" }],
+    "open": ["pergunta que ficou sem resposta"],
+    "next": ["ação que a pessoa assumiu fazer"],
+    "deliverable": "1 frase nomeando o artefato; OU a sentinela exploratória literal abaixo"
+  }
+}
+```
+
+**Regras anti-invenção (máx. 7):**
+1. **Só o comprometido entra.** Use apenas o que aconteceu. IA sugeriu e a pessoa aceitou = legítimo; sugeriu e a pessoa não assumiu = fora; condicional ("se eu decidir", "talvez") = não é decisão nem `next` (se virou dúvida, vai pra `open`).
+2. **`next` só com verbo de compromisso** ("vou fazer X", "preciso de Y"). Sem isso, `next: []`. Não duplique: pergunta fica só em `open`; respondê-la não vira `next`.
+3. **Vazio é honesto.** Lista sem conteúdo real fica `[]`. Encher lista vazia com algo cogitado-mas-não-assumido é o pior erro.
+4. **Nunca jargão de engenharia** (PR, diff, commit, deploy, teste, pipeline). Descreva pela necessidade de produto/negócio, não pela ótica de quem constrói.
+5. **Descritivo, nunca avaliativo.** Não diga se foi boa/ruim, não aconselhe, não corrija a pessoa.
+6. **`decided[].what` é obrigatório** (decisão sem `what` é descartada sem aviso). `deliverable` exploratório usa a sentinela **literal** (travessão `—`): `Sessão exploratória — sem decisão/entregável fechado`.
+7. **Prosa no `outputLocale`** da sessão; chrome do envelope em inglês. Conciso: cada item ~1 frase; sem redundância, mas mantenha toda decisão verdadeira.
+
+**Gravar (Python inline via Bash — mesmo padrão dos passos 5/7; NÃO use o Write tool):**
+
+```bash
+python3 -c "
+import json
+from pathlib import Path
+obj = {
+  'schemaVersion': 1,
+  'kind': 'product',
+  'sealedAt': '<closed_at do passo 5>',
+  'outputLocale': '<output_locale ou en>',
+  'summary': { 'tldr': '...', 'decided': [], 'open': [], 'next': [], 'deliverable': '...' },
+}
+p = Path('.agent-session/<spec_id>/product-summary.json')
+p.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n')
+print('wrote', p)
+"
+```
+
+Acrescente ao report (passo 6) a linha: `Product summary: .agent-session/<spec_id>/product-summary.json`.
+
 ### 7. Orientar sobre próximos passos
 Baseado no prefixo do `spec_id`:
 - `FEAT-` → `"Session <spec_id> sealed. O rastro permanece em .agent-session/<spec_id>/. Para iniciar uma nova feature: /spec-writer."`

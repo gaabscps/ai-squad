@@ -1,4 +1,5 @@
 // Contrato do resumo de sessão de PRODUTO/DESIGN (caminho work_type: product).
+// O envelope selado pelo /ship espelha este contrato em shared/skills/ship/skill.md (6.1).
 // Distinto da narrativa dev (SessionNarrative em ../narrative/types.ts): SEM
 // changes/verifications/prReview — esses são jargão de engenharia. A estrutura aqui
 // é a "receita" validada por red-team: decidido / em aberto / próximo passo / entregável.
