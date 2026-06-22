@@ -12,23 +12,27 @@ function asDecision(v: unknown): ProductDecision {
 }
 function arr<T>(v: unknown, f: (x: unknown) => T): T[] { return Array.isArray(v) ? v.map(f) : []; }
 
+/** Normaliza um objeto já parseado em ProductSummary (descarta decisão sem 'what' e strings vazias). */
+export function normalizeProductSummary(obj: unknown): ProductSummary {
+  const o = (obj ?? {}) as Record<string, unknown>;
+  return {
+    tldr: str(o.tldr),
+    // descarta decisões sem 'what' (lixo) — alinhado à regra anti-invenção do prompt
+    decided: arr(o.decided, asDecision).filter((d) => d.what.trim().length > 0),
+    open: strArr(o.open),
+    next: strArr(o.next),
+    deliverable: str(o.deliverable),
+  };
+}
+
 /** Extrai o ProductSummary do JSON do LLM (tolera cercas ```json e texto ao redor). null se não houver JSON parseável. */
 export function parseProductSummary(raw: string): ProductSummary | null {
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
-  let obj: Record<string, unknown>;
   try {
-    obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+    return normalizeProductSummary(JSON.parse(raw.slice(start, end + 1)));
   } catch {
     return null;
   }
-  return {
-    tldr: str(obj.tldr),
-    // descarta decisões sem 'what' (lixo) — alinhado à regra anti-invenção do prompt
-    decided: arr(obj.decided, asDecision).filter((d) => d.what.trim().length > 0),
-    open: strArr(obj.open),
-    next: strArr(obj.next),
-    deliverable: str(obj.deliverable),
-  };
 }

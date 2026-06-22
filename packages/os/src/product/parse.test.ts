@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseProductSummary } from "./parse.js";
+import { parseProductSummary, normalizeProductSummary } from "./parse.js";
 
 describe("parseProductSummary", () => {
   it("extrai um resumo completo de JSON puro", () => {
@@ -66,5 +66,13 @@ describe("parseProductSummary", () => {
     expect(r.open).toEqual([]);
     expect(r.next).toEqual([]);
     expect(r.deliverable).toBe("");
+  });
+
+  it("normalizeProductSummary aceita objeto já parseado e descarta decisão sem what", () => {
+    const r = normalizeProductSummary({ tldr: "t", decided: [{ what: "", why: "y" }, { what: "ok" }], open: ["", "q"], next: [], deliverable: "d" });
+    expect(r.tldr).toBe("t");
+    expect(r.decided).toEqual([{ what: "ok", why: null, rejected: null }]);
+    expect(r.open).toEqual(["q"]);
+    expect(r.deliverable).toBe("d");
   });
 });
