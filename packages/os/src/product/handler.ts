@@ -8,7 +8,8 @@ import { observedFingerprint } from "../narrative/fingerprint.js";
 import { runNarrative, type NarrativeHandle } from "../narrative/service.js";
 import { buildProductPrompt } from "./prompt.js";
 import { parseProductSummary } from "./parse.js";
-import { readProductSummary, writeProductSummary } from "./cache.js";
+import { readProductSummary, writeProductSummary, type CachedProductSummary } from "./cache.js";
+import { readSealedProductSummary, type SealedProductSummary } from "./sealed.js";
 
 // Handler do resumo de PRODUTO. Espelha narrative/handler.ts (mesmo ciclo fetch/generate,
 // cancelamento, cache por fingerprint), mas usa o prompt/parse/cache de produto. Reusa
@@ -38,6 +39,18 @@ function find(store: Store, projectId: string, specId: string): { projectPath: s
   return null;
 }
 
+/** true se o selado deve vencer o cache: mais recente vence; empate e timestamps inválidos favorecem o selado (fonte canônica do framework). */
+function preferSealed(sealed: SealedProductSummary | null, cached: CachedProductSummary | null): boolean {
+  if (!sealed) return false;
+  if (!cached) return true;
+  const ts = (s: string): number | null => { const d = Date.parse(s); return Number.isNaN(d) ? null : d; };
+  const a = ts(sealed.sealedAt), b = ts(cached.generatedAt);
+  if (a !== null && b !== null) return a >= b;
+  if (a !== null) return true;   // cache sem carimbo válido
+  if (b !== null) return false;  // selado sem carimbo válido
+  return true;                   // ambos inválidos → selado
+}
+
 /** Handler das mensagens product:* ligado a UM socket (o `send`). Só sessões observadas. */
 export function makeProductHandler(store: Store, deps: ProductHandlerDeps = {}) {
   const cacheRoot = deps.cacheRoot ?? join(process.cwd(), ".aios-cache");
@@ -53,11 +66,19 @@ export function makeProductHandler(store: Store, deps: ProductHandlerDeps = {}) 
 
     if (msg.type === "product:fetch") {
       const cached = readProductSummary(cacheRoot, projectId, specId);
-      if (!cached) return;
+      // projectPath tolerando found=null (corrida do coletor): a Project pode existir sem o Spec
+      const projectPath = found?.projectPath ?? store.getSnapshot().find((p) => p.id === projectId)?.path ?? null;
+      const sealed = projectPath ? readSealedProductSummary(join(projectPath, ".agent-session", specId)) : null;
+      if (!cached && !sealed) return;
+      if (preferSealed(sealed, cached) && sealed) {
+        send(JSON.stringify({ type: "product:cached", projectId, specId, summary: sealed.summary, generatedAt: sealed.sealedAt, costUsd: null, stale: false, source: "sealed" }));
+        return;
+      }
+      const c = cached as CachedProductSummary;
       const stale = found?.spec.observed
-        ? observedFingerprint(found.spec.observed, found.spec.status) !== cached.fingerprint
+        ? observedFingerprint(found.spec.observed, found.spec.status) !== c.fingerprint
         : true;
-      send(JSON.stringify({ type: "product:cached", projectId, specId, summary: cached.summary, generatedAt: cached.generatedAt, costUsd: cached.costUsd ?? null, stale }));
+      send(JSON.stringify({ type: "product:cached", projectId, specId, summary: c.summary, generatedAt: c.generatedAt, costUsd: c.costUsd ?? null, stale, source: "generated" }));
       return;
     }
 
