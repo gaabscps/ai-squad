@@ -883,6 +883,17 @@ describe("DetailDrawer — modo observado: parecer de entrega condicional", () =
   });
 });
 
+describe("DetailDrawer — link de export full-page", () => {
+  it("mostra link de export full-page com o href correto", () => {
+    const spec = makeObservedSpec({ id: "OBS-7" });
+    const item_ = { spec, projectId: "proj-x", projectName: "proj", projectPath: "/x" };
+    render(<DetailDrawer item={item_} onClose={() => {}} />);
+    const link = screen.getByRole("link", { name: /tela cheia/i });
+    expect(link.getAttribute("href")).toBe("?export=1&projectId=proj-x&specId=OBS-7");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+});
+
 // ─── obs-facts: faixa de fatos-chave ─────────────────────────────────────────
 
 describe("DetailDrawer — modo observado: faixa obs-facts", () => {

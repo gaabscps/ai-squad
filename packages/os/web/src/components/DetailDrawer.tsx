@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import type { SpecWithProject } from "../lib/kanbanObserved";
 import { attentionReason, columnForSpec } from "../lib/kanbanObserved";
 import { fmtTokens, fmtUsd, fmtDate, fmtDurationBetween } from "../format";
+import { exportHref } from "../lib/exportUrl";
 import { PhaseBar } from "./PhaseBar";
 import { PhaseJourney } from "./PhaseJourney";
 import { StatusBadge } from "./StatusBadge";
@@ -61,6 +62,15 @@ export function DetailDrawer({
           )}
           <StatusBadge spec={spec} />
           <SpecJobIndicator projectId={projectId} specId={spec.id} />
+          <a
+            className="drawer-export"
+            href={exportHref(projectId, spec.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="abrir em tela cheia (para exportar / Jira)"
+          >
+            tela cheia ↗
+          </a>
           <button
             type="button"
             className="drawer-close"

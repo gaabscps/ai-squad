@@ -1,6 +1,8 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { ProjectsProvider } from "./state/projects";
 import { useLiveProjects } from "./state/useLiveProjects";
+import { ExportPage } from "./components/ExportPage";
+import { parseExportTarget } from "./lib/exportUrl";
 import { Board, type SelectedSpec } from "./components/Board";
 import { FolderManager } from "./components/FolderManager";
 import {
@@ -10,21 +12,23 @@ import {
 import type { AttentionClient } from "./state/attentionClient";
 import type { Project } from "../../src/store/types";
 
+// Renderiza o Board com os dados ao vivo; recebe onHide por prop (o WS já está no AppInner).
 function BoardLive({
   selected,
   onSelect,
   onClose,
+  onHide,
   onOpenFolderManager,
 }: {
   selected: SelectedSpec | null;
   onSelect: (spec: SelectedSpec) => void;
   onClose: () => void;
+  onHide: (id: string, hidden: boolean) => void;
   onOpenFolderManager?: () => void;
 }) {
-  const { toggleHide } = useLiveProjects();
   return (
     <Board
-      onHide={toggleHide}
+      onHide={onHide}
       selected={selected}
       onSelect={onSelect}
       onClose={onClose}
@@ -65,6 +69,7 @@ function AppInner() {
   const [selected, setSelected] = useState<SelectedSpec | null>(null);
   const [folderManagerOpen, setFolderManagerOpen] = useState(false);
   const { markSeen, getJob } = useDiagnosisJobs();
+  const { toggleHide } = useLiveProjects(); // conecta o WS — vale pro board E pra ExportPage
 
   useEffect(() => {
     if (selected) {
@@ -74,9 +79,9 @@ function AppInner() {
 
   const job = selected ? getJob(selected.projectId, selected.specId) : undefined;
 
-  // When a job completes while the drawer is already open, `selected` doesn't
-  // change — so the effect above won't fire. This second effect watches the
-  // job state directly and marks it seen the moment it reaches a terminal state.
+  // Quando um job conclui com o drawer já aberto, `selected` não muda —
+  // então o efeito acima não dispara. Este segundo efeito observa o estado
+  // do job diretamente e marca seen assim que ele atinge um estado terminal.
   useEffect(() => {
     if (
       selected &&
@@ -88,12 +93,19 @@ function AppInner() {
     }
   }, [selected, job, markSeen]);
 
+  // Ramifica para a ExportPage quando a URL contém export=1&projectId=…&specId=…
+  const exportTarget = parseExportTarget(window.location.search);
+  if (exportTarget) {
+    return <ExportPage projectId={exportTarget.projectId} specId={exportTarget.specId} />;
+  }
+
   return (
     <>
       <BoardLive
         selected={selected}
         onSelect={setSelected}
         onClose={() => setSelected(null)}
+        onHide={toggleHide}
         onOpenFolderManager={() => setFolderManagerOpen(true)}
       />
       <FolderManager
