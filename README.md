@@ -123,9 +123,9 @@ cd ai-squad
 
 ---
 
-## ⚡ Running `/pm` on Sonnet 4.6 with bypass — high-throughput, lower cost
+## ⚡ Running `/pm` on Claude Sonnet 5 with bypass — high-throughput, lower cost
 
-The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without your input. Pairing it with **Sonnet 4.6** (instead of the default Opus 4.8) and **bypass-permissions mode** removes both the per-turn approval friction and the higher-tier model cost.
+The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without your input. Pairing it with **Claude Sonnet 5** (instead of the default Opus 4.8) and **bypass-permissions mode** removes both the per-turn approval friction and the higher-tier model cost.
 
 > **Bypass mode**: a Claude Code flag that auto-approves every tool call (file edit, shell command, network request) instead of pausing to ask you. The agent runs flat out.
 
@@ -133,13 +133,13 @@ The `/pm` Skill (Autonomous PM) runs the entire SDD pipeline end-to-end without 
 
 ```bash
 # In the project where ai-squad is deployed:
-claude --model claude-sonnet-4-6 --dangerously-skip-permissions
+claude --model claude-sonnet-5 --dangerously-skip-permissions
 
 # Then, inside the session:
 /pm "<your pitch>"
 ```
 
-You must pass `--dangerously-skip-permissions` **at session start** — it cannot be enabled mid-session. The `--model` flag pins the top-level orchestrator to Sonnet 4.6; subagents follow their canonical Tier × Loop table (Haiku for cheap tiers, Sonnet/Opus where the work warrants it), so you still get the right model for each task — just without the Opus 4.8 floor.
+You must pass `--dangerously-skip-permissions` **at session start** — it cannot be enabled mid-session. The `--model` flag pins the top-level orchestrator to Claude Sonnet 5; subagents follow their canonical Tier × Loop table (Haiku for cheap tiers, Sonnet/Opus where the work warrants it), so you still get the right model for each task — just without the Opus 4.8 floor.
 
 ### Trade-off at a glance
 
@@ -152,7 +152,7 @@ You must pass `--dangerously-skip-permissions` **at session start** — it canno
 <td>
 
 - **~5× lower token cost** vs Opus 4.8 baseline
-- **Faster turns** — Sonnet 4.6 latency is materially lower
+- **Faster turns** — Sonnet-tier latency is materially lower than Opus
 - **Zero approval prompts** for the full multi-hour pipeline
 - **Hands-off**: spec → plan → tasks → code → handoff, untouched
 
@@ -195,11 +195,11 @@ Defense-in-depth narrows the blast radius. It doesn't eliminate it:
 >
 > ⚠️ **Hallucinated specs ship as real code.** If `spec-writer` invents a requirement, the pipeline will faithfully implement it. The four conversational phases (Specify / Plan / Tasks) exist specifically so you read these artifacts — `/pm` collapses that into one trust decision at the start.
 >
-> ⚠️ **Cost can still escalate.** Sonnet 4.6 is cheaper per token, but the pipeline runs longer and dispatches more subagents under autonomous operation. Watch your Anthropic Console usage after each session.
+> ⚠️ **Cost can still escalate.** Sonnet 5 is cheaper per token than Opus, but the pipeline runs longer and dispatches more subagents under autonomous operation. Watch your Anthropic Console usage after each session.
 
 **Recommended posture:**
 
-- Use bypass + Sonnet 4.6 for **well-scoped features** where the spec is unambiguous and the codebase is well-tested
+- Use bypass + Sonnet 5 for **well-scoped features** where the spec is unambiguous and the codebase is well-tested
 - Run inside a **dedicated git worktree** (`git worktree add ../<repo>-pm <branch>`) so the diff is reviewable in isolation
 - Keep **`/pm` off** for security-sensitive work, migrations, or anything touching production credentials — fall back to the interactive `/spec-writer → /designer → /task-builder → /orchestrator` flow with default permissions
 

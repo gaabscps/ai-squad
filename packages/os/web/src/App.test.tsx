@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { useEffect as reactUseEffect, useState as reactUseState } from "react";
-import { AppProviders } from "./App";
+import { AppProviders, App } from "./App";
 import { useDiagnosisJobs } from "./state/diagnosisJobs";
 
 import type { AttentionClient, AttentionServerMsg } from "./state/attentionClient";
@@ -594,5 +594,31 @@ describe("App — AC-008: job conclui com drawer já aberto → markSeen sem fec
 
     expect(screen.getByTestId("badge").dataset.state).toBe("ready");
     expect(screen.getByTestId("badge").dataset.seen).toBe("true");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Modo export: AppInner ramifica para ExportPage quando a URL tem export=1
+// ---------------------------------------------------------------------------
+
+describe("App — modo export", () => {
+  it("renderiza a ExportPage quando a URL tem export=1", () => {
+    // WebSocket não existe no jsdom; stub noop para o useLiveProjects do AppInner.
+    vi.stubGlobal("WebSocket", class {
+      onopen: (() => void) | null = null;
+      onmessage: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      readyState = 0;
+      send() {}
+      close() {}
+    });
+    window.history.replaceState({}, "", "/?export=1&projectId=p&specId=OBS-1");
+
+    render(<App />);
+    // sem dados no snapshot (WS stub não emite), a ExportPage cai no estado de carregando
+    expect(screen.getByTestId("export-loading")).toBeTruthy();
+
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
   });
 });

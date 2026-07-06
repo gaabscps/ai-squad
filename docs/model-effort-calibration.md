@@ -156,9 +156,12 @@ T4 → complexity=large/alto
 
 | Modelo | Effort default da plataforma | Nota |
 |---|---|---|
-| claude-opus-4-7 | `xhigh` | Único modelo que suporta `xhigh` de forma plena. |
-| claude-opus-4-6 | `high` | |
-| claude-sonnet-4-6 | `high` | Default atual dos subagents do framework. |
+| claude-fable-5 | `xhigh` | Modelo mais capaz da Anthropic; preço acima do tier Opus. Framework não roteia nenhum Role pra ele por default — só sob pedido explícito do usuário. |
+| claude-opus-4-8 | `xhigh` | Modelo Opus mais recente; mesma superfície de `effort` do 4.7. |
+| claude-opus-4-7 | `xhigh` | |
+| claude-opus-4-6 | `high` | Não suporta `xhigh`. |
+| claude-sonnet-5 | `high` | Único Sonnet que suporta `xhigh` — use nas tasks de coding/agentic mais difíceis. |
+| claude-sonnet-4-6 | `high` | Não suporta `xhigh`. |
 | claude-haiku-4-5 | `medium` | Tier mais econômico; `high` é o teto recomendado. |
 
 **Os 5 níveis de effort:**
@@ -168,7 +171,7 @@ T4 → complexity=large/alto
 | `low` | Fast, minimal reasoning | Latency-sensitive, trivial. **Não usar em dev** — documentado como anti-pattern. |
 | `medium` | Balances cost and quality | Reviewers procedurais (code-reviewer), QA, audit-agent. |
 | `high` | More internal reasoning | Dev T3/T4, logic-reviewer, qualquer task com julgamento. |
-| `xhigh` | Deep reasoning | blocker-specialist, spec-writer, designer. **Opus 4.8 only.** |
+| `xhigh` | Deep reasoning | blocker-specialist, spec-writer, designer. **Fable 5, Opus 4.7+ e Sonnet 5** (não Sonnet 4.6, Opus 4.6, Haiku). |
 | `max` | No ceiling on reasoning | Casos extremos. Retorno decrescente documentado — não usar como default. |
 
 ---

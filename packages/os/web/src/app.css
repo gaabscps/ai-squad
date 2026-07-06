@@ -1126,3 +1126,40 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .narr-pr-group { display: flex; flex-direction: column; margin-bottom: 6px; font-size: 12px; }
 .narr-pr-files { color: var(--text-mute); }
 .narr-pr-risk { color: #A8742F; font-size: 12px; margin-top: 8px; }
+
+/* ── Export full-page ─────────────────────────────────────────── */
+.export-page { max-width: 900px; margin: 0 auto; padding: 32px 28px 80px; }
+.export-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.export-id { font-family: var(--mono, monospace); color: var(--text-soft); }
+.export-title { flex: 1 1 100%; margin: 4px 0 0; font-size: 24px; }
+.export-proj { color: var(--text-soft); font-size: 13px; }
+.export-print { margin-left: auto; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
+.export-facts { display: flex; flex-wrap: wrap; gap: 18px; margin: 16px 0 8px; }
+.export-facts dt { font-size: 11px; color: var(--text-soft); text-transform: uppercase; }
+.export-facts dd { margin: 0; font-family: var(--mono, monospace); }
+.export-loading, .export-error { padding: 48px; text-align: center; color: var(--text-soft); }
+
+/* ── Painel "copiar pro Jira" ─────────────────────────────────── */
+.jira-panel { margin-top: 24px; border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; background: var(--surface); }
+.jira-field { margin-bottom: 14px; }
+.jira-label { display: block; font-size: 11px; color: var(--text-soft); text-transform: uppercase; margin-bottom: 4px; }
+.jira-summary { margin: 0 0 6px; font-weight: 600; }
+.jira-body { white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--border-soft); border-radius: 6px; padding: 12px; font-size: 12px; max-height: 360px; overflow: auto; }
+.jira-copy { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; font-size: 12px; }
+.drawer-export { font-size: 12px; color: var(--accent, #2563eb); text-decoration: none; }
+
+/* ── Impressão (PDF via window.print) ─────────────────────────── */
+@media print {
+  @page { size: A4; margin: 1cm; }
+  .topbar, .drawer-overlay, .drawer, .md-viewer-overlay,
+  .export-print, .jira-copy, .narr-generate, .narr-regen { display: none !important; }
+  .export-page { max-width: none; padding: 0; }
+  .tl-item { break-inside: avoid; }
+  .narr-change { break-inside: avoid; }
+  /* diff legível no papel: fundo claro, texto escuro */
+  .diff-view, .diff-view.dracula { background: #fff !important; color: #111 !important; border-color: #ccc !important; max-height: none !important; overflow: visible !important; }
+  .diff-view.dracula .diff-line.add, .diff-line.add { background: #eef7ef !important; }
+  .diff-view.dracula .diff-line.del, .diff-line.del { background: #faecec !important; }
+  details { } details > summary { display: revert; }
+  details:not([open]) { } /* timeline já abre os <details> na página; nada a forçar */
+}
