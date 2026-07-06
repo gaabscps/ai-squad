@@ -18,10 +18,10 @@
 | `low` | Fast, minimal internal reasoning | Latency-sensitive, trivial tasks | All |
 | `medium` | Balances cost and quality | Reasonable default for structured tasks (pattern review, procedural execution) | All |
 | `high` | More internal reasoning; minimum bar for intelligence-sensitive tasks | Tasks needing solid reasoning (implementation, gap analysis) | All |
-| `xhigh` | Deep reasoning; recommended default for Opus 4.8 in agentic tasks | High-stakes decisions, arbitration | **Opus 4.8 only** |
+| `xhigh` | Deep reasoning; recommended default for Opus 4.8 in agentic tasks | High-stakes decisions, arbitration | **Fable 5, Opus 4.7+, and Sonnet 5 only** (not Sonnet 4.6, Opus 4.6, Haiku) |
 | `max` | No ceiling on reasoning; can show diminishing returns | Extreme cases, architectural debugging | All |
 
-Platform defaults: `xhigh` on Opus 4.8; `high` on Opus 4.6 and Sonnet 4.6.
+Platform defaults: `xhigh` on Fable 5, Opus 4.8, and Opus 4.7; `high` on Opus 4.6, Sonnet 4.6, and Sonnet 5 (Sonnet 5 also supports `xhigh` for its hardest coding/agentic tasks — see [`docs/model-effort-calibration.md`](../../docs/model-effort-calibration.md) §6). ai-squad does not currently route any Role to Fable 5 by default — it is priced above Opus-tier and reserved for cases where the user explicitly asks for it.
 
 ## How effort interacts with model selection
 
