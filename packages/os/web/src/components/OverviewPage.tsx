@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import type { OverviewData, AttentionItem, FeatureRow, WindowKey } from "../lib/overview";
 import { WINDOWS } from "../lib/overview";
-import { fmtUsd, fmtRelativeTime } from "../format";
+import { fmtUsd, fmtRelativeTime, fmtDate } from "../format";
 
 /** Callbacks de drill-down: cada número/linha clicável desce pro recorte que o compõe. */
 export interface OverviewDrill {
@@ -100,9 +101,14 @@ function EfficiencyCard({ efficiency, onDrill }: { efficiency: OverviewData["eff
         </div>
         <Sparkline points={efficiency.spark} />
       </div>
-      <div className="ov-kpi-sub ov-p50p95" onClick={onDrill.toTable} role="button" tabIndex={0}>
+      <button
+        type="button"
+        className="ov-kpi-sub ov-p50p95 ov-drill-btn"
+        onClick={onDrill.toTable}
+        style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: 0, padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+      >
         P50 <b className="ov-drill">{fmtUsd(efficiency.p50)}</b> · P95 <b className="ov-drill">{fmtUsd(efficiency.p95)}</b>
-      </div>
+      </button>
     </div>
   );
 }
@@ -113,16 +119,21 @@ function SpendCard({ spend, onDrill }: { spend: OverviewData["spend"]; onDrill: 
   return (
     <div className="ov-card">
       <h2><span className="ov-dot ov-dot-amber" />GASTO</h2>
-      <div className="ov-kpi ov-kpi-sm ov-drill" onClick={onDrill.toTable} role="button" tabIndex={0}>
+      <button
+        type="button"
+        className="ov-kpi ov-kpi-sm ov-drill ov-drill-btn"
+        onClick={onDrill.toTable}
+        style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: 0, padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+      >
         {fmtUsd(spend.totalUsd)}{spend.incomplete ? " (parcial)" : ""}
-      </div>
+      </button>
       <div className="ov-kpi-sub">{spend.activeProjects} projeto{spend.activeProjects === 1 ? "" : "s"} ativo{spend.activeProjects === 1 ? "" : "s"} na janela</div>
       <div className="ov-bars">
         {spend.byProject.map((p) => (
           <div className="ov-brow" key={p.projectName}>
             <span className="ov-brow-lbl">{p.projectName}</span>
             <span className="ov-brow-bar" style={{ width: `${(p.costUsd / max) * 100}%` }} />
-            <span className="ov-brow-val">{p.costUsd.toFixed(2)}</span>
+            <span className="ov-brow-val">{fmtUsd(p.costUsd)}</span>
           </div>
         ))}
       </div>
@@ -130,9 +141,84 @@ function SpendCard({ spend, onDrill }: { spend: OverviewData["spend"]; onDrill: 
   );
 }
 
+/** Faixa "pra daily": frase determinística da janela + botão que copia pro clipboard. */
+function DailyBand({ dailyLine }: { dailyLine: string }) {
+  const [copied, setCopied] = useState(false);
+
+  // Volta o rótulo "copiado" ao normal após 2s; limpa o timer ao desmontar/mudar.
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  // Escreve no clipboard e só marca "copiado" se a escrita teve sucesso (mesmo padrão do CopyJiraPanel).
+  const copy = () => {
+    navigator.clipboard.writeText(dailyLine).then(
+      () => setCopied(true),
+      () => {},
+    );
+  };
+
+  return (
+    <div className="ov-daily">
+      <span className="ov-daily-tag">PRA DAILY</span>
+      <p className="ov-daily-line">{dailyLine}</p>
+      <button type="button" className="ov-daily-copy" onClick={copy}>
+        {copied ? "copiado ✓" : "copiar"}
+      </button>
+    </div>
+  );
+}
+
+/** Rótulo pt-BR + variante de cor por FeatureStatus (pill da tabela de features). */
+const FEATURE_STATUS: Record<FeatureRow["status"], { label: string; variant: "blocked" | "done" | "amber" | "accent" }> = {
+  needs_attention: { label: "precisa de você", variant: "blocked" },
+  done: { label: "concluída", variant: "done" },
+  idle: { label: "parada", variant: "amber" },
+  running: { label: "rodando", variant: "accent" },
+};
+
+/** Tabela de features tocadas na janela — cada linha clicável desce pro drill da feature. */
+function FeaturesTable({ rows, onDrill }: { rows: FeatureRow[]; onDrill: OverviewDrill }) {
+  return (
+    <table className="ov-feats">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Projeto</th>
+          <th>Sessões</th>
+          <th>Custo</th>
+          <th>Status</th>
+          <th>Última atividade</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const st = FEATURE_STATUS[row.status];
+          return (
+            <tr
+              key={row.featureId}
+              className="ov-rowlink"
+              onClick={() => onDrill.feature(row)}
+            >
+              <td>{row.name}</td>
+              <td>{row.projectName}</td>
+              <td>{row.sessionsClosed}/{row.sessionsTotal}</td>
+              <td>{fmtUsd(row.costUsd)}{row.costIncomplete ? " (parcial)" : ""}</td>
+              <td><span className={`ov-status ov-status-${st.variant}`}>{st.label}</span></td>
+              <td>{fmtDate(row.lastActivityAt)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 /**
- * Overview: cabeçalho com seletor de janela + grid primário (Atenção, Entrega) +
- * grid secundário (Eficiência, Gasto). Faixa daily + tabela de features vêm na Task 5.
+ * Overview: cabeçalho com seletor de janela + faixa daily + grid primário
+ * (Atenção, Entrega) + grid secundário (Eficiência, Gasto) + tabela de features.
  */
 export function OverviewPage({ data, window, onWindow, onDrill }: {
   data: OverviewData;
@@ -160,10 +246,14 @@ export function OverviewPage({ data, window, onWindow, onDrill }: {
         <DeliveryCard delivery={data.delivery} />
       </div>
 
+      <DailyBand dailyLine={data.dailyLine} />
+
       <div className="ov-grid ov-grid-secondary">
         <EfficiencyCard efficiency={data.efficiency} onDrill={onDrill} />
         <SpendCard spend={data.spend} onDrill={onDrill} />
       </div>
+
+      <FeaturesTable rows={data.featureRows} onDrill={onDrill} />
     </div>
   );
 }

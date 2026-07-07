@@ -18,7 +18,8 @@ describe("OverviewPage — 4 cards", () => {
     render(<OverviewPage data={data} window="7d" onWindow={() => {}} onDrill={{ attentionSession: () => {}, feature: () => {}, toTable: () => {} }} />);
     expect(screen.getByText("validar CNPJ")).toBeInTheDocument();
     expect(screen.getByText(/US\$ 8\.40/)).toBeInTheDocument();
-    expect(screen.getByText(/US\$ 96\.20/)).toBeInTheDocument();
+    // total de gasto + a barra do único projeto mostram o mesmo valor formatado (fmtUsd) — duas ocorrências.
+    expect(screen.getAllByText(/US\$ 96\.20/)).toHaveLength(2);
   });
 
   it("clicar numa linha da fila chama onDrill.attentionSession", () => {
