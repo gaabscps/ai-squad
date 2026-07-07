@@ -90,6 +90,7 @@ export function makeObservedMeta(over: Partial<ObservedMeta> = {}): ObservedMeta
     driftFlags: [],
     baseSha: null,
     outputLocale: null,
+    feature: null,
     markers: [],
     report: null,
     ...over,

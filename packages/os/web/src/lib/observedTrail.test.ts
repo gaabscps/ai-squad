@@ -5,7 +5,7 @@ import type { ObservedMeta } from "../../../src/store/types";
 const base: ObservedMeta = {
   intent: "x", createdAt: null, closedAt: null, attentionKind: null,
   decisions: [], evidence: [], driftFlags: [],
-  baseSha: null, outputLocale: null, markers: [], report: null,
+  baseSha: null, outputLocale: null, feature: null, markers: [], report: null,
 };
 
 describe("visibleDecisions", () => {

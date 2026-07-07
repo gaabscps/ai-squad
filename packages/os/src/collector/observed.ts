@@ -24,6 +24,7 @@ import type {
   ObservedDriftFlag,
   ObservedDecision,
   ObservedEvidence,
+  ObservedFeatureRef,
 } from "../store/types.js";
 import { readDeliveryReport } from "./delivery-report.js";
 import { readObservedCostRollup } from "./cost-report.js";
@@ -88,6 +89,9 @@ export function readSessionDir(specDir: string, _projectRoot?: string): Spec | n
 function observedSpec(specDir: string, raw: Record<string, any>): Spec {
   const { status, drift } = deriveObservedStatus(raw);
 
+  const parsedFeature = parseFeature(raw.feature);
+  drift.push(...parsedFeature.drift);
+
   const ymlDecisions = normalizeDecisions(raw.decisions);
   const evidence = normalizeEvidence(raw.evidence);
   const trail = readTrail(specDir);
@@ -128,6 +132,7 @@ function observedSpec(specDir: string, raw: Record<string, any>): Spec {
     baseSha: nonEmptyString(raw.base_sha),
     outputLocale: nonEmptyString(raw.output_locale),
     workType: nonEmptyString(raw.work_type),
+    feature: parsedFeature.feature,
     markers,
     report: readReport(specDir),
   };
@@ -240,6 +245,7 @@ function degradedSpec(specDir: string): Spec {
     baseSha: null,
     outputLocale: null,
     workType: null,
+    feature: null,
     markers: [],
     report: null,
   };
@@ -385,6 +391,29 @@ export function withAt<T>(rawArr: unknown, normalized: T[]): (T & { at: string |
     const at = item && typeof item.at === "string" ? item.at : null;
     return { ...n, at };
   });
+}
+
+/**
+ * Normaliza o bloco feature: do YAML. Ausente → { feature: null, drift: [] } (órfã
+ * legítima). Presente mas sem id/name ou não-objeto → null + driftFlag (card nunca mente).
+ */
+function parseFeature(raw: unknown): { feature: ObservedFeatureRef | null; drift: ObservedDriftFlag[] } {
+  if (raw === undefined || raw === null) return { feature: null, drift: [] };
+  if (typeof raw !== "object" || Array.isArray(raw)) return { feature: null, drift: ["invalid_feature_block"] };
+  const f = raw as Record<string, unknown>;
+  const id = nonEmptyString(f.id);
+  const name = nonEmptyString(f.name);
+  if (id === null || name === null) return { feature: null, drift: ["invalid_feature_block"] };
+  const js = f.jira_snapshot;
+  const jira =
+    js && typeof js === "object" && !Array.isArray(js)
+      ? {
+          status: nonEmptyString((js as Record<string, unknown>).status),
+          fetchedAt: nonEmptyString((js as Record<string, unknown>).fetched_at),
+          url: nonEmptyString((js as Record<string, unknown>).url),
+        }
+      : null;
+  return { feature: { id, key: nonEmptyString(f.key), name, jira }, drift: [] };
 }
 
 /**

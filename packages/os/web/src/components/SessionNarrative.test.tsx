@@ -13,7 +13,7 @@ function clientThatEmitsOnFetch(msg: NarrativeServerMsg): NarrativeClient {
 function observed(): ObservedMeta {
   return {
     intent: "x", createdAt: null, closedAt: null, attentionKind: null, decisions: [], evidence: [],
-    driftFlags: [], baseSha: null, outputLocale: "pt-BR", report: null,
+    driftFlags: [], baseSha: null, outputLocale: "pt-BR", feature: null, report: null,
     markers: [{ kind: "edit", at: "t", exact: true, note: null, decision: null, evidence: null, blockMs: null,
       editFiles: [{ path: "a.ts", added: 1, removed: 0, patch: "@@ -0 +1 @@\n+linha" }] }],
   };

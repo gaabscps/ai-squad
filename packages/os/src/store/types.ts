@@ -77,7 +77,9 @@ export interface CostRollup {
 
 // Flags de inconsistência de ciclo de vida detectadas em sessões observadas.
 // Exibidas no drawer (badge de drift) — o card nunca some, mas o drawer detalha o problema.
-export type ObservedDriftFlag = "closed_with_open_status" | "unknown_status" | "unreadable_yaml";
+export type ObservedDriftFlag =
+  | "closed_with_open_status" | "unknown_status" | "unreadable_yaml"
+  | "invalid_feature_block";
 
 // Item de decisão registrado pelo modelo durante a sessão (best-effort, sem required).
 export interface ObservedDecision {
@@ -116,6 +118,14 @@ export interface ObservedMarker {
   blockMs: number | null;  // duração da espera (kind === "block"); null nos demais ou bloqueio em aberto
 }
 
+// Referência de feature declarada no session.yml (bloco feature:), já normalizada.
+export interface ObservedFeatureRef {
+  id: string;                 // estável; com key == key, sem key == ft-<slug>
+  key: string | null;         // issue-key do Jira
+  name: string;
+  jira: { status: string | null; fetchedAt: string | null; url: string | null } | null;
+}
+
 // Metadados exclusivos do modo observado; presença do campo = card observado.
 export interface ObservedMeta {
   intent: string;
@@ -128,6 +138,7 @@ export interface ObservedMeta {
   baseSha: string | null;        // git base_sha lido do session.yml (âncora do diff)
   outputLocale: string | null;   // output_locale da sessão (BCP-47); idioma dos labels da timeline
   workType?: string | null;      // work_type da sessão (dev|product); ausente/null ⇒ tratado como dev. Aditivo (protocolo do schema: opcional na leitura). Roteia o resumo de produto no aiOS.
+  feature: ObservedFeatureRef | null; // bloco feature: do session.yml; null = órfã (sem drift) ou bloco inválido (com drift)
   markers: ObservedMarker[];     // a timeline curada (preenchida na Task 8)
   report: string | null;        // conteúdo de report.md (parecer determinístico); null se ausente
 }

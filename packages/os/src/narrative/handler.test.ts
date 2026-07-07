@@ -26,7 +26,7 @@ function fakeSpawn(out: string) {
 }
 
 function observed(): ObservedMeta {
-  return { intent: "x", createdAt: "a", closedAt: "b", attentionKind: null, decisions: [], evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", report: null, markers: [] };
+  return { intent: "x", createdAt: "a", closedAt: "b", attentionKind: null, decisions: [], evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", feature: null, report: null, markers: [] };
 }
 function fakeStore(projectPath: string, spec: Spec): Store {
   return { getSnapshot: () => [{ id: "p", name: "proj", path: projectPath, specs: [spec] }] } as unknown as Store;

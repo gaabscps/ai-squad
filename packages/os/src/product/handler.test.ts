@@ -9,7 +9,7 @@ import type { ObservedMeta, Spec } from "../store/types.js";
 
 const SUMMARY = { tldr: "t", decided: [{ what: "x", why: null, rejected: null }], open: [], next: [], deliverable: "d" };
 function observed(): ObservedMeta {
-  return { intent: "x", createdAt: "a", closedAt: "b", attentionKind: null, decisions: [], evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", workType: "product", report: null, markers: [] };
+  return { intent: "x", createdAt: "a", closedAt: "b", attentionKind: null, decisions: [], evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", workType: "product", feature: null, report: null, markers: [] };
 }
 function fakeStore(projectPath: string, spec: Spec): Store {
   return { getSnapshot: () => [{ id: "p", name: "proj", path: projectPath, specs: [spec] }] } as unknown as Store;

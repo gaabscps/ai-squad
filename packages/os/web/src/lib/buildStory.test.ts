@@ -278,7 +278,7 @@ describe("buildStory — manchete narrada (modo observado com contagens)", () =>
   const obsBase = {
     intent: "melhorar UI", createdAt: "2026-06-12T20:00:00Z", closedAt: null,
     attentionKind: null, decisions: [], evidence: [], driftFlags: [],
-    baseSha: null, outputLocale: null, markers: [], report: null,
+    baseSha: null, outputLocale: null, feature: null, markers: [], report: null,
   };
   const emptyCost = makeCost({ totalCostUsd: null, totalTokens: 0 });
   const NOW = Date.parse("2026-06-12T22:00:00Z");

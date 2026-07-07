@@ -5,7 +5,7 @@ import type { ObservedMeta } from "../store/types.js";
 function obs(partial: Partial<ObservedMeta>): ObservedMeta {
   return {
     intent: "x", createdAt: "a", closedAt: "b", attentionKind: null, decisions: [],
-    evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", report: null, markers: [], ...partial,
+    evidence: [], driftFlags: [], baseSha: null, outputLocale: "pt-BR", feature: null, report: null, markers: [], ...partial,
   };
 }
 

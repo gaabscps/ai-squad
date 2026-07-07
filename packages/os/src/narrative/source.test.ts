@@ -6,7 +6,7 @@ function obs(partial: Partial<ObservedMeta>): ObservedMeta {
   return {
     intent: "fazer X", createdAt: "2026-06-20T14:00:00Z", closedAt: "2026-06-20T16:00:00Z",
     attentionKind: null, decisions: [], evidence: [], driftFlags: [], baseSha: "abc",
-    outputLocale: "pt-BR", report: null, markers: [], ...partial,
+    outputLocale: "pt-BR", feature: null, report: null, markers: [], ...partial,
   };
 }
 
