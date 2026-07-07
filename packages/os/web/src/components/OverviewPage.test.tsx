@@ -28,4 +28,37 @@ describe("OverviewPage — 4 cards", () => {
     fireEvent.click(screen.getByText("validar CNPJ"));
     expect(attentionSession).toHaveBeenCalledWith(data.attention.items[0]);
   });
+
+  it("DeliveryCard mostra plural correto 'sessões' com sessionsTotal >= 2", () => {
+    const dataWithMultipleSessions: OverviewData = {
+      ...data,
+      delivery: {
+        ...data.delivery,
+        items: [
+          {
+            featureId: "F2",
+            name: "Dashboard",
+            projectName: "p",
+            status: "running",
+            sessionsClosed: 2,
+            sessionsTotal: 2,
+            costUsd: 150.0,
+            costIncomplete: false,
+            lastActivityAt: null,
+          },
+        ],
+      },
+    };
+    render(
+      <OverviewPage
+        data={dataWithMultipleSessions}
+        window="7d"
+        onWindow={() => {}}
+        onDrill={{ attentionSession: () => {}, feature: () => {}, toTable: () => {} }}
+      />
+    );
+    // Verificar que o texto contém "sessões" (correto) e não "sessãoes" (incorreto)
+    expect(screen.getByText(/2\/2 sessões/)).toBeInTheDocument();
+    expect(screen.queryByText(/sessãoes/)).not.toBeInTheDocument();
+  });
 });

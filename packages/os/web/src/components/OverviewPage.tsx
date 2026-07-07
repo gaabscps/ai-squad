@@ -71,7 +71,7 @@ function DeliveryCard({ delivery }: { delivery: OverviewData["delivery"] }) {
             <span className="ov-srow-check">{item.status === "done" ? "✓" : "◔"}</span>
             <span className="ov-srow-name">{item.name}</span>
             <span className="ov-srow-meta">
-              {item.sessionsClosed}/{item.sessionsTotal} sessão{item.sessionsTotal === 1 ? "" : "es"} · {fmtUsd(item.costUsd)}{item.costIncomplete ? " (parcial)" : ""}
+              {item.sessionsClosed}/{item.sessionsTotal} {item.sessionsTotal === 1 ? "sessão" : "sessões"} · {fmtUsd(item.costUsd)}{item.costIncomplete ? " (parcial)" : ""}
             </span>
           </div>
         ))}
@@ -92,7 +92,7 @@ function EfficiencyCard({ efficiency, onDrill }: { efficiency: OverviewData["eff
           <div className="ov-kpi ov-kpi-sm">{fmtUsd(efficiency.avgCostPerSession)} <small>/ sessão</small></div>
           <div className="ov-kpi-sub">
             custo médio
-            {efficiency.trendPct !== null && (
+            {efficiency.trendPct !== null && efficiency.trendPct !== 0 && (
               <span className={`ov-delta ${trendUp ? "ov-delta-up" : ""}`}>
                 {" "}· {trendDown ? "▼" : "▲"} {Math.abs(efficiency.trendPct * 100).toFixed(0)}% vs período anterior
               </span>
@@ -220,7 +220,7 @@ function FeaturesTable({ rows, onDrill }: { rows: FeatureRow[]; onDrill: Overvie
  * Overview: cabeçalho com seletor de janela + faixa daily + grid primário
  * (Atenção, Entrega) + grid secundário (Eficiência, Gasto) + tabela de features.
  */
-export function OverviewPage({ data, window, onWindow, onDrill }: {
+export function OverviewPage({ data, window: timeWindow, onWindow, onDrill }: {
   data: OverviewData;
   window: WindowKey;
   onWindow: (w: WindowKey) => void;
@@ -233,7 +233,7 @@ export function OverviewPage({ data, window, onWindow, onDrill }: {
           <button
             key={w.key}
             type="button"
-            className={w.key === window ? "on" : ""}
+            className={w.key === timeWindow ? "on" : ""}
             onClick={() => onWindow(w.key)}
           >
             {w.label}
