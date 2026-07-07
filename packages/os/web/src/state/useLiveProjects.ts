@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useProjectsDispatch } from "./projects";
+import type { FeatureActionMsg } from "../components/FeatureCard";
 
 /**
  * Conecta ao WS /ws (caminho relativo), despacha cada snapshot, marca connected,
  * e reconecta com backoff (1s,2s,4s… teto 10s) quando cai — ex.: você reinicia o
- * `npm run serve` e o board volta sozinho, sem F5. Devolve toggleHide pra o board
- * mandar hide/unhide pelo mesmo socket.
+ * `npm run serve` e o board volta sozinho, sem F5. Devolve toggleHide e
+ * sendFeatureAction pra o board mandar hide/unhide e feature:* pelo mesmo socket.
  */
 export function useLiveProjects(): {
   toggleHide: (id: string, hidden: boolean) => void;
+  sendFeatureAction: (msg: FeatureActionMsg) => void;
 } {
   const dispatch = useProjectsDispatch();
   const dispatchRef = useRef(dispatch);
@@ -71,5 +73,12 @@ export function useLiveProjects(): {
     }
   }, []);
 
-  return { toggleHide };
+  const sendFeatureAction = useCallback((msg: FeatureActionMsg) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    }
+  }, []);
+
+  return { toggleHide, sendFeatureAction };
 }

@@ -87,8 +87,8 @@ a:hover { text-decoration: underline; }
   /* Coluna sem caixa: cards soltos no fundo, o head é só um rótulo (estética editorial) */
   background: transparent; border: 0; padding: 0;
   /* min-width: 0 — sem isto a trilha 1fr (= minmax(auto,1fr)) não encolhe abaixo
-     do conteúdo mínimo; .kcard-title é nowrap, então a coluna estica até o título
-     inteiro e o board ganha scroll horizontal (blowout). NÃO remover. */
+     do conteúdo mínimo; texto longo do card estica a coluna e o board ganha
+     scroll horizontal (blowout). NÃO remover. */
   min-width: 0;
 }
 .kcol-head { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
@@ -101,28 +101,13 @@ a:hover { text-decoration: underline; }
 .kcol-count { margin-left: auto; color: var(--text-mute); }
 .kcol-empty { font-size: 12px; color: var(--text-mute); padding: 8px 4px; margin: 0; }
 
-.kcard { background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--text-mute); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); cursor: pointer; transition: box-shadow 0.12s, transform 0.12s, border-color 0.12s; }
-.kcard:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); border-color: var(--border); }
-.kcard[data-status="running"] { border-left-color: var(--running); }
-.kcard[data-status="blocked"] { border-left-color: var(--blocked); }
-.kcard[data-status="escalated"] { border-left-color: var(--escalated); }
-.kcard[data-status="paused"] { border-left-color: var(--paused); }
-.kcard[data-status="done"] { border-left-color: var(--done); }
-.kcard-row1 { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.kcard-id { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
-.kcard-proj { font-size: 9px; color: var(--sdd); background: color-mix(in srgb, var(--sdd) 12%, transparent); padding: 1px 7px; border-radius: 999px; margin-left: auto; }
-.kcard[data-squad="discovery"] .kcard-proj { color: var(--discovery); background: color-mix(in srgb, var(--discovery) 12%, transparent); }
-.kcard-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kcard-why { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; margin-bottom: 8px; }
+/* .kcard-why usa as mesmas classes why-* de .drawer-why (DetailDrawer) — mantidas, .kcard-why removida com o KanbanCard */
 .why-blocked { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 10%, transparent); }
 .why-escalated { color: var(--escalated); background: color-mix(in srgb, var(--escalated) 10%, transparent); }
 .why-paused, .why-audit { color: var(--paused); background: color-mix(in srgb, var(--paused) 12%, transparent); }
 /* Âmbar entra na família "aguardando humano" (vermelho fica para os hard stops) */
 .why-input { color: var(--paused); background: color-mix(in srgb, var(--paused) 12%, transparent); }
 .why-unreadable { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 10%, transparent); }
-.kcard-phase { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; }
-.kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
-.kcard-time { margin-left: auto; }
 
 /* ---- FeatureCard (card de feature no kanban agrupado) ---- */
 .fcard { background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--text-mute); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); transition: box-shadow 0.12s, border-color 0.12s; }
@@ -141,6 +126,8 @@ a:hover { text-decoration: underline; }
 .fcard-session:hover { background: var(--surface-soft); }
 .fcard-session-id { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .fcard-session-title { font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcard-action { font-size: 10px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.fcard-action:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
 /* ---- Tabela ---- */
 .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -502,9 +489,6 @@ a:hover { text-decoration: underline; }
 .fm-empty { padding: 24px 16px; font-size: 13px; color: var(--text-mute); text-align: center; }
 .fm-loading { padding: 24px 16px; font-size: 13px; color: var(--text-mute); text-align: center; }
 
-/* ── KanbanCard – meta row (tasks + cost) ─────────────────────────────── */
-.kcard-tasks { color: var(--text-dim); }
-.kcard-cost { margin-left: 10px; color: var(--text-dim); }
 .cost-empty { color: var(--text-mute); }
 .cost-unreliable { color: var(--blocked); font-size: 10px; }
 /* Hint muted em cards observados onde USD não está disponível mas tokens estão */

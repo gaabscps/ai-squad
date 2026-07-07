@@ -11,24 +11,29 @@ import {
 } from "./state/diagnosisJobs";
 import type { AttentionClient } from "./state/attentionClient";
 import type { Project } from "../../src/store/types";
+import type { FeatureActionMsg } from "./components/FeatureCard";
 
-// Renderiza o Board com os dados ao vivo; recebe onHide por prop (o WS já está no AppInner).
+// Renderiza o Board com os dados ao vivo; recebe onHide/onFeatureAction por prop
+// (o WS já está no AppInner).
 function BoardLive({
   selected,
   onSelect,
   onClose,
   onHide,
+  onFeatureAction,
   onOpenFolderManager,
 }: {
   selected: SelectedSpec | null;
   onSelect: (spec: SelectedSpec) => void;
   onClose: () => void;
   onHide: (id: string, hidden: boolean) => void;
+  onFeatureAction: (msg: FeatureActionMsg) => void;
   onOpenFolderManager?: () => void;
 }) {
   return (
     <Board
       onHide={onHide}
+      onFeatureAction={onFeatureAction}
       selected={selected}
       onSelect={onSelect}
       onClose={onClose}
@@ -69,7 +74,7 @@ function AppInner() {
   const [selected, setSelected] = useState<SelectedSpec | null>(null);
   const [folderManagerOpen, setFolderManagerOpen] = useState(false);
   const { markSeen, getJob } = useDiagnosisJobs();
-  const { toggleHide } = useLiveProjects(); // conecta o WS — vale pro board E pra ExportPage
+  const { toggleHide, sendFeatureAction } = useLiveProjects(); // conecta o WS — vale pro board E pra ExportPage
 
   useEffect(() => {
     if (selected) {
@@ -106,6 +111,7 @@ function AppInner() {
         onSelect={setSelected}
         onClose={() => setSelected(null)}
         onHide={toggleHide}
+        onFeatureAction={sendFeatureAction}
         onOpenFolderManager={() => setFolderManagerOpen(true)}
       />
       <FolderManager

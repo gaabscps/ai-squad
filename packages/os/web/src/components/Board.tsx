@@ -7,6 +7,7 @@ import { ProjectFilter } from "./ProjectFilter";
 import { KanbanBoard } from "./KanbanBoard";
 import { SpecTable } from "./SpecTable";
 import { DetailDrawer } from "./DetailDrawer";
+import type { FeatureActionMsg } from "./FeatureCard";
 
 /**
  * A seleção guarda (projectId, specId) e re-localiza o item a cada render — se
@@ -19,12 +20,14 @@ export interface SelectedSpec {
 
 export function Board({
   onHide,
+  onFeatureAction,
   selected: selectedProp,
   onSelect: onSelectProp,
   onClose: onCloseProp,
   onOpenFolderManager,
 }: {
   onHide: (id: string, hidden: boolean) => void;
+  onFeatureAction?: (msg: FeatureActionMsg) => void;
   selected?: SelectedSpec | null;
   onSelect?: (spec: SelectedSpec) => void;
   onClose?: () => void;
@@ -75,6 +78,18 @@ export function Board({
         !isArchived(sp.spec, now, archiveAfterDays) && !isDormant(sp.spec, now)),
     }))
     .filter((fi) => fi.sessions.length > 0);
+
+  // Alvos do "mover para" por projeto: {id, name} únicos, excluindo órfãs (uma
+  // feature órfã é uma sessão solta, não um destino válido de mover-para).
+  const knownFeaturesByProject = new Map<string, { id: string; name: string }[]>();
+  for (const fi of flattenFeatures(projects, showHidden)) {
+    if (fi.feature.orphan) continue;
+    const list = knownFeaturesByProject.get(fi.projectId) ?? [];
+    if (!list.some((kf) => kf.id === fi.feature.id)) {
+      list.push({ id: fi.feature.id, name: fi.feature.name });
+    }
+    knownFeaturesByProject.set(fi.projectId, list);
+  }
 
   // Join sessão → nome da feature pra coluna "Feature" da tabela (chave estável
   // projectId/specId). Features órfãs ficam de fora: o nome delas é o título da
@@ -130,7 +145,12 @@ export function Board({
       />
       <main className="board-body">
         {view === "kanban" ? (
-          <KanbanBoard items={featureItems} onSelectSession={handleSelect} />
+          <KanbanBoard
+            items={featureItems}
+            onSelectSession={handleSelect}
+            onFeatureAction={onFeatureAction}
+            knownFeaturesByProject={knownFeaturesByProject}
+          />
         ) : view === "archived" && shown.length === 0 ? (
           <p className="empty-archived">Nenhuma feature arquivada ou dormente.</p>
         ) : (

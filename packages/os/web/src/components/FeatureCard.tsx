@@ -4,6 +4,70 @@ import type { SpecWithProject } from "../lib/kanban";
 import { StatusBadge } from "./StatusBadge";
 import { fmtUsd, fmtTokens } from "../format";
 
+// Mensagem de correção manual enviada ao servidor via WS (Task 6: feature:*).
+export interface FeatureActionMsg {
+  type: "feature:assign" | "feature:markDone" | "feature:rename";
+  projectId: string;
+  sessionId?: string;
+  featureId?: string | null;
+  done?: boolean;
+  name?: string;
+}
+
+// Linha de sessão expandida com o controle "mover para outra feature".
+function SessionRow({
+  s,
+  projectId,
+  knownFeatures,
+  currentFeatureId,
+  onSelectSession,
+  onFeatureAction,
+}: {
+  s: SpecWithProject;
+  projectId: string;
+  knownFeatures: { id: string; name: string }[];
+  currentFeatureId: string;
+  onSelectSession: (s: SpecWithProject) => void;
+  onFeatureAction?: (msg: FeatureActionMsg) => void;
+}) {
+  const [moving, setMoving] = useState(false);
+  const targets = knownFeatures.filter((kf) => kf.id !== currentFeatureId);
+
+  return (
+    <li>
+      <button type="button" className="fcard-session" onClick={() => onSelectSession(s)}>
+        <span className="fcard-session-id">{s.spec.id}</span>
+        <span className="fcard-session-title">{s.spec.title}</span>
+        <StatusBadge spec={s.spec} />
+      </button>
+      {onFeatureAction && (
+        moving ? (
+          <select
+            aria-label={`nova feature de ${s.spec.id}`}
+            defaultValue=""
+            onChange={(e) => {
+              const value = e.target.value;
+              const featureId = value === "" ? null : value;
+              onFeatureAction({ type: "feature:assign", projectId, sessionId: s.spec.id, featureId });
+              setMoving(false);
+            }}
+          >
+            <option value="" disabled>escolher…</option>
+            {targets.map((kf) => (
+              <option key={kf.id} value={kf.id}>{kf.name}</option>
+            ))}
+            <option value="">Sem feature</option>
+          </select>
+        ) : (
+          <button type="button" aria-label={`mover ${s.spec.id}`} onClick={() => setMoving(true)}>
+            mover
+          </button>
+        )
+      )}
+    </li>
+  );
+}
+
 /**
  * Card de feature no kanban: header (nome, key, tags), métricas agregadas
  * (sessões fechadas/total, custo somado, atenção) e lista expansível das
@@ -12,9 +76,13 @@ import { fmtUsd, fmtTokens } from "../format";
 export function FeatureCard({
   item,
   onSelectSession,
+  onFeatureAction,
+  knownFeatures = [],
 }: {
   item: FeatureWithProject;
   onSelectSession: (s: SpecWithProject) => void;
+  onFeatureAction?: (msg: FeatureActionMsg) => void;
+  knownFeatures?: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const f = item.feature;
@@ -42,17 +110,31 @@ export function FeatureCard({
           <span className="fcard-attention-count">{f.attention.count} aguardando você</span>
         )}
         {f.status === "idle" && <span className="fcard-hint">sessões fechadas — marcar entregue?</span>}
+        {onFeatureAction && f.key === null && f.status !== "done" && (
+          <button type="button" className="fcard-action"
+            onClick={() => onFeatureAction({ type: "feature:markDone", projectId: item.projectId, featureId: f.id, done: true })}>
+            marcar como entregue
+          </button>
+        )}
+        {onFeatureAction && f.doneSource === "manual" && (
+          <button type="button" className="fcard-action"
+            onClick={() => onFeatureAction({ type: "feature:markDone", projectId: item.projectId, featureId: f.id, done: false })}>
+            reabrir
+          </button>
+        )}
       </div>
       {open && (
         <ul className="fcard-sessions">
           {item.sessions.map((s) => (
-            <li key={s.spec.id}>
-              <button type="button" className="fcard-session" onClick={() => onSelectSession(s)}>
-                <span className="fcard-session-id">{s.spec.id}</span>
-                <span className="fcard-session-title">{s.spec.title}</span>
-                <StatusBadge spec={s.spec} />
-              </button>
-            </li>
+            <SessionRow
+              key={s.spec.id}
+              s={s}
+              projectId={item.projectId}
+              knownFeatures={knownFeatures}
+              currentFeatureId={f.id}
+              onSelectSession={onSelectSession}
+              onFeatureAction={onFeatureAction}
+            />
           ))}
         </ul>
       )}
