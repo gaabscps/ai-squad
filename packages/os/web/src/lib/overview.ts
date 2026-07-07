@@ -47,6 +47,20 @@ function costIncomplete(spec: Spec): boolean {
   return spec.cost.partial || COST_INCOMPLETE.has(spec.cost.source);
 }
 
+/** Percentil linear sobre lista já ordenada asc; null se vazia. p ∈ [0,100]. */
+export function percentile(sorted: number[], p: number): number | null {
+  if (sorted.length === 0) return null;
+  if (sorted.length === 1) return sorted[0];
+  const rank = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(rank), hi = Math.ceil(rank);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (rank - lo) * (sorted[hi] - sorted[lo]);
+}
+
+function dayBucket(iso: string, hourly: boolean): string {
+  return hourly ? iso.slice(0, 13) + ":00:00Z" : iso.slice(0, 10);
+}
+
 export function computeOverview(projects: readonly Project[], window: OverviewWindow, now: number): OverviewData {
   const all = flattenSpecs(projects as Project[], false).filter((sp) => sp.spec.observed);
 
@@ -81,6 +95,31 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
     .map(([projectName, costUsd]) => ({ projectName, costUsd }))
     .sort((a, b) => b.costUsd - a.costUsd);
 
+  // Eficiência — média/percentis só sobre custo conhecido; tendência vs janela anterior de mesmo tamanho.
+  const withCost = win.filter((sp) => sp.spec.cost.totalCostUsd !== null);
+  const costs = withCost.map((sp) => sp.spec.cost.totalCostUsd!).sort((a, b) => a - b);
+  const avg = costs.length ? costs.reduce((s, x) => s + x, 0) / costs.length : null;
+
+  const prevWin = all.filter((sp) => {
+    const t = activityInstant(sp.spec); if (t === null) return false;
+    const ms = Date.parse(t);
+    return ms >= now - 2 * window.ms && ms < now - window.ms && sp.spec.cost.totalCostUsd !== null;
+  });
+  const prevCosts = prevWin.map((sp) => sp.spec.cost.totalCostUsd!);
+  const prevAvg = prevCosts.length ? prevCosts.reduce((s, x) => s + x, 0) / prevCosts.length : null;
+  const trendPct = avg !== null && prevAvg !== null && prevAvg !== 0 ? (avg - prevAvg) / prevAvg : null;
+
+  const hourly = window.key === "today";
+  const sparkMap = new Map<string, number>();
+  for (const sp of withCost) {
+    const t = activityInstant(sp.spec)!;
+    const b = dayBucket(t, hourly);
+    sparkMap.set(b, (sparkMap.get(b) ?? 0) + sp.spec.cost.totalCostUsd!);
+  }
+  const spark = [...sparkMap.entries()].map(([at, costUsd]) => ({ at, costUsd })).sort((a, b) => a.at.localeCompare(b.at));
+
+  const efficiency = { avgCostPerSession: avg, sessionsWithCost: costs.length, trendPct, p50: percentile(costs, 50), p95: percentile(costs, 95), spark };
+
   return {
     window: window.key,
     attention: { count: attnItems.length, items: attnItems },
@@ -90,7 +129,7 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
       featuresTouched: touchedFeatureIds.size,
       items: [], // preenchido na Task 3
     },
-    efficiency: { avgCostPerSession: null, sessionsWithCost: 0, trendPct: null, p50: null, p95: null, spark: [] }, // preenchido na Task 2
+    efficiency,
     spend: { totalUsd: spendTotal, incomplete: spendIncomplete, byProject, activeProjects: byProjectMap.size },
     dailyLine: "", // preenchido na Task 3
     featureRows: [], // preenchido na Task 3
