@@ -7,6 +7,8 @@ import { ProjectFilter } from "./ProjectFilter";
 import { KanbanBoard } from "./KanbanBoard";
 import { SpecTable } from "./SpecTable";
 import { DetailDrawer } from "./DetailDrawer";
+import { OverviewPage, type OverviewDrill } from "./OverviewPage";
+import { computeOverview, WINDOWS, type WindowKey } from "../lib/overview";
 import type { FeatureActionMsg } from "./FeatureCard";
 
 /**
@@ -34,7 +36,8 @@ export function Board({
   onOpenFolderManager?: () => void;
 }) {
   const { projects, connected, archiveAfterDays } = useProjects();
-  const [view, setView] = useState<ViewMode>("kanban");
+  const [view, setView] = useState<ViewMode>("overview");
+  const [window, setWindow] = useState<WindowKey>("7d");
   const [filter, setFilter] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showHidden, setShowHidden] = useState(false);
@@ -132,6 +135,22 @@ export function Board({
     }
   };
 
+  // Drill-down da Overview: cada card/linha desce pro recorte do kanban/tabela
+  // que o compõe, reusando os mesmos setters/handlers do resto do Board.
+  const drill: OverviewDrill = {
+    attentionSession: (item) => {
+      setView("kanban");
+      const found = all.find((sp) => sp.projectId === item.projectId && sp.spec.id === item.sessionId);
+      if (found) handleSelect(found);
+    },
+    feature: (row) => {
+      setView("kanban");
+      setFilter(row.projectId);
+      setQuery(row.name);
+    },
+    toTable: () => setView("table"),
+  };
+
   return (
     <div className="app-shell">
       <TopBar connected={connected} query={query} onQuery={setQuery} view={view} onView={setView} onOpenFolderManager={onOpenFolderManager} />
@@ -144,7 +163,14 @@ export function Board({
         onHide={handleHide}
       />
       <main className="board-body">
-        {view === "kanban" ? (
+        {view === "overview" ? (
+          <OverviewPage
+            data={computeOverview(projects, WINDOWS[window], Date.now())}
+            window={window}
+            onWindow={setWindow}
+            onDrill={drill}
+          />
+        ) : view === "kanban" ? (
           <KanbanBoard
             items={featureItems}
             onSelectSession={handleSelect}

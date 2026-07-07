@@ -2,7 +2,7 @@
  * Barra superior: marca + pílula de conexão + busca + toggle Kanban|Tabela|Arquivadas
  * + botão Pastas. Sem estado próprio; recebe tudo via props/callbacks.
  */
-export type ViewMode = "kanban" | "table" | "archived";
+export type ViewMode = "overview" | "kanban" | "table" | "archived";
 
 export function TopBar({
   connected,
@@ -43,6 +43,13 @@ export function TopBar({
         Pastas
       </button>
       <div className="seg" role="group" aria-label="visão">
+        <button
+          type="button"
+          className={view === "overview" ? "on" : ""}
+          onClick={() => onView("overview")}
+        >
+          Overview
+        </button>
         <button
           type="button"
           className={view === "kanban" ? "on" : ""}

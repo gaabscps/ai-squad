@@ -56,8 +56,10 @@ function renderBoardWithDispatch(
 }
 
 describe("Board", () => {
-  it("mostra o card de feature no kanban por padrão; expandir revela a sessão-membro", async () => {
+  it("mostra o card de feature no kanban; expandir revela a sessão-membro", async () => {
     renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", status: "running", tasks: [{ id: "T-1", state: "running", loops: 0, dispatches: [] }] })], features: [makeFeature({ id: "ft-1", name: "Feature Um", sessionIds: ["FEAT-1"], status: "running" })] }]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     expect(screen.getByText("Feature Um")).toBeInTheDocument();
     expect(screen.getByText("Em andamento")).toBeInTheDocument();
     await userEvent.click(screen.getByText("Feature Um"));
@@ -69,6 +71,8 @@ describe("Board", () => {
       { id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })], features: [makeFeature({ id: "ft-1", name: "Feature A", sessionIds: ["FEAT-1"] })] },
       { id: "b", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })], features: [makeFeature({ id: "ft-2", name: "Feature B", sessionIds: ["FEAT-2"] })] },
     ]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByRole("button", { name: "proj-a" }));
     expect(screen.getByText("Feature A")).toBeInTheDocument();
     expect(screen.queryByText("Feature B")).toBeNull();
@@ -82,6 +86,8 @@ describe("Board", () => {
       makeFeature({ id: "ft-1", name: "Feature A", sessionIds: ["FEAT-1"] }),
       makeFeature({ id: "ft-2", name: "Feature B", sessionIds: ["FEAT-2"] }),
     ] }]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.type(screen.getByPlaceholderText(/buscar/i), "pdf");
     expect(screen.getByText("Feature A")).toBeInTheDocument();
     expect(screen.queryByText("Feature B")).toBeNull();
@@ -109,6 +115,8 @@ describe("Board", () => {
 
   it("clicar numa sessão expandida abre o drawer; fechar o esconde", async () => {
     renderBoard([{ id: "a", name: "proj-a", specs: [makeSpec({ id: "FEAT-1", title: "Checkout" })], features: [makeFeature({ id: "ft-1", name: "Feature Checkout", sessionIds: ["FEAT-1"] })] }]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByText("Feature Checkout"));
     await userEvent.click(screen.getByText("FEAT-1"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -121,6 +129,8 @@ describe("Board", () => {
       { id: "proj-abc", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })], features: [makeFeature({ id: "ft-1", name: "Feature A", sessionIds: ["FEAT-1"] })] },
       { id: "proj-xyz", name: "proj-b", specs: [makeSpec({ id: "FEAT-2" })], features: [makeFeature({ id: "ft-2", name: "Feature B", sessionIds: ["FEAT-2"] })] },
     ]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByRole("button", { name: "proj-a" })); // filtra proj-a
     await userEvent.click(screen.getByRole("button", { name: /ocultar proj-a/i }));
     expect(onHide).toHaveBeenCalledWith("proj-abc", true);
@@ -132,6 +142,8 @@ describe("Board", () => {
       { id: "proj-abc", name: "proj-a", specs: [makeSpec({ id: "FEAT-1" })], features: [makeFeature({ id: "ft-1", name: "Feature A", sessionIds: ["FEAT-1"] })] },
       { id: "proj-xyz", name: "proj-b", hidden: true, specs: [makeSpec({ id: "FEAT-2" })], features: [makeFeature({ id: "ft-2", name: "Feature B", sessionIds: ["FEAT-2"] })] },
     ]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByLabelText(/mostrar ocultos/i)); // revela proj-b
     await userEvent.click(screen.getByRole("button", { name: "proj-b" })); // filtra o oculto
     expect(screen.queryByText("Feature A")).toBeNull(); // só proj-b
@@ -161,6 +173,8 @@ describe("Board — dormência", () => {
 
   it("kanban esconde a feature cuja única sessão-membro está dormente", () => {
     renderBoard([{ id: "a", name: "proj-a", specs: [runningDormente(), runningAtivo()], features: featsSleepAwake }]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
     expect(screen.queryByText("Feature Sleep")).toBeNull();
     expect(screen.getByText("Feature Awake")).toBeInTheDocument();
   });
@@ -201,6 +215,8 @@ describe("Board — arquivamento", () => {
 
   it("kanban esconde a feature cuja única sessão-membro está arquivada (done velha)", () => {
     renderBoard([{ id: "a", name: "proj-a", specs: [doneVelha(), doneNova()], features: featsOldNew }]);
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
     expect(screen.queryByText("Feature Old")).toBeNull();
     expect(screen.getByText("Feature New")).toBeInTheDocument(); // done nova ainda aparece
   });
@@ -228,6 +244,8 @@ describe("Board — AC-014: foco do painel por id resiliente a snapshot WebSocke
       { id: "proj-p", name: "proj-p", specs: [spec], features: [feature] },
     ]);
 
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByText("Feature X"));
     await userEvent.click(screen.getByText("FEAT-X"));
     const dialog = screen.getByRole("dialog");
@@ -254,6 +272,8 @@ describe("Board — AC-014: foco do painel por id resiliente a snapshot WebSocke
       { id: "proj-p", name: "proj-p", specs: [spec], features: [feature] },
     ]);
 
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByText("Feature X"));
     await userEvent.click(screen.getByText("FEAT-X"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -271,6 +291,8 @@ describe("Board — AC-014: foco do painel por id resiliente a snapshot WebSocke
       { id: "proj-p", name: "proj-p", specs: [spec], features: [feature] },
     ]);
 
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByText("Feature X"));
     await userEvent.click(screen.getByText("FEAT-X"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -293,6 +315,8 @@ describe("Board — AC-014: foco do painel por id resiliente a snapshot WebSocke
       { id: "proj-p", name: "proj-p", specs: [specX, specY], features: [featureX, featureY] },
     ]);
 
+    // Landing default agora é a Overview (S2/Task 6); entra no kanban explicitamente.
+    await userEvent.click(screen.getByRole("button", { name: "Kanban" }));
     await userEvent.click(screen.getByText("Feature X"));
     await userEvent.click(screen.getByText("FEAT-X"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
