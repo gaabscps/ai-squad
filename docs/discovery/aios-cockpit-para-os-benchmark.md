@@ -118,6 +118,34 @@ de conjunto. Confirma o TL;DR: o aiOS tem o drill-down, falta o zoom-out.
 
 ---
 
+## 3.5 Definições do dono (o requisito de produto — fonte: respostas diretas, OBS-012)
+
+Estas são as respostas do dono às perguntas de refinamento. São o requisito canônico da
+Overview e de tudo que vier depois — qualquer spec futura valida contra isto.
+
+**Hierarquia de importância (o que fica GRANDE no topo da dashboard):**
+
+| Prioridade | Pergunta que a tela responde | Peso |
+|---|---|---|
+| 1 (empate) | "Algo precisa de mim agora?" — atenção/fila | primário |
+| 1 (empate) | "O que rolou / quanto entreguei?" — entrega/placar | primário |
+| 2 | "Tô ficando mais eficiente?" — tendência | secundário |
+| 2 | "Tô gastando demais?" — gasto | secundário |
+
+**Os três usos reais (a dashboard é uma superfície de LEITURA, não um monitor passivo):**
+1. **Report na daily** — chegar no standup e ler "ontem entreguei X, hoje preciso de Y".
+2. **Estudo do que foi feito na feature** — mergulhar no trabalho executado.
+3. **Reflexão sobre a IA** — performance do modelo, o próprio uso, onde ganhar eficiência.
+
+**Unidade de primeira classe: a FEATURE** (card do Jira ou request do usuário). A sessão é
+"uma forma de dividir em pequenos trabalhos e ter relatórios mais bem escritos de uma
+pequena/média entrega" — sub-nível, agrupada sob a feature. Drill-down canônico:
+**feature → sessões → passos**.
+
+**Mecanismo de junção escolhido:** híbrido A+C — a skill pergunta na abertura (picker),
+hook valida a forma ("chicoteia o agente"), correção manual no OS como rede de segurança.
+Chave: "os dois, opcional" — issue-key do Jira quando existe, nome livre quando não.
+
 ## 4. Decisão — primeira fatia e por quê
 
 "Virar um OS" é um **programa**, não uma feature (são 6-7 lacunas independentes na tabela). Por isso
