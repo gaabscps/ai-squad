@@ -43,6 +43,49 @@ Tell the human the contract is open and what is now captured automatically
 
 Capture `base_sha` too with `git rev-parse HEAD` (Bash) and write it into the session.yml — it is the stable anchor for the session's diff. If the repo is not a git repo (the command fails), omit the field.
 
+### 1.5 Feature (agrupamento — pergunta única na abertura)
+
+Every observed session belongs to a feature (a Jira card or a loose user
+request). Ask ONCE, right after opening the contract — never mid-work, and
+never again on resume (if `session.yml` already has a `feature:` block, read
+it and move on).
+
+1. Scan sibling `.agent-session/*/session.yml` files for existing `feature:`
+   blocks; collect the ~5 most recently active (dedup by `id`).
+2. Ask via `AskUserQuestion` (self-sufficient widget — instrumentation
+   preference, same as step 2's): options = each recent feature as
+   "<id> · <name>" (label "continuar"), plus "Nova feature" and
+   "Sem feature por ora".
+3. Resolve the block:
+   - **Continuar**: copy `id`/`key`/`name` verbatim from the chosen block
+     (string divergence is impossible by construction).
+   - **Nova** with an issue-key (`^[A-Z][A-Z0-9]*-\d+$`): `key` = the key
+     uppercased, `id` = same as key. If a Jira tool (MCP) is available,
+     fetch the issue and set `name` = real title, plus a snapshot; if not,
+     `name` = the key itself (the next session enriches it).
+   - **Nova** with a free name: no `key`; `id` = `ft-<slug(name)>` (lowercase,
+     accents stripped, non-alphanumerics → hyphens).
+   - **Sem feature**: `id` = `ft-<slug(intent)>`, `name` = the intent. This is
+     a legitimate orphan — an explicit human choice, not a failure.
+4. Write the block into `session.yml` (same write as the contract or a
+   follow-up edit — the deployed verify-observed-feature hook validates the
+   shape and corrects YOU, the agent, if malformed):
+
+```yaml
+feature:
+  key: PAY-1234              # only when an issue-key was given
+  name: "Export de fatura"
+  id: PAY-1234               # == key when present; ft-<slug(name)> otherwise
+  jira_snapshot:             # only when key + Jira MCP available
+    status: "In Progress"
+    fetched_at: <now, UTC ISO-8601>
+    url: "https://<site>/browse/PAY-1234"
+```
+
+This is instrumentation (like preferring AskUserQuestion in step 2), NOT an
+implementation opinion — the stone rule stands: zero opinions about HOW the
+work is done.
+
 ### 2. Work (not this Skill's business)
 No steps here, on purpose. One instrumentation preference (not an opinion on
 the work): when you need a blocking decision from the human, prefer the

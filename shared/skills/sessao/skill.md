@@ -45,6 +45,48 @@ base_sha: <git rev-parse HEAD>   # âncora de diff; se não for repo git, omitir
 Avise que o contrato está aberto e o que passa a ser capturado automaticamente (custo,
 tempo, status de atenção), e siga com o que a pessoa pediu.
 
+### 1.5 Feature (agrupamento — pergunta única na abertura)
+
+Toda sessão observada pertence a uma feature (um card do Jira ou um pedido avulso da
+pessoa). Pergunte UMA VEZ, logo após abrir o contrato — nunca no meio do trabalho, e
+nunca de novo ao retomar (se o `session.yml` já tem um bloco `feature:`, leia-o e siga
+em frente).
+
+1. Escaneie os `session.yml` irmãos em `.agent-session/*/` procurando blocos `feature:`
+   já existentes; junte as ~5 features mais recentemente ativas (dedup por `id`).
+2. Pergunte via `AskUserQuestion` (widget autossuficiente — preferência de
+   instrumentação, igual à do passo 2): opções = cada feature recente como
+   "<id> · <name>" (rótulo "continuar"), mais "Nova feature" e
+   "Sem feature por ora".
+3. Resolva o bloco:
+   - **Continuar**: copie `id`/`key`/`name` literalmente do bloco escolhido (divergência
+     de string é impossível por construção).
+   - **Nova** com issue-key (`^[A-Z][A-Z0-9]*-\d+$`): `key` = a key em maiúsculas,
+     `id` = igual à key. Se houver uma ferramenta de Jira (MCP) disponível, busque o
+     card e defina `name` = título real, mais um snapshot; se não houver, `name` = a
+     própria key (a próxima sessão enriquece).
+   - **Nova** com nome livre: sem `key`; `id` = `ft-<slug(name)>` (minúsculo, sem
+     acentos, não-alfanuméricos → hífen).
+   - **Sem feature**: `id` = `ft-<slug(intenção)>`, `name` = a intenção. Isso é um
+     órfão legítimo — escolha explícita da pessoa, não uma falha.
+4. Grave o bloco no `session.yml` (na mesma escrita do contrato ou numa edição
+   seguinte — o hook `verify-observed-feature`, já implantado, valida o formato e
+   corrige VOCÊ, o agente, se estiver malformado):
+
+```yaml
+feature:
+  key: PAY-1234              # só quando uma issue-key foi informada
+  name: "Export de fatura"
+  id: PAY-1234               # == key quando presente; ft-<slug(name)> caso contrário
+  jira_snapshot:             # só quando há key + Jira MCP disponível
+    status: "In Progress"
+    fetched_at: <agora, UTC ISO-8601>
+    url: "https://<site>/browse/PAY-1234"
+```
+
+Isso é instrumentação (como preferir `AskUserQuestion` no passo 2), NÃO uma opinião de
+implementação — a stone rule permanece: zero opiniões sobre COMO o trabalho é feito.
+
 ### 2. Trabalhar (não é assunto desta Skill)
 Sem passos aqui, de propósito. Uma única preferência de instrumentação (não uma opinião
 sobre o trabalho): quando precisar de uma decisão bloqueante da pessoa, prefira a
