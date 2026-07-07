@@ -33,6 +33,20 @@ describe("SpecTable", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
   });
 
+  it("coluna Feature mostra '—' quando não há mapeamento de feature para a sessão", () => {
+    render(<SpecTable items={items} onSelect={vi.fn()} />);
+    expect(screen.getByText("feature")).toBeInTheDocument(); // header da coluna existe
+    const row = screen.getByText("FEAT-1").closest("tr")!;
+    expect(within(row).getByText("—")).toBeInTheDocument();
+  });
+
+  it("coluna Feature mostra o nome resolvido via featureNameBySession", () => {
+    const featureNameBySession = new Map([[`${items[0].projectId}/${items[0].spec.id}`, "Export de fatura"]]);
+    render(<SpecTable items={items} onSelect={vi.fn()} featureNameBySession={featureNameBySession} />);
+    const row = screen.getByText("FEAT-1").closest("tr")!;
+    expect(within(row).getByText("Export de fatura")).toBeInTheDocument();
+  });
+
   it("clicar numa linha chama onSelect", async () => {
     const onSelect = vi.fn();
     render(<SpecTable items={items} onSelect={onSelect} />);

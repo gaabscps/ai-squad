@@ -124,6 +124,24 @@ a:hover { text-decoration: underline; }
 .kcard-meta { display: flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
 .kcard-time { margin-left: auto; }
 
+/* ---- FeatureCard (card de feature no kanban agrupado) ---- */
+.fcard { background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--text-mute); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); transition: box-shadow 0.12s, border-color 0.12s; }
+.fcard:hover { box-shadow: var(--shadow-lift); border-color: var(--border); }
+.fcard-attention { border-left-color: var(--blocked); }
+.fcard-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; border: 0; background: transparent; padding: 0; margin: 0 0 8px; cursor: pointer; text-align: left; font: inherit; }
+.fcard-name { font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text); }
+.fcard-key { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
+.fcard-tag { font-size: 10px; color: var(--text-dim); background: var(--surface-soft); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.fcard-jira { font-size: 10px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 1px 8px; }
+.fcard-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
+.fcard-attention-count { color: var(--blocked); font-weight: 600; }
+.fcard-hint { color: var(--paused); }
+.fcard-sessions { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 6px; }
+.fcard-session { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 6px 8px; border-radius: 8px; cursor: pointer; text-align: left; font: inherit; }
+.fcard-session:hover { background: var(--surface-soft); }
+.fcard-session-id { font-family: var(--mono); font-size: 10px; color: var(--text-mute); }
+.fcard-session-title { font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---- Tabela ---- */
 .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .spec-table th { text-align: left; background: var(--surface-soft); border-bottom: 1px solid var(--border); }

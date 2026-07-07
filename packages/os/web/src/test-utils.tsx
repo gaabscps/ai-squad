@@ -1,4 +1,4 @@
-import type { Project, Spec, Task, CostRollup, Dispatch, DeliveryReport, ObservedMeta } from "../../src/store/types";
+import type { Project, Spec, Task, CostRollup, Dispatch, DeliveryReport, ObservedMeta, Feature, FeatureCost } from "../../src/store/types";
 
 export function makeDispatch(over: Partial<Dispatch> = {}): Dispatch {
   return {
@@ -76,6 +76,40 @@ export function makeSpec(over: Partial<Spec> = {}): Spec {
 
 export function makeProject(over: Partial<Project> = {}): Project {
   return { id: "proj-abc", path: "/x/proj", name: "proj", specs: [], features: [], hidden: false, ...over };
+}
+
+export function makeFeatureCost(over: Partial<FeatureCost> = {}): FeatureCost {
+  return {
+    totalCostUsd: 0.5,
+    totalTokens: 1350,
+    tokens: { input: 100, output: 50, cacheRead: 1000, cacheCreation: 200 },
+    incomplete: false,
+    ...over,
+  };
+}
+
+/**
+ * Feature de teste; por padrão referencia uma única sessão "FEAT-001" (o id
+ * default de makeSpec) pra facilitar o join nos testes de Board/KanbanBoard.
+ */
+export function makeFeature(over: Partial<Feature> = {}): Feature {
+  return {
+    id: "ft-1",
+    key: null,
+    name: "Feature exemplo",
+    orphan: false,
+    projectId: "proj-abc",
+    sessionIds: ["FEAT-001"],
+    status: "running",
+    doneSource: null,
+    attention: { count: 0, items: [] },
+    delivery: { sessionsClosed: 0, sessionsTotal: 1, deliverables: [] },
+    cost: makeFeatureCost(),
+    time: { firstOpenedAt: null, lastClosedAt: null, spanMs: null, engagedMs: null },
+    lastActivityAt: null,
+    jira: null,
+    ...over,
+  };
 }
 
 /** Metadados mínimos de uma sessão observada (campo Spec.observed). */

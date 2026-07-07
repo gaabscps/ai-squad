@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useProjects } from "../state/projects";
 import { flattenSpecs, matchesQuery, isArchived, isDormant, type SpecWithProject } from "../lib/kanbanObserved";
+import { flattenFeatures, featureMatchesQuery, type FeatureWithProject } from "../lib/kanbanFeatures";
 import { TopBar, type ViewMode } from "./TopBar";
 import { ProjectFilter } from "./ProjectFilter";
 import { KanbanBoard } from "./KanbanBoard";
@@ -62,6 +63,30 @@ export function Board({
       ? all.find((sp) => sp.projectId === activeSelected.projectId && sp.spec.id === activeSelected.specId) ?? null
       : null;
 
+  // Pipeline exclusivo da view kanban: agrupa por FEATURE (não por sessão). Uma
+  // feature some quando nenhuma sessão-membro sobrevive aos filtros de
+  // archive/dormência — mesmo critério de "shown", aplicado por dentro do map.
+  const featureItems: FeatureWithProject[] = flattenFeatures(projects, showHidden)
+    .filter((fi) => filter === null || fi.projectId === filter)
+    .filter((fi) => featureMatchesQuery(fi, query))
+    .map((fi) => ({
+      ...fi,
+      sessions: fi.sessions.filter((sp) =>
+        !isArchived(sp.spec, now, archiveAfterDays) && !isDormant(sp.spec, now)),
+    }))
+    .filter((fi) => fi.sessions.length > 0);
+
+  // Join sessão → nome da feature pra coluna "Feature" da tabela (chave estável
+  // projectId/specId). Features órfãs ficam de fora: o nome delas é o título da
+  // própria sessão, e a célula mostra "—" pra sessão sem feature declarada.
+  const featureNameBySession = new Map<string, string>();
+  for (const fi of flattenFeatures(projects, showHidden)) {
+    if (fi.feature.orphan) continue;
+    for (const sp of fi.sessions) {
+      featureNameBySession.set(`${sp.projectId}/${sp.spec.id}`, fi.feature.name);
+    }
+  }
+
   const handleHide = (id: string, hidden: boolean) => {
     if (hidden && filter === id) setFilter(null);
     onHide(id, hidden);
@@ -105,11 +130,11 @@ export function Board({
       />
       <main className="board-body">
         {view === "kanban" ? (
-          <KanbanBoard items={shown} onSelect={handleSelect} />
+          <KanbanBoard items={featureItems} onSelectSession={handleSelect} />
         ) : view === "archived" && shown.length === 0 ? (
           <p className="empty-archived">Nenhuma feature arquivada ou dormente.</p>
         ) : (
-          <SpecTable items={shown} onSelect={handleSelect} />
+          <SpecTable items={shown} onSelect={handleSelect} featureNameBySession={featureNameBySession} />
         )}
       </main>
       <DetailDrawer item={selectedItem} onClose={handleClose} />

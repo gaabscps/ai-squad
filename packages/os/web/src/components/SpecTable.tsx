@@ -28,9 +28,11 @@ function valueFor(item: SpecWithProject, key: SortKey): string | number {
 export function SpecTable({
   items,
   onSelect,
+  featureNameBySession,
 }: {
   items: SpecWithProject[];
   onSelect: (item: SpecWithProject) => void;
+  featureNameBySession?: Map<string, string>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("activity");
   const [asc, setAsc] = useState(false);
@@ -73,6 +75,7 @@ export function SpecTable({
               </button>
             </th>
           ))}
+          <th>feature</th>
           <th>título</th>
         </tr>
       </thead>
@@ -112,6 +115,9 @@ export function SpecTable({
               )}
             </td>
             <td>{fmtRelativeTime(it.spec.lastActivityAt)}</td>
+            <td className="feature-cell">
+              {featureNameBySession?.get(`${it.projectId}/${it.spec.id}`) ?? "—"}
+            </td>
             <td>
               {it.spec.title}
               <SpecJobIndicator projectId={it.projectId} specId={it.spec.id} />
