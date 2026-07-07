@@ -35,4 +35,28 @@ describe("OverviewPage — daily + janela + tabela", () => {
     fireEvent.click(screen.getByText("Export de fatura"));
     expect(feature).toHaveBeenCalled();
   });
+
+  it("botão copiar da daily escreve no clipboard e mostra 'copiado' no sucesso", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const dailyLine = "Na janela: entregou 1 feature (Export).";
+    render(<OverviewPage data={make()} window="7d" onWindow={() => {}} onDrill={{ attentionSession: () => {}, feature: () => {}, toTable: () => {} }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /copiar/i }));
+    expect(writeText).toHaveBeenCalledWith(dailyLine);
+    expect(await screen.findByRole("button", { name: /copiado/i })).toBeTruthy();
+  });
+
+  it("botão copiar da daily não mostra 'copiado' se writeText rejeita", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("clipboard denied"));
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<OverviewPage data={make()} window="7d" onWindow={() => {}} onDrill={{ attentionSession: () => {}, feature: () => {}, toTable: () => {} }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /copiar/i }));
+    // Small tick to allow promise rejection to settle
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Assert the success text is absent and button still shows "copiar"
+    expect(screen.queryByRole("button", { name: /copiado/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /copiar/i })).toBeTruthy();
+  });
 });
