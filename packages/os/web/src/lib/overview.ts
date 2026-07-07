@@ -153,7 +153,7 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
     const names = deliveredRows.slice(0, 2).map((r) => r.name).join(", ");
     parts.push(`entregou ${deliveredRows.length} feature${deliveredRows.length > 1 ? "s" : ""} (${names})`);
   }
-  if (closedInWin.length) parts.push(`fechou ${closedInWin.length} sessõe${closedInWin.length > 1 ? "s" : ""}${projectsClosed.length ? " em " + projectsClosed.slice(0, 2).join(", ") : ""}`);
+  if (closedInWin.length) parts.push(`fechou ${closedInWin.length} ${closedInWin.length > 1 ? "sessões" : "sessão"}${projectsClosed.length ? " em " + projectsClosed.slice(0, 2).join(", ") : ""}`);
   if (spendTotal !== null) parts.push(`gastou ${fmtUsd(spendTotal)}`);
   let dailyLine: string;
   const attnCount = attnItems.length;
@@ -161,7 +161,7 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
     dailyLine = "Nada fechou nem travou nesta janela.";
   } else {
     const head = parts.length ? `Na janela: ${parts.join(", ")}.` : "";
-    const tail = attnCount ? `Agora ${attnCount} sessã${attnCount > 1 ? "es" : "o"} esperam você.` : "";
+    const tail = attnCount ? `Agora ${attnCount} ${attnCount > 1 ? "sessões esperam" : "sessão espera"} você.` : "";
     dailyLine = [head, tail].filter(Boolean).join(" ");
   }
 
