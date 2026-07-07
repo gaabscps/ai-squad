@@ -62,3 +62,51 @@ def test_arquivo_fora_de_agent_session_ignora(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
     assert vof.main() == 0
     assert capsys.readouterr().out.strip() == ""
+
+
+def test_bloco_indentado_4_espacos_passa(tmp_path, monkeypatch, capsys):
+    rc, out = _run(
+        tmp_path,
+        BASE + 'feature:\n    id: PAY-1\n    key: PAY-1\n    name: "Export"\n',
+        monkeypatch, capsys,
+    )
+    assert rc == 0
+    assert out is None
+
+
+def test_bloco_indentado_tab_passa(tmp_path, monkeypatch, capsys):
+    rc, out = _run(
+        tmp_path,
+        BASE + 'feature:\n\tid: PAY-1\n\tkey: PAY-1\n\tname: "Export"\n',
+        monkeypatch, capsys,
+    )
+    assert rc == 0
+    assert out is None
+
+
+def test_bloco_com_sub_bloco_jira_snapshot_passa(tmp_path, monkeypatch, capsys):
+    yaml_text = (
+        BASE
+        + 'feature:\n'
+        + '    id: PAY-1\n'
+        + '    key: PAY-1\n'
+        + '    name: "Export"\n'
+        + '    jira_snapshot:\n'
+        + '      status: Done\n'
+        + '      summary: "x"\n'
+    )
+    rc, out = _run(tmp_path, yaml_text, monkeypatch, capsys)
+    assert rc == 0
+    assert out is None
+
+
+def test_valor_com_aspas_preserva_hash(tmp_path, monkeypatch, capsys):
+    rc, out = _run(
+        tmp_path,
+        BASE + 'feature:\n  id: PAY-1\n  name: "Fix #123"\n',
+        monkeypatch, capsys,
+    )
+    assert rc == 0
+    assert out is None
+    fb = vof._feature_block(BASE + 'feature:\n  id: PAY-1\n  name: "Fix #123"\n')
+    assert fb["name"] == "Fix #123"

@@ -31,13 +31,36 @@ _REASON = (
 )
 
 
-def _feature_block(text: str):
-    """Extrai os escalares diretos (indent 2) do bloco top-level `feature:`.
+def _parse_value(raw: str) -> str:
+    """Extrai o valor de um `key: value`, preservando `#` dentro de aspas.
 
-    Retorna dict ({} se o bloco existe mas está vazio) ou None se ausente.
-    Parser mínimo de indentação — stdlib, sem PyYAML (regra dos hooks).
+    Se o valor começa com aspas (simples ou duplas), usa o conteúdo até a
+    aspa de fechamento correspondente (comentários depois dela são
+    ignorados). Caso contrário, corta um comentário ` #...` à direita.
+    """
+    raw = raw.strip()
+    if raw[:1] in ("\"", "'"):
+        quote = raw[0]
+        end = raw.find(quote, 1)
+        if end != -1:
+            return raw[1:end]
+        return raw[1:]  # aspa sem fechamento: melhor esforço
+    return re.sub(r"\s+#.*$", "", raw).strip()
+
+
+def _feature_block(text: str):
+    """Extrai os escalares diretos do bloco top-level `feature:`.
+
+    O indent dos filhos diretos é detectado pela PRIMEIRA linha filha (2
+    espaços, 4 espaços, tab — qualquer largura), e comparado literalmente
+    (não por contagem de colunas) para tolerar tabs. Linhas mais indentadas
+    que esse prefixo (ex.: filhos de `jira_snapshot:`) são sub-blocos e
+    ficam de fora. Retorna dict ({} se o bloco existe mas está vazio) ou
+    None se ausente. Parser mínimo de indentação — stdlib, sem PyYAML
+    (regra dos hooks).
     """
     out, inside = {}, False
+    child_prefix = None
     for ln in text.splitlines():
         if not inside:
             if re.match(r"^feature:\s*(#.*)?$", ln):
@@ -45,11 +68,19 @@ def _feature_block(text: str):
             continue
         if ln.strip() == "":
             continue
-        if not ln.startswith(" "):
+        if not re.match(r"^[ \t]", ln):
             break  # voltou pro nível 0: bloco acabou
-        m = re.match(r"^  ([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*(#.*)?$", ln)
+        if child_prefix is None:
+            m0 = re.match(r"^([ \t]+)", ln)
+            child_prefix = m0.group(1)
+        if not ln.startswith(child_prefix):
+            continue  # indent menor que o dos filhos diretos, mas não nível 0 — ignora
+        rest = ln[len(child_prefix):]
+        if rest[:1] in (" ", "\t"):
+            continue  # mais indentado que os filhos diretos: sub-bloco (ex.: jira_snapshot)
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", rest)
         if m:
-            out[m.group(1)] = m.group(2).strip().strip('"').strip("'")
+            out[m.group(1)] = _parse_value(m.group(2))
     return out if inside else None
 
 
