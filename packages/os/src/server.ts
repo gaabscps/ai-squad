@@ -4,7 +4,7 @@ import { loadConfig, saveHidden, saveConfigFields, type AiosConfig } from "./con
 import { Store } from "./store/store.js";
 import { watchProjects } from "./collector/watcher.js";
 import { resolveAddablePath } from "./collector/browse.js";
-import { createServer } from "./ui/app.js";
+import { createServer, type FeatureAction } from "./ui/app.js";
 
 const CONFIG_PATH = join(process.cwd(), "aios.config.json");
 const config: AiosConfig = loadConfig(CONFIG_PATH);
@@ -82,7 +82,24 @@ async function removeInclude(path: string): Promise<{ persisted: boolean }> {
   return result;
 }
 
-const server = createServer(store, toggleHide, config.archiveAfterDays, () => config.include ?? [], addInclude, removeInclude);
+// Aplica uma correção manual da camada de feature: muta o overlay em memória,
+// persiste no aios.config.json e reconstrói o snapshot (padrão do toggleHide).
+function applyFeatureAction(msg: FeatureAction): void {
+  const overlay = (config.features ??= {});
+  if (msg.type === "feature:assign") {
+    (overlay.assign ??= {})[`${msg.projectId}/${msg.sessionId}`] = msg.featureId;
+  } else if (msg.type === "feature:markDone") {
+    (overlay.done ??= {})[`${msg.projectId}/${msg.featureId}`] = msg.done;
+  } else {
+    (overlay.names ??= {})[`${msg.projectId}/${msg.featureId}`] = msg.name;
+  }
+  void saveConfigFields({ features: config.features }, CONFIG_PATH).then((r) => {
+    if (!r.persisted) console.warn(`[aiOS] feature action aplicada em memória mas não persistida em ${CONFIG_PATH}`);
+  });
+  store.rebuild();
+}
+
+const server = createServer(store, toggleHide, config.archiveAfterDays, () => config.include ?? [], addInclude, removeInclude, applyFeatureAction);
 // As roots são lidas só aqui, na inicialização: mudá-las em aios.config.json exige reiniciar
 // o servidor (o hide, ao contrário, é relido a cada rebuild via a função passada ao Store).
 

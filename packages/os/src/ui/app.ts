@@ -21,6 +21,13 @@ function isInside(root: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
+// Ação de correção manual da camada de feature (o C do design); validada na forma aqui,
+// aplicada no server.ts (overlay + rebuild).
+export type FeatureAction =
+  | { type: "feature:assign"; projectId: string; sessionId: string; featureId: string | null }
+  | { type: "feature:markDone"; projectId: string; featureId: string; done: boolean }
+  | { type: "feature:rename"; projectId: string; featureId: string; name: string };
+
 /** Devolve o http.Server SEM dar listen — separa criação de binding de porta. */
 export function createServer(
   store: Store,
@@ -31,6 +38,7 @@ export function createServer(
     Promise.resolve({ persisted: false, alreadyExisted: false }),
   removeInclude: (path: string) => Promise<{ persisted: boolean }> = () =>
     Promise.resolve({ persisted: false }),
+  onFeatureAction: (msg: FeatureAction) => void = () => {},
 ): Server {
   const app = express();
   app.use(express.json());
@@ -132,7 +140,18 @@ export function createServer(
     const onNarrative = makeNarrativeHandler(store);
     const onProduct = makeProductHandler(store);
     socket.on("message", (raw) => {
-      let msg: { type?: string; id?: string; specId?: string; taskId?: string; force?: boolean };
+      let msg: {
+        type?: string;
+        id?: string;
+        specId?: string;
+        taskId?: string;
+        force?: boolean;
+        projectId?: string;
+        featureId?: string | null;
+        sessionId?: string;
+        done?: boolean;
+        name?: string;
+      };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
@@ -174,6 +193,17 @@ export function createServer(
         onProduct(msg as never, (data) => {
           if (socket.readyState === WebSocket.OPEN) socket.send(data);
         });
+        return;
+      }
+      if (msg.type === "feature:assign" || msg.type === "feature:markDone" || msg.type === "feature:rename") {
+        const m = msg as Record<string, unknown>;
+        const okAssign = msg.type === "feature:assign" && typeof m.projectId === "string" &&
+          typeof m.sessionId === "string" && (typeof m.featureId === "string" || m.featureId === null);
+        const okDone = msg.type === "feature:markDone" && typeof m.projectId === "string" &&
+          typeof m.featureId === "string" && typeof m.done === "boolean";
+        const okRename = msg.type === "feature:rename" && typeof m.projectId === "string" &&
+          typeof m.featureId === "string" && typeof m.name === "string" && m.name !== "";
+        if (okAssign || okDone || okRename) onFeatureAction(msg as FeatureAction);
         return;
       }
       if (typeof msg.id !== "string") return;
