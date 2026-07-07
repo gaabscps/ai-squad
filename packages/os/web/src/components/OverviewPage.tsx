@@ -241,12 +241,12 @@ export function OverviewPage({ data, window, onWindow, onDrill }: {
         ))}
       </div>
 
+      <DailyBand dailyLine={data.dailyLine} />
+
       <div className="ov-grid ov-grid-primary">
         <AttentionCard attention={data.attention} onDrill={onDrill} />
         <DeliveryCard delivery={data.delivery} />
       </div>
-
-      <DailyBand dailyLine={data.dailyLine} />
 
       <div className="ov-grid ov-grid-secondary">
         <EfficiencyCard efficiency={data.efficiency} onDrill={onDrill} />

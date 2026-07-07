@@ -37,7 +37,7 @@ export function Board({
 }) {
   const { projects, connected, archiveAfterDays } = useProjects();
   const [view, setView] = useState<ViewMode>("overview");
-  const [window, setWindow] = useState<WindowKey>("7d");
+  const [timeWindow, setTimeWindow] = useState<WindowKey>("7d");
   const [filter, setFilter] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showHidden, setShowHidden] = useState(false);
@@ -165,9 +165,9 @@ export function Board({
       <main className="board-body">
         {view === "overview" ? (
           <OverviewPage
-            data={computeOverview(projects, WINDOWS[window], Date.now())}
-            window={window}
-            onWindow={setWindow}
+            data={computeOverview(projects, WINDOWS[timeWindow], Date.now())}
+            window={timeWindow}
+            onWindow={setTimeWindow}
             onDrill={drill}
           />
         ) : view === "kanban" ? (
