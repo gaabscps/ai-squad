@@ -176,7 +176,48 @@ export interface Project {
   path: string;
   name: string;
   specs: Spec[];
+  features: Feature[];
   hidden: boolean;
+}
+
+// ── Camada de feature (agrupador derivado; ver design 2026-07-06) ────────────
+
+export type FeatureStatus = "needs_attention" | "running" | "idle" | "done";
+
+export interface FeatureAttentionItem {
+  sessionId: string;
+  kind: string;              // attentionKind da sessão (fallback "input") ou status attention-like
+  blockedForMs: number | null; // now - lastActivityAt; null sem lastActivityAt
+}
+
+// Subset honesto de custo agregável entre sessões (byPhase/reportPath não somam).
+export interface FeatureCost {
+  totalCostUsd: number | null;  // soma dos não-nulos; null se nenhum membro tem $
+  totalTokens: number;
+  tokens: { input: number; output: number; cacheRead: number; cacheCreation: number };
+  incomplete: boolean;          // algum membro com source partial/empty/unreliable ou partial=true
+}
+
+export interface Feature {
+  id: string;
+  key: string | null;
+  name: string;                 // canônico: overlay.names > jira.title(snapshot) > name declarado
+  orphan: boolean;              // sessão sem bloco feature (agrupada como feature-de-uma)
+  projectId: string;
+  sessionIds: string[];         // ordenadas por createdAt asc; front faz o join com Project.specs
+  status: FeatureStatus;        // atenção vence; done nunca derivado das sessões
+  doneSource: "jira" | "manual" | null;
+  attention: { count: number; items: FeatureAttentionItem[] };
+  delivery: { sessionsClosed: number; sessionsTotal: number; deliverables: string[] };
+  cost: FeatureCost;
+  time: {
+    firstOpenedAt: string | null;
+    lastClosedAt: string | null;
+    spanMs: number | null;      // 1ª abertura → último fechamento (ou now se alguma aberta)
+    engagedMs: number | null;   // soma das durações por sessão (aberta conta até now)
+  };
+  lastActivityAt: string | null;
+  jira: { status: string | null; title: string | null; url: string | null } | null; // snapshot mais novo
 }
 
 // ── Delivery-report (parecer de entrega do ai-squad) ───────────────────────

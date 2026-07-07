@@ -75,7 +75,7 @@ export function makeSpec(over: Partial<Spec> = {}): Spec {
 }
 
 export function makeProject(over: Partial<Project> = {}): Project {
-  return { id: "proj-abc", path: "/x/proj", name: "proj", specs: [], hidden: false, ...over };
+  return { id: "proj-abc", path: "/x/proj", name: "proj", specs: [], features: [], hidden: false, ...over };
 }
 
 /** Metadados mínimos de uma sessão observada (campo Spec.observed). */

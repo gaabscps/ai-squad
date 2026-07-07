@@ -58,6 +58,7 @@ function toProject(projectPath: string, hide: Set<string>): Project {
     path: projectPath,
     name,
     specs: loadSpecs(projectPath),
+    features: [], // camada de feature ainda não fiada aqui (Task 5)
     hidden: hide.has(name) || hide.has(projectPath),
   };
 }

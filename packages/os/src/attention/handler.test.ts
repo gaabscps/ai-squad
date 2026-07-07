@@ -17,12 +17,12 @@ function fakeProc() {
 }
 
 function makeStore(spec: Spec, projectPath = "/proj/login") {
-  const project: Project = { id: "proj-abc", path: projectPath, name: "login", specs: [spec], hidden: false };
+  const project: Project = { id: "proj-abc", path: projectPath, name: "login", specs: [spec], features: [], hidden: false };
   return { getSnapshot: () => [project] } as any;
 }
 
 function makeMultiSpecStore(specs: Spec[], projectPath = "/proj/login") {
-  const project: Project = { id: "proj-abc", path: projectPath, name: "login", specs, hidden: false };
+  const project: Project = { id: "proj-abc", path: projectPath, name: "login", specs, features: [], hidden: false };
   return { getSnapshot: () => [project] } as any;
 }
 
