@@ -6,6 +6,8 @@
 import type { Project, Spec, FeatureStatus } from "../../../src/store/types";
 import { flattenSpecs } from "./kanban";
 import { attentionReason } from "./kanbanObserved";
+import { flattenFeatures } from "./kanbanFeatures";
+import { fmtUsd } from "../format";
 
 export type WindowKey = "today" | "7d" | "30d";
 export interface OverviewWindow { key: WindowKey; ms: number; label: string; }
@@ -120,18 +122,61 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
 
   const efficiency = { avgCostPerSession: avg, sessionsWithCost: costs.length, trendPct, p50: percentile(costs, 50), p95: percentile(costs, 95), spark };
 
+  // featureRows — features com ≥1 sessão-membro na janela; mais recentes primeiro.
+  const winSessionIds = new Set(win.map((sp) => sp.spec.id));
+  const featureRows: FeatureRow[] = flattenFeatures(projects as Project[], false)
+    .filter((fi) => fi.feature.sessionIds.some((id) => winSessionIds.has(id)))
+    .map((fi) => ({
+      projectId: fi.projectId, featureId: fi.feature.id, name: fi.feature.name, projectName: fi.projectName,
+      key: fi.feature.key, orphan: fi.feature.orphan, status: fi.feature.status, doneSource: fi.feature.doneSource,
+      sessionsClosed: fi.feature.delivery.sessionsClosed, sessionsTotal: fi.feature.delivery.sessionsTotal,
+      costUsd: fi.feature.cost.totalCostUsd, costIncomplete: fi.feature.cost.incomplete,
+      lastActivityAt: fi.feature.lastActivityAt,
+    }))
+    .sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+
+  // delivery.items — features entregues (done) ou em andamento (idle/running) na janela.
+  const deliveredRows = featureRows.filter((r) => r.status === "done");
+  const deliveryItems: DeliveryItem[] = featureRows
+    .filter((r) => r.status === "done" || r.status === "idle" || r.status === "running")
+    .map((r) => ({
+      featureId: r.featureId, name: r.name, projectName: r.projectName, status: r.status,
+      sessionsClosed: r.sessionsClosed, sessionsTotal: r.sessionsTotal, costUsd: r.costUsd,
+      costIncomplete: r.costIncomplete, lastActivityAt: r.lastActivityAt,
+    }));
+
+  // dailyLine — template determinístico (sem LLM): cada trecho some quando a contagem é 0;
+  // sem nada pra contar e sem atenção pendente → frase honesta de "nada aconteceu".
+  const projectsClosed = [...new Set(closedInWin.map((sp) => sp.projectName))];
+  const parts: string[] = [];
+  if (deliveredRows.length) {
+    const names = deliveredRows.slice(0, 2).map((r) => r.name).join(", ");
+    parts.push(`entregou ${deliveredRows.length} feature${deliveredRows.length > 1 ? "s" : ""} (${names})`);
+  }
+  if (closedInWin.length) parts.push(`fechou ${closedInWin.length} sessõe${closedInWin.length > 1 ? "s" : ""}${projectsClosed.length ? " em " + projectsClosed.slice(0, 2).join(", ") : ""}`);
+  if (spendTotal !== null) parts.push(`gastou ${fmtUsd(spendTotal)}`);
+  let dailyLine: string;
+  const attnCount = attnItems.length;
+  if (parts.length === 0 && attnCount === 0) {
+    dailyLine = "Nada fechou nem travou nesta janela.";
+  } else {
+    const head = parts.length ? `Na janela: ${parts.join(", ")}.` : "";
+    const tail = attnCount ? `Agora ${attnCount} sessã${attnCount > 1 ? "es" : "o"} esperam você.` : "";
+    dailyLine = [head, tail].filter(Boolean).join(" ");
+  }
+
   return {
     window: window.key,
     attention: { count: attnItems.length, items: attnItems },
     delivery: {
-      featuresDelivered: 0, // preenchido na Task 3
+      featuresDelivered: deliveredRows.length,
       sessionsClosed: closedInWin.length,
       featuresTouched: touchedFeatureIds.size,
-      items: [], // preenchido na Task 3
+      items: deliveryItems,
     },
     efficiency,
     spend: { totalUsd: spendTotal, incomplete: spendIncomplete, byProject, activeProjects: byProjectMap.size },
-    dailyLine: "", // preenchido na Task 3
-    featureRows: [], // preenchido na Task 3
+    dailyLine,
+    featureRows,
   };
 }

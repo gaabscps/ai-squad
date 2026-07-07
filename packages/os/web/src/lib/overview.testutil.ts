@@ -1,4 +1,5 @@
 import type { Project, Spec } from "../../../src/store/types";
+import { buildFeatures } from "../../../src/collector/features";
 
 export function spec(over: Partial<Spec> & {
   id?: string; createdAt?: string; closedAt?: string | null;
@@ -30,6 +31,8 @@ export function spec(over: Partial<Spec> & {
 }
 
 export function project(name: string, specs: Spec[]): Project {
-  // features não são lidas por computeOverview nesta task (usa flattenSpecs); [] basta
-  return { id: `${name}-hash`, path: `/${name}`, name, specs, hidden: false, features: [] };
+  // features derivadas pelo mesmo builder de produção (buildFeatures), pra featureRows
+  // testar contra a semântica real: status "done" nunca vem do status da sessão.
+  const id = `${name}-hash`;
+  return { id, path: `/${name}`, name, specs, hidden: false, features: buildFeatures(id, specs, undefined, Date.now()) };
 }
