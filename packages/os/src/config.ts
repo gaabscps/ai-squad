@@ -1,15 +1,17 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { FeaturesOverlay } from "./collector/features.js";
 
 export interface AiosConfig {
   roots: string[]; // pastas-raiz pra auto-scan
   include?: string[]; // paths avulsos de projeto, fora das roots
   hide: string[]; // names ou paths de projeto a ocultar (persistido)
   archiveAfterDays: number; // dias após concluir até a feature done sair do board
+  features?: FeaturesOverlay; // overlay de correção manual da camada de feature (dono: OS)
 }
 
-const DEFAULTS: AiosConfig = { roots: [], include: [], hide: [], archiveAfterDays: 7 };
+const DEFAULTS: AiosConfig = { roots: [], include: [], hide: [], archiveAfterDays: 7, features: {} };
 
 /**
  * Lê o config atual, faz merge dos campos fornecidos e persiste.
@@ -60,6 +62,7 @@ export function loadConfig(configPath: string): AiosConfig {
     include: (raw.include ?? []).map(expandTilde),
     hide: raw.hide ?? [],
     archiveAfterDays: raw.archiveAfterDays ?? 7,
+    features: raw.features ?? {},
   };
 }
 

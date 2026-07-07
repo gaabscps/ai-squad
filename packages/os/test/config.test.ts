@@ -22,7 +22,7 @@ describe("loadConfig", () => {
 
   it("devolve defaults vazios quando o arquivo não existe", () => {
     const c = loadConfig(join(tmpdir(), "nao-existe-aios-xyz.json"));
-    expect(c).toEqual({ roots: [], include: [], hide: [], archiveAfterDays: 7 });
+    expect(c).toEqual({ roots: [], include: [], hide: [], archiveAfterDays: 7, features: {} });
   });
 
   it("expande ~ nas roots (Node não faz isso sozinho)", () => {
