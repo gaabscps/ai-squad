@@ -1,5 +1,5 @@
 /**
- * Barra superior: marca + pílula de conexão + busca + toggle Kanban|Tabela|Arquivadas
+ * Barra superior: marca + pílula de conexão + busca + toggle Overview|Kanban|Tabela|Arquivadas
  * + botão Pastas. Sem estado próprio; recebe tudo via props/callbacks.
  */
 export type ViewMode = "overview" | "kanban" | "table" | "archived";
