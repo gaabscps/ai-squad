@@ -47,7 +47,7 @@ function SessionRow({
             defaultValue=""
             onChange={(e) => {
               const value = e.target.value;
-              const featureId = value === "" ? null : value;
+              const featureId = value === "__none__" ? null : value;
               onFeatureAction({ type: "feature:assign", projectId, sessionId: s.spec.id, featureId });
               setMoving(false);
             }}
@@ -56,7 +56,7 @@ function SessionRow({
             {targets.map((kf) => (
               <option key={kf.id} value={kf.id}>{kf.name}</option>
             ))}
-            <option value="">Sem feature</option>
+            <option value="__none__">Sem feature</option>
           </select>
         ) : (
           <button type="button" aria-label={`mover ${s.spec.id}`} onClick={() => setMoving(true)}>

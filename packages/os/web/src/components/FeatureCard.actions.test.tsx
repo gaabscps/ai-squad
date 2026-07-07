@@ -54,4 +54,16 @@ describe("ações de correção manual", () => {
       type: "feature:assign", projectId: "P", sessionId: "OBS-001", featureId: "AUTH-9",
     });
   });
+
+  it("escolher 'Sem feature' envia feature:assign com featureId: null", () => {
+    const onAction = vi.fn();
+    render(<FeatureCard item={base} onSelectSession={() => {}} onFeatureAction={onAction}
+      knownFeatures={[{ id: "AUTH-9", name: "Login" }]} />);
+    fireEvent.click(screen.getByText("Export de fatura")); // expande
+    fireEvent.click(screen.getByLabelText("mover OBS-001"));
+    fireEvent.change(screen.getByLabelText("nova feature de OBS-001"), { target: { value: "__none__" } });
+    expect(onAction).toHaveBeenCalledWith({
+      type: "feature:assign", projectId: "P", sessionId: "OBS-001", featureId: null,
+    });
+  });
 });
