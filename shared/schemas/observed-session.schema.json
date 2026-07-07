@@ -19,6 +19,27 @@
     },
     "output_locale": { "type": "string", "description": "BCP-47 tag; language of human-facing prose. Absent defaults to en." },
     "work_type": { "type": "string", "enum": ["dev", "product"], "description": "Persona/tipo de trabalho da sessão. Ausente ou 'dev' = caminho de desenvolvimento (resumo dev→tech lead). 'product' = sessão de produto/design (resumo decidido/em aberto/próximo passo, persona de produto). Aditivo e retrocompatível; ausência defaults a dev. Escrito pela skill /sessao; lido pelo collector observado e pelo módulo product/ do aiOS." },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "description": "Agrupador de sessões sob uma feature (card Jira ou request do usuário). Escrito pela skill /observe|/sessao na abertura (picker); validado na forma por verify-observed-feature.py. id é estável e nunca recomputado: com key, id == key; sem key, id = ft-<slug(name)>. Aditivo — sessões antigas sem o bloco são órfãs legítimas no aiOS.",
+      "properties": {
+        "id": { "type": "string", "description": "Id interno estável da feature. Com key, é a própria key normalizada (uppercase); sem key, ft-<slug(name)>." },
+        "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*-\\d+$", "description": "Issue-key do Jira; opcional. Presença dispara o snapshot de enriquecimento." },
+        "name": { "type": "string", "description": "Nome humano da feature; título real do Jira quando há key, texto livre quando não." },
+        "jira_snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Snapshot do Jira colhido pelo agente (MCP) na abertura da sessão; refrescado a cada nova sessão da feature. O aiOS usa o mais novo entre as sessões-membro. NÃO é espelho vivo (fase 2).",
+          "properties": {
+            "status": { "type": "string", "description": "Status textual do card no momento do snapshot." },
+            "fetched_at": { "type": "string", "description": "ISO 8601 UTC do snapshot." },
+            "url": { "type": "string", "description": "URL do card." }
+          }
+        }
+      }
+    },
     "created_at": { "type": "string", "description": "ISO 8601 UTC, real clock. Lower bound of the contract's cost window." },
     "base_sha": {
       "type": "string",
