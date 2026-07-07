@@ -58,7 +58,7 @@ function toProject(projectPath: string, hide: Set<string>): Project {
     path: projectPath,
     name,
     specs: loadSpecs(projectPath),
-    features: [], // camada de feature ainda não fiada aqui (Task 5)
+    features: [], // placeholder de tipo; o Store sobrescreve no rebuild (buildFeatures)
     hidden: hide.has(name) || hide.has(projectPath),
   };
 }
