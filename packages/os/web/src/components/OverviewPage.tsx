@@ -6,7 +6,8 @@ import { fmtUsd, fmtRelativeTime, fmtDate } from "../format";
 /** Callbacks de drill-down: cada número/linha clicável desce pro recorte que o compõe. */
 export interface OverviewDrill {
   attentionSession: (item: AttentionItem) => void;
-  feature: (row: FeatureRow) => void;
+  // aceita qualquer linha com projeto+nome (FeatureRow da tabela ou DeliveryItem do card Entrega)
+  feature: (f: { projectId: string; name: string }) => void;
   toTable: () => void;
 }
 
@@ -55,7 +56,7 @@ function AttentionCard({ attention, onDrill }: { attention: OverviewData["attent
 }
 
 /** Card "Entrega": placar features/sessões fechadas + lista de features tocadas na janela. */
-function DeliveryCard({ delivery }: { delivery: OverviewData["delivery"] }) {
+function DeliveryCard({ delivery, onDrill }: { delivery: OverviewData["delivery"]; onDrill: OverviewDrill }) {
   return (
     <div className="ov-card">
       <h2><span className="ov-dot ov-dot-done" />ENTREGA</h2>
@@ -67,13 +68,13 @@ function DeliveryCard({ delivery }: { delivery: OverviewData["delivery"] }) {
       <div className="ov-kpi-sub">de {delivery.featuresTouched} features tocadas na janela</div>
       <div className="ov-ship-list">
         {delivery.items.map((item) => (
-          <div key={item.featureId} className="ov-srow">
+          <button key={item.featureId} type="button" className="ov-srow" onClick={() => onDrill.feature(item)}>
             <span className="ov-srow-check">{item.status === "done" ? "✓" : "◔"}</span>
             <span className="ov-srow-name">{item.name}</span>
             <span className="ov-srow-meta">
               {item.sessionsClosed}/{item.sessionsTotal} {item.sessionsTotal === 1 ? "sessão" : "sessões"} · {fmtUsd(item.costUsd)}{item.costIncomplete && item.costUsd !== null ? " (parcial)" : ""}
             </span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -247,7 +248,7 @@ export function OverviewPage({ data, window: timeWindow, onWindow, onDrill }: {
 
       <div className="ov-grid ov-grid-primary">
         <AttentionCard attention={data.attention} onDrill={onDrill} />
-        <DeliveryCard delivery={data.delivery} />
+        <DeliveryCard delivery={data.delivery} onDrill={onDrill} />
       </div>
 
       <div className="ov-grid ov-grid-secondary">

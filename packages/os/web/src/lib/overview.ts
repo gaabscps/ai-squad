@@ -18,7 +18,7 @@ export const WINDOWS: Record<WindowKey, OverviewWindow> = {
 };
 
 export interface AttentionItem { projectId: string; projectName: string; sessionId: string; what: string; whyLabel: string; since: string | null; }
-export interface DeliveryItem { featureId: string; name: string; projectName: string; status: FeatureStatus; sessionsClosed: number; sessionsTotal: number; costUsd: number | null; costIncomplete: boolean; lastActivityAt: string | null; }
+export interface DeliveryItem { projectId: string; featureId: string; name: string; projectName: string; status: FeatureStatus; sessionsClosed: number; sessionsTotal: number; costUsd: number | null; costIncomplete: boolean; lastActivityAt: string | null; }
 export interface SpendByProject { projectName: string; costUsd: number; }
 export interface FeatureRow { projectId: string; featureId: string; name: string; projectName: string; key: string | null; orphan: boolean; status: FeatureStatus; doneSource: "jira" | "manual" | null; sessionsClosed: number; sessionsTotal: number; costUsd: number | null; costIncomplete: boolean; lastActivityAt: string | null; }
 export interface SparkPoint { at: string; costUsd: number; }
@@ -142,7 +142,7 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
   const deliveryItems: DeliveryItem[] = featureRows
     .filter((r) => r.status === "done" || r.status === "idle" || r.status === "running")
     .map((r) => ({
-      featureId: r.featureId, name: r.name, projectName: r.projectName, status: r.status,
+      projectId: r.projectId, featureId: r.featureId, name: r.name, projectName: r.projectName, status: r.status,
       sessionsClosed: r.sessionsClosed, sessionsTotal: r.sessionsTotal, costUsd: r.costUsd,
       costIncomplete: r.costIncomplete, lastActivityAt: r.lastActivityAt,
     }));
