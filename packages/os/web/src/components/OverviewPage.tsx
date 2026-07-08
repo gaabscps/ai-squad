@@ -55,7 +55,10 @@ function AttentionCard({ attention, onDrill }: { attention: OverviewData["attent
   );
 }
 
-/** Card "Entrega": placar features/sessões fechadas + lista de features tocadas na janela. */
+// O card Entrega é um RESUMO: mostra só as N mais recentes; a lista completa é a tabela do rodapé.
+const DELIVERY_PREVIEW = 4;
+
+/** Card "Entrega": placar features/sessões fechadas + resumo das features mais recentes na janela. */
 function DeliveryCard({ delivery, onDrill }: { delivery: OverviewData["delivery"]; onDrill: OverviewDrill }) {
   return (
     <div className="ov-card">
@@ -67,7 +70,8 @@ function DeliveryCard({ delivery, onDrill }: { delivery: OverviewData["delivery"
       </div>
       <div className="ov-kpi-sub">de {delivery.featuresTouched} features tocadas na janela</div>
       <div className="ov-ship-list">
-        {delivery.items.map((item) => (
+        {/* resumo: só as mais recentes; a lista completa vive na tabela do rodapé */}
+        {delivery.items.slice(0, DELIVERY_PREVIEW).map((item) => (
           <button key={item.featureId} type="button" className="ov-srow" onClick={() => onDrill.feature(item)}>
             <span className="ov-srow-check">{item.status === "done" ? "✓" : "◔"}</span>
             <span className="ov-srow-name">{item.name}</span>
@@ -76,6 +80,11 @@ function DeliveryCard({ delivery, onDrill }: { delivery: OverviewData["delivery"
             </span>
           </button>
         ))}
+        {delivery.items.length > DELIVERY_PREVIEW && (
+          <button type="button" className="ov-srow-more ov-drill-btn" onClick={onDrill.toTable}>
+            +{delivery.items.length - DELIVERY_PREVIEW} outras — ver na Tabela
+          </button>
+        )}
       </div>
     </div>
   );

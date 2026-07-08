@@ -1207,6 +1207,8 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .ov-ship-list { display: flex; flex-direction: column; gap: 8px; }
 .ov-srow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; cursor: pointer; padding: 9px 12px; background: var(--surface-soft); border: 1px solid var(--border-soft); border-radius: 10px; }
 .ov-srow:hover { border-color: var(--border); }
+.ov-srow-more { width: 100%; text-align: left; font: inherit; cursor: pointer; padding: 6px 12px; background: none; border: 0; color: var(--text-mute); font-size: 12px; }
+.ov-srow-more:hover { color: var(--accent); }
 .ov-srow-check { color: var(--done); font-weight: 700; }
 .ov-srow-name { flex: 1; font-weight: 600; color: var(--text); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-srow-meta { font-family: var(--mono); font-size: 11px; color: var(--text-mute); white-space: nowrap; }
