@@ -71,7 +71,7 @@ function DeliveryCard({ delivery }: { delivery: OverviewData["delivery"] }) {
             <span className="ov-srow-check">{item.status === "done" ? "✓" : "◔"}</span>
             <span className="ov-srow-name">{item.name}</span>
             <span className="ov-srow-meta">
-              {item.sessionsClosed}/{item.sessionsTotal} {item.sessionsTotal === 1 ? "sessão" : "sessões"} · {fmtUsd(item.costUsd)}{item.costIncomplete ? " (parcial)" : ""}
+              {item.sessionsClosed}/{item.sessionsTotal} {item.sessionsTotal === 1 ? "sessão" : "sessões"} · {fmtUsd(item.costUsd)}{item.costIncomplete && item.costUsd !== null ? " (parcial)" : ""}
             </span>
           </div>
         ))}
@@ -125,7 +125,7 @@ function SpendCard({ spend, onDrill }: { spend: OverviewData["spend"]; onDrill: 
         onClick={onDrill.toTable}
         style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: 0, padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
       >
-        {fmtUsd(spend.totalUsd)}{spend.incomplete ? " (parcial)" : ""}
+        {fmtUsd(spend.totalUsd)}{spend.incomplete && spend.totalUsd !== null ? " (parcial)" : ""}
       </button>
       <div className="ov-kpi-sub">{spend.activeProjects} projeto{spend.activeProjects === 1 ? "" : "s"} ativo{spend.activeProjects === 1 ? "" : "s"} na janela</div>
       <div className="ov-bars">
@@ -182,6 +182,7 @@ const FEATURE_STATUS: Record<FeatureRow["status"], { label: string; variant: "bl
 /** Tabela de features tocadas na janela — cada linha clicável desce pro drill da feature. */
 function FeaturesTable({ rows, onDrill }: { rows: FeatureRow[]; onDrill: OverviewDrill }) {
   return (
+    <div className="ov-feats-wrap">
     <table className="ov-feats">
       <thead>
         <tr>
@@ -205,7 +206,7 @@ function FeaturesTable({ rows, onDrill }: { rows: FeatureRow[]; onDrill: Overvie
               <td>{row.name}</td>
               <td>{row.projectName}</td>
               <td>{row.sessionsClosed}/{row.sessionsTotal}</td>
-              <td>{fmtUsd(row.costUsd)}{row.costIncomplete ? " (parcial)" : ""}</td>
+              <td>{fmtUsd(row.costUsd)}{row.costIncomplete && row.costUsd !== null ? " (parcial)" : ""}</td>
               <td><span className={`ov-status ov-status-${st.variant}`}>{st.label}</span></td>
               <td>{fmtDate(row.lastActivityAt)}</td>
             </tr>
@@ -213,6 +214,7 @@ function FeaturesTable({ rows, onDrill }: { rows: FeatureRow[]; onDrill: Overvie
         })}
       </tbody>
     </table>
+    </div>
   );
 }
 

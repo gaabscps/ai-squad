@@ -79,8 +79,10 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
   const win = all.filter((sp) => inWindow(activityInstant(sp.spec), window, now));
 
   // Entrega — sessões fechadas na janela + features tocadas na janela.
+  // Chave por projeto+id: OBS-NNN reinicia em cada projeto, então "OBS-001" sozinho
+  // colide entre projetos e vaza a atividade de um para as features homônimas de outro.
   const closedInWin = win.filter((sp) => sp.spec.status === "done");
-  const touchedFeatureIds = new Set(win.map((sp) => sp.spec.observed!.feature?.id ?? `orfa-${sp.spec.id}`));
+  const touchedFeatureIds = new Set(win.map((sp) => `${sp.projectId}/${sp.spec.observed!.feature?.id ?? `orfa-${sp.spec.id}`}`));
 
   // Gasto — soma honesta por projeto.
   const byProjectMap = new Map<string, number>();
@@ -123,9 +125,9 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
   const efficiency = { avgCostPerSession: avg, sessionsWithCost: costs.length, trendPct, p50: percentile(costs, 50), p95: percentile(costs, 95), spark };
 
   // featureRows — features com ≥1 sessão-membro na janela; mais recentes primeiro.
-  const winSessionIds = new Set(win.map((sp) => sp.spec.id));
+  const winSessionKeys = new Set(win.map((sp) => `${sp.projectId}/${sp.spec.id}`));
   const featureRows: FeatureRow[] = flattenFeatures(projects as Project[], false)
-    .filter((fi) => fi.feature.sessionIds.some((id) => winSessionIds.has(id)))
+    .filter((fi) => fi.feature.sessionIds.some((id) => winSessionKeys.has(`${fi.projectId}/${id}`)))
     .map((fi) => ({
       projectId: fi.projectId, featureId: fi.feature.id, name: fi.feature.name, projectName: fi.projectName,
       key: fi.feature.key, orphan: fi.feature.orphan, status: fi.feature.status, doneSource: fi.feature.doneSource,
