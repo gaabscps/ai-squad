@@ -18,6 +18,7 @@
 import { appendFile, chmod, cp, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const SKILL_LINE_CAP = 300;
 const AGENT_LINE_CAP = 150;
@@ -575,6 +576,22 @@ function findOrCreateMatcherBucket(eventArray, matcher) {
   return bucket;
 }
 
+// Self-heals a stale components/ snapshot before every deploy. `components/`
+// is a generated copy of squads/+shared/ (see sync-components.mjs); nothing
+// refreshes it automatically after the initial `npm link`/`npm install`, so
+// source edits made after that point were silently invisible to `deploy` —
+// re-running deploy kept redeploying the same stale snapshot no matter how
+// many times or which flags were used (the OBS-031 stale-pricing incident).
+// Published tarballs never ship scripts/sync-components.mjs (see package.json
+// "files"), so its absence IS the dev-vs-published signal: no special-casing
+// needed beyond "does the file exist".
+async function maybeSyncFromSource(pkgRoot) {
+  const syncScript = join(pkgRoot, 'scripts', 'sync-components.mjs');
+  if (!(await exists(syncScript))) return;
+  const { syncComponents } = await import(pathToFileURL(syncScript).href);
+  await syncComponents();
+}
+
 async function ensureGitignore(repoRoot) {
   const gitignorePath = join(repoRoot, '.gitignore');
   let existing = '';
@@ -593,6 +610,8 @@ async function ensureGitignore(repoRoot) {
 }
 
 export async function runDeploy({ pkgRoot, squads = [], repoRoot, globalOnly = false, hooksOnly = false }) {
+  await maybeSyncFromSource(pkgRoot);
+
   const componentsRoot = join(pkgRoot, 'components');
 
   if (!(await isDir(componentsRoot))) {

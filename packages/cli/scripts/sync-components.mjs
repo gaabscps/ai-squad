@@ -89,7 +89,12 @@ async function syncShared() {
   }
 }
 
-async function main() {
+// Exported so `deploy.js` can call it directly (self-heal a stale components/
+// snapshot before deploying) when running from a monorepo source checkout.
+// Published tarballs never ship this file (see package.json "files"), so
+// callers detect dev-mode by checking whether this module exists at all —
+// this function itself stays unconditional.
+export async function syncComponents() {
   console.log('ai-squad cli: syncing components from squads/ + shared/ -> packages/cli/components/');
   await rm(COMPONENTS_DST, { recursive: true, force: true });
   await mkdir(COMPONENTS_DST, { recursive: true });
@@ -106,7 +111,7 @@ async function main() {
 // Only run the sync when invoked as a script (`node sync-components.mjs`), not
 // when imported by a test that just wants to exercise bundleFilter.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((err) => {
+  syncComponents().catch((err) => {
     console.error('sync-components failed:', err);
     process.exit(1);
   });
