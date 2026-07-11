@@ -32,14 +32,49 @@ function makeItem(over: Partial<FeatureWithProject> = {}, featureOver: Partial<F
 const base = makeItem();
 
 describe("ações de correção manual", () => {
-  it("marcar como entregue envia feature:markDone (feature sem key)", () => {
+  it("feature aberta (com key) mostra os dois botões e emite feature:setDelivery certo", () => {
     const onAction = vi.fn();
-    const item = { ...base, feature: { ...base.feature, key: null, status: "idle" as const } };
+    const item = { ...base, feature: { ...base.feature, status: "idle" as const } }; // base.feature tem key "PAY-1"
     render(<FeatureCard item={item} onSelectSession={() => {}} onFeatureAction={onAction}
       knownFeatures={[]} />);
+
+    fireEvent.click(screen.getByText("marcar aguardando deploy"));
+    expect(onAction).toHaveBeenCalledWith({
+      type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "awaiting_deploy",
+    });
+
     fireEvent.click(screen.getByText("marcar como entregue"));
     expect(onAction).toHaveBeenCalledWith({
-      type: "feature:markDone", projectId: "P", featureId: base.feature.id, done: true,
+      type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "done",
+    });
+  });
+
+  it("feature aguardando deploy mostra a tag, 'marcar como entregue' e 'reabrir' (sem repetir o botão de entrar em deploy)", () => {
+    const onAction = vi.fn();
+    const item = { ...base, feature: { ...base.feature, status: "awaiting_deploy" as const } };
+    render(<FeatureCard item={item} onSelectSession={() => {}} onFeatureAction={onAction}
+      knownFeatures={[]} />);
+
+    expect(screen.getByText("aguardando deploy")).toBeInTheDocument();
+    expect(screen.queryByText("marcar aguardando deploy")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("reabrir"));
+    expect(onAction).toHaveBeenCalledWith({
+      type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "open",
+    });
+  });
+
+  it("feature entregue mostra só 'reabrir'", () => {
+    const onAction = vi.fn();
+    const item = { ...base, feature: { ...base.feature, status: "done" as const, doneSource: "manual" as const } };
+    render(<FeatureCard item={item} onSelectSession={() => {}} onFeatureAction={onAction}
+      knownFeatures={[]} />);
+
+    expect(screen.queryByText("marcar aguardando deploy")).not.toBeInTheDocument();
+    expect(screen.queryByText("marcar como entregue")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("reabrir"));
+    expect(onAction).toHaveBeenCalledWith({
+      type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "open",
     });
   });
 

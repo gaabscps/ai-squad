@@ -6,11 +6,12 @@ import { fmtUsd, fmtTokens } from "../format";
 
 // Mensagem de correção manual enviada ao servidor via WS (Task 6: feature:*).
 export interface FeatureActionMsg {
-  type: "feature:assign" | "feature:markDone" | "feature:rename";
+  type: "feature:assign" | "feature:markDone" | "feature:setDelivery" | "feature:rename";
   projectId: string;
   sessionId?: string;
   featureId?: string | null;
   done?: boolean;
+  state?: "open" | "awaiting_deploy" | "done";
   name?: string;
 }
 
@@ -99,6 +100,7 @@ export function FeatureCard({
         {f.key && <span className="fcard-key">{f.key}</span>}
         {f.orphan && <span className="fcard-tag">sem feature</span>}
         {f.jira?.status && <span className="fcard-jira">{f.jira.status}</span>}
+        {f.status === "awaiting_deploy" && <span className="fcard-tag">aguardando deploy</span>}
         {f.status === "done" && f.doneSource && (
           <span className="fcard-tag">entregue · {f.doneSource === "jira" ? "Jira" : "manual"}</span>
         )}
@@ -110,15 +112,21 @@ export function FeatureCard({
           <span className="fcard-attention-count">{f.attention.count} aguardando você</span>
         )}
         {f.status === "idle" && <span className="fcard-hint">sessões fechadas — marcar entregue?</span>}
-        {onFeatureAction && f.key === null && f.status !== "done" && (
+        {onFeatureAction && f.status !== "awaiting_deploy" && f.status !== "done" && (
           <button type="button" className="fcard-action"
-            onClick={() => onFeatureAction({ type: "feature:markDone", projectId: item.projectId, featureId: f.id, done: true })}>
+            onClick={() => onFeatureAction({ type: "feature:setDelivery", projectId: item.projectId, featureId: f.id, state: "awaiting_deploy" })}>
+            marcar aguardando deploy
+          </button>
+        )}
+        {onFeatureAction && f.status !== "done" && (
+          <button type="button" className="fcard-action"
+            onClick={() => onFeatureAction({ type: "feature:setDelivery", projectId: item.projectId, featureId: f.id, state: "done" })}>
             marcar como entregue
           </button>
         )}
-        {onFeatureAction && f.doneSource === "manual" && (
+        {onFeatureAction && (f.status === "awaiting_deploy" || f.status === "done") && (
           <button type="button" className="fcard-action"
-            onClick={() => onFeatureAction({ type: "feature:markDone", projectId: item.projectId, featureId: f.id, done: false })}>
+            onClick={() => onFeatureAction({ type: "feature:setDelivery", projectId: item.projectId, featureId: f.id, state: "open" })}>
             reabrir
           </button>
         )}

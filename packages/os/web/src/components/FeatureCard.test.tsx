@@ -90,4 +90,10 @@ describe("FeatureCard", () => {
     render(<FeatureCard item={item} onSelectSession={() => {}} />);
     expect(screen.getByText(/entregue · Jira/)).toBeInTheDocument();
   });
+
+  it("feature awaiting_deploy mostra a tag 'aguardando deploy'", () => {
+    const item = makeItem({}, { status: "awaiting_deploy" });
+    render(<FeatureCard item={item} onSelectSession={() => {}} />);
+    expect(screen.getByText("aguardando deploy")).toBeInTheDocument();
+  });
 });
