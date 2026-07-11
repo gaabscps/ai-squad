@@ -2,7 +2,8 @@
  * Agrupador de sessões observadas em Features (derivado na leitura; design 2026-07-06).
  * Precedências: overlay.assign > bloco feature: do YAML > órfã.
  * Nome canônico: overlay.names > name declarado (snapshot Jira mais novo dá o campo jira).
- * Status: atenção vence; done vem do overlay (manual) ou do snapshot Jira, nunca das sessões.
+ * Status: atenção vence; entrega (aguardando_deploy/done) vem do overlay (manual) ou do
+ * snapshot Jira (done), nunca das sessões.
  */
 import type {
   Spec, Feature, FeatureStatus, FeatureAttentionItem, FeatureCost,
@@ -10,7 +11,8 @@ import type {
 
 export interface FeaturesOverlay {
   assign?: Record<string, string | null>; // "<projectId>/<sessionId>" → featureId (null = volta a órfã)
-  done?: Record<string, boolean>;         // "<projectId>/<featureId>" → entregue (toggle manual)
+  done?: Record<string, boolean>;         // legado: "<projectId>/<featureId>" → entregue; fallback quando deliveryState não tem a chave
+  deliveryState?: Record<string, "awaiting_deploy" | "done">; // "<projectId>/<featureId>" → estado de entrega manual
   names?: Record<string, string>;         // "<projectId>/<featureId>" → renome manual
 }
 
@@ -18,6 +20,17 @@ export interface FeaturesOverlay {
 const ATTENTION = new Set<string>(["needs_attention", "unreadable", "blocked", "escalated", "paused"]);
 // Status textuais de Jira aceitos como "entregue" no snapshot (comparação lowercase).
 const JIRA_DONE = new Set(["done", "closed", "resolved", "concluído", "concluido"]);
+
+/** Estado de entrega efetivo: deliveryState (novo) vence; done:true (legado) é fallback; ausência = aberto. */
+function resolveDeliveryState(
+  overlay: FeaturesOverlay | undefined,
+  key: string,
+): "open" | "awaiting_deploy" | "done" {
+  const explicit = overlay?.deliveryState?.[key];
+  if (explicit !== undefined) return explicit;
+  if (overlay?.done?.[key] === true) return "done";
+  return "open";
+}
 
 /** Slug estável de nome de feature: sem acentos, kebab, prefixo ft-. */
 export function slugifyFeatureName(name: string): string {
@@ -76,8 +89,9 @@ export function buildFeatures(
     const declaredName = withKey?.name ?? members[0].title;
     const name = overlay?.names?.[`${projectId}/${fid}`] ?? declaredName;
 
-    // done: manual (overlay) vence; senão snapshot Jira; nunca derivado das sessões
-    const manualDone = overlay?.done?.[`${projectId}/${fid}`] === true;
+    // entrega: deliveryState (overlay) vence sobre done legado; jira é fallback só do terminal; nunca derivado das sessões
+    const deliveryState = resolveDeliveryState(overlay, `${projectId}/${fid}`);
+    const manualDone = deliveryState === "done";
     const jiraDone = newestJira?.status != null && JIRA_DONE.has(newestJira.status.toLowerCase());
     const doneSource = manualDone ? "manual" : jiraDone ? "jira" : null;
 
@@ -92,6 +106,7 @@ export function buildFeatures(
     const status: FeatureStatus =
       attentionItems.length > 0 ? "needs_attention"
       : doneSource !== null ? "done"
+      : deliveryState === "awaiting_deploy" ? "awaiting_deploy"
       : members.some((m) => m.status === "running") ? "running"
       : "idle";
 

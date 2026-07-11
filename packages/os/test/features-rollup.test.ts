@@ -107,4 +107,52 @@ describe("buildFeatures", () => {
     const sdd = { ...obsSpec({ id: "FEAT-001" }), observed: undefined } as Spec;
     expect(buildFeatures("P", [sdd], undefined, NOW)).toHaveLength(0);
   });
+
+  it("overlay deliveryState=awaiting_deploy marca aguardando_deploy", () => {
+    const specs = [obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" })];
+    const [f] = buildFeatures("P", specs, { deliveryState: { "P/PAY-1": "awaiting_deploy" } }, NOW);
+    expect(f.status).toBe("awaiting_deploy");
+    expect(f.doneSource).toBeNull();
+  });
+
+  it("deliveryState=done marca done com doneSource manual", () => {
+    const specs = [obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" })];
+    const [f] = buildFeatures("P", specs, { deliveryState: { "P/PAY-1": "done" } }, NOW);
+    expect(f.status).toBe("done");
+    expect(f.doneSource).toBe("manual");
+  });
+
+  it("done legado (overlay.done=true) ainda funciona quando deliveryState não tem a chave", () => {
+    const specs = [obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" })];
+    const [f] = buildFeatures("P", specs, { done: { "P/PAY-1": true } }, NOW);
+    expect(f.status).toBe("done");
+    expect(f.doneSource).toBe("manual");
+  });
+
+  it("deliveryState vence sobre done legado quando os dois existem pra mesma chave", () => {
+    const specs = [obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" })];
+    const [f] = buildFeatures(
+      "P", specs,
+      { done: { "P/PAY-1": true }, deliveryState: { "P/PAY-1": "awaiting_deploy" } },
+      NOW,
+    );
+    expect(f.status).toBe("awaiting_deploy");
+  });
+
+  it("atenção sobrepõe aguardando_deploy e ele volta sozinho quando a atenção some (reabrir contínuo do QA)", () => {
+    const overlay = { deliveryState: { "P/PAY-1": "awaiting_deploy" as const } };
+    const comAtencao = [
+      obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" }),
+      obsSpec({ id: "OBS-002", feature: FEAT, status: "needs_attention" }),
+    ];
+    const [f1] = buildFeatures("P", comAtencao, overlay, NOW);
+    expect(f1.status).toBe("needs_attention");
+
+    const semAtencao = [
+      obsSpec({ id: "OBS-001", feature: FEAT, status: "done", closedAt: "2026-07-06T01:00:00Z" }),
+      obsSpec({ id: "OBS-002", feature: FEAT, status: "done", closedAt: "2026-07-06T02:00:00Z" }),
+    ];
+    const [f2] = buildFeatures("P", semAtencao, overlay, NOW);
+    expect(f2.status).toBe("awaiting_deploy");
+  });
 });

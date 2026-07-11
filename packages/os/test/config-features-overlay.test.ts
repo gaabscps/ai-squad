@@ -22,4 +22,14 @@ describe("overlay features no aios.config.json", () => {
     expect(raw.hide).toEqual(["/y"]);
     expect(raw.features.assign["P/OBS-001"]).toBe("PAY-1");
   });
+
+  it("saveConfigFields persiste deliveryState preservando o resto", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aios-cfg-"));
+    const p = join(dir, "aios.config.json");
+    writeFileSync(p, JSON.stringify({ roots: ["/x"], hide: ["/y"] }));
+    await saveConfigFields({ features: { deliveryState: { "P/PAY-1": "awaiting_deploy" } } }, p);
+    const raw = JSON.parse(readFileSync(p, "utf-8"));
+    expect(raw.roots).toEqual(["/x"]);
+    expect(raw.features.deliveryState["P/PAY-1"]).toBe("awaiting_deploy");
+  });
 });

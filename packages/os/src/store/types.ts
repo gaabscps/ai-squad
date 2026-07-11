@@ -182,7 +182,7 @@ export interface Project {
 
 // ── Camada de feature (agrupador derivado; ver design 2026-07-06) ────────────
 
-export type FeatureStatus = "needs_attention" | "running" | "idle" | "done";
+export type FeatureStatus = "needs_attention" | "running" | "idle" | "awaiting_deploy" | "done";
 
 export interface FeatureAttentionItem {
   sessionId: string;
