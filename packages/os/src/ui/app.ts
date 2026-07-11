@@ -26,6 +26,7 @@ function isInside(root: string, target: string): boolean {
 export type FeatureAction =
   | { type: "feature:assign"; projectId: string; sessionId: string; featureId: string | null }
   | { type: "feature:markDone"; projectId: string; featureId: string; done: boolean }
+  | { type: "feature:setDelivery"; projectId: string; featureId: string; state: "open" | "awaiting_deploy" | "done" }
   | { type: "feature:rename"; projectId: string; featureId: string; name: string };
 
 /** Devolve o http.Server SEM dar listen — separa criação de binding de porta. */
@@ -150,6 +151,7 @@ export function createServer(
         featureId?: string | null;
         sessionId?: string;
         done?: boolean;
+        state?: string;
         name?: string;
       };
       try {
@@ -195,15 +197,21 @@ export function createServer(
         });
         return;
       }
-      if (msg.type === "feature:assign" || msg.type === "feature:markDone" || msg.type === "feature:rename") {
+      if (
+        msg.type === "feature:assign" || msg.type === "feature:markDone" ||
+        msg.type === "feature:setDelivery" || msg.type === "feature:rename"
+      ) {
         const m = msg as Record<string, unknown>;
         const okAssign = msg.type === "feature:assign" && typeof m.projectId === "string" &&
           typeof m.sessionId === "string" && (typeof m.featureId === "string" || m.featureId === null);
         const okDone = msg.type === "feature:markDone" && typeof m.projectId === "string" &&
           typeof m.featureId === "string" && typeof m.done === "boolean";
+        const okSetDelivery = msg.type === "feature:setDelivery" && typeof m.projectId === "string" &&
+          typeof m.featureId === "string" &&
+          (m.state === "open" || m.state === "awaiting_deploy" || m.state === "done");
         const okRename = msg.type === "feature:rename" && typeof m.projectId === "string" &&
           typeof m.featureId === "string" && typeof m.name === "string" && m.name !== "";
-        if (okAssign || okDone || okRename) onFeatureAction(msg as FeatureAction);
+        if (okAssign || okDone || okSetDelivery || okRename) onFeatureAction(msg as FeatureAction);
         return;
       }
       if (typeof msg.id !== "string") return;

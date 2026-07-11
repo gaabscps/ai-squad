@@ -19,7 +19,7 @@ function connect(port: number): Promise<WebSocket> {
 }
 
 describe("WS feature:*", () => {
-  it("roteia assign/markDone/rename pro callback", async () => {
+  it("roteia assign/markDone/setDelivery/rename pro callback", async () => {
     const received: unknown[] = [];
     const server = createServer(
       fakeStore(), () => {}, 7, () => [],
@@ -33,11 +33,13 @@ describe("WS feature:*", () => {
 
     ws.send(JSON.stringify({ type: "feature:assign", projectId: "P", sessionId: "OBS-001", featureId: "PAY-1" }));
     ws.send(JSON.stringify({ type: "feature:markDone", projectId: "P", featureId: "PAY-1", done: true }));
+    ws.send(JSON.stringify({ type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "awaiting_deploy" }));
     ws.send(JSON.stringify({ type: "feature:rename", projectId: "P", featureId: "PAY-1", name: "Novo" }));
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(received).toHaveLength(3);
+    expect(received).toHaveLength(4);
     expect((received[0] as { type: string }).type).toBe("feature:assign");
+    expect(received[2]).toEqual({ type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "awaiting_deploy" });
     ws.close();
     await new Promise((r) => server.close(r));
   });
@@ -54,6 +56,24 @@ describe("WS feature:*", () => {
     const port = (server.address() as { port: number }).port;
     const ws = await connect(port);
     ws.send(JSON.stringify({ type: "feature:assign" })); // sem projectId/sessionId
+    await new Promise((r) => setTimeout(r, 100));
+    expect(received).toHaveLength(0);
+    ws.close();
+    await new Promise((r) => server.close(r));
+  });
+
+  it("feature:setDelivery com state fora do domínio é ignorado", async () => {
+    const received: unknown[] = [];
+    const server = createServer(
+      fakeStore(), () => {}, 7, () => [],
+      () => Promise.resolve({ persisted: false, alreadyExisted: false }),
+      () => Promise.resolve({ persisted: false }),
+      (msg) => { received.push(msg); },
+    );
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as { port: number }).port;
+    const ws = await connect(port);
+    ws.send(JSON.stringify({ type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "cancelado" }));
     await new Promise((r) => setTimeout(r, 100));
     expect(received).toHaveLength(0);
     ws.close();
