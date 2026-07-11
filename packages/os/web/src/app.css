@@ -1242,6 +1242,7 @@ details.delivery-acs-wrap[open] > .delivery-acs-summary::before { content: "▾ 
 .ov-status-done { color: var(--done); }
 .ov-status-amber { color: var(--amber, #A8742F); }
 .ov-status-accent { color: var(--accent); }
+.ov-status-deploy { color: var(--deploy); }
 
 /* ── Impressão (PDF via window.print) ─────────────────────────── */
 @media print {

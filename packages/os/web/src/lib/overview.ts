@@ -137,10 +137,10 @@ export function computeOverview(projects: readonly Project[], window: OverviewWi
     }))
     .sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
 
-  // delivery.items — features entregues (done) ou em andamento (idle/running) na janela.
+  // delivery.items — features entregues (done), aguardando deploy ou em andamento (idle/running) na janela.
   const deliveredRows = featureRows.filter((r) => r.status === "done");
   const deliveryItems: DeliveryItem[] = featureRows
-    .filter((r) => r.status === "done" || r.status === "idle" || r.status === "running")
+    .filter((r) => r.status === "done" || r.status === "awaiting_deploy" || r.status === "idle" || r.status === "running")
     .map((r) => ({
       projectId: r.projectId, featureId: r.featureId, name: r.name, projectName: r.projectName, status: r.status,
       sessionsClosed: r.sessionsClosed, sessionsTotal: r.sessionsTotal, costUsd: r.costUsd,

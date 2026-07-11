@@ -182,11 +182,12 @@ function DailyBand({ dailyLine }: { dailyLine: string }) {
 }
 
 /** Rótulo pt-BR + variante de cor por FeatureStatus (pill da tabela de features). */
-const FEATURE_STATUS: Record<FeatureRow["status"], { label: string; variant: "blocked" | "done" | "amber" | "accent" }> = {
+const FEATURE_STATUS: Record<FeatureRow["status"], { label: string; variant: "blocked" | "done" | "amber" | "accent" | "deploy" }> = {
   needs_attention: { label: "precisa de você", variant: "blocked" },
   done: { label: "concluída", variant: "done" },
   idle: { label: "parada", variant: "amber" },
   running: { label: "rodando", variant: "accent" },
+  awaiting_deploy: { label: "aguardando deploy", variant: "deploy" },
 };
 
 /** Tabela de features tocadas na janela — cada linha clicável desce pro drill da feature. */

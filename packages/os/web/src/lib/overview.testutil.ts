@@ -1,5 +1,5 @@
 import type { Project, Spec } from "../../../src/store/types";
-import { buildFeatures } from "../../../src/collector/features";
+import { buildFeatures, type FeaturesOverlay } from "../../../src/collector/features";
 
 export function spec(over: Partial<Spec> & {
   id?: string; createdAt?: string; closedAt?: string | null;
@@ -30,9 +30,9 @@ export function spec(over: Partial<Spec> & {
   } as Spec;
 }
 
-export function project(name: string, specs: Spec[]): Project {
+export function project(name: string, specs: Spec[], overlay?: FeaturesOverlay): Project {
   // features derivadas pelo mesmo builder de produção (buildFeatures), pra featureRows
   // testar contra a semântica real: status "done" nunca vem do status da sessão.
   const id = `${name}-hash`;
-  return { id, path: `/${name}`, name, specs, hidden: false, features: buildFeatures(id, specs, undefined, Date.now()) };
+  return { id, path: `/${name}`, name, specs, hidden: false, features: buildFeatures(id, specs, overlay, Date.now()) };
 }

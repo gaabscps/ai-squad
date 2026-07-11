@@ -34,4 +34,15 @@ describe("computeOverview — janela + atenção + entrega + gasto", () => {
     const d = computeOverview([project("p", [a])], WINDOWS["7d"], NOW);
     expect(d.spend.totalUsd).toBeNull();
   });
+
+  it("feature aguardando_deploy aparece em delivery.items mas NÃO conta em featuresDelivered", () => {
+    const s = spec({ id: "OBS-001", status: "done", closedAt: "2026-07-06T12:00:00Z", featureId: "PAY-1", featureName: "Export" });
+    const d = computeOverview(
+      [project("p", [s], { deliveryState: { "p-hash/PAY-1": "awaiting_deploy" } })],
+      WINDOWS["7d"], NOW,
+    );
+    expect(d.delivery.featuresDelivered).toBe(0);
+    const item = d.delivery.items.find((i) => i.featureId === "PAY-1");
+    expect(item?.status).toBe("awaiting_deploy");
+  });
 });

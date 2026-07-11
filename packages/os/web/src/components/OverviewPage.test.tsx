@@ -61,4 +61,17 @@ describe("OverviewPage — 4 cards", () => {
     expect(screen.getByText(/2\/2 sessões/)).toBeInTheDocument();
     expect(screen.queryByText(/sessãoes/)).not.toBeInTheDocument();
   });
+
+  it("FeaturesTable mostra o rótulo 'aguardando deploy' pra features nesse estado", () => {
+    const dataWithDeploy: OverviewData = {
+      ...data,
+      featureRows: [{
+        projectId: "P", featureId: "F3", name: "Relatório", projectName: "p", key: "SUS-301",
+        orphan: false, status: "awaiting_deploy", doneSource: "manual",
+        sessionsClosed: 1, sessionsTotal: 1, costUsd: 12, costIncomplete: false, lastActivityAt: null,
+      }],
+    };
+    render(<OverviewPage data={dataWithDeploy} window="7d" onWindow={() => {}} onDrill={{ attentionSession: () => {}, feature: () => {}, toTable: () => {} }} />);
+    expect(screen.getByText("aguardando deploy")).toBeInTheDocument();
+  });
 });
