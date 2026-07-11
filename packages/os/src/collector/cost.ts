@@ -9,10 +9,17 @@ interface RawModelUsage {
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
 }
-interface RawCostFile {
+interface RawCostBlock {
   total_cost_usd?: number;
   by_model?: Record<string, RawModelUsage>;
   unpriced_models?: string[];
+}
+interface RawCostFile extends RawCostBlock {
+  scope?: string;
+  // capture-session-cost.py grava scope: "session" com o custo aninhado em
+  // planning/orchestration, não em total_cost_usd/by_model na raiz do arquivo.
+  planning?: RawCostBlock;
+  orchestration?: RawCostBlock;
 }
 
 interface RawSum {
@@ -46,13 +53,22 @@ function sumRawCosts(costsDir: string): RawSum {
     } catch {
       continue;
     }
-    if (typeof raw.total_cost_usd === "number") totalCostUsd = (totalCostUsd ?? 0) + raw.total_cost_usd;
-    if (Array.isArray(raw.unpriced_models) && raw.unpriced_models.length > 0) partial = true;
-    for (const usage of Object.values(raw.by_model ?? {})) {
-      tokens.input += usage.input_tokens ?? 0;
-      tokens.output += usage.output_tokens ?? 0;
-      tokens.cacheRead += usage.cache_read_input_tokens ?? 0;
-      tokens.cacheCreation += usage.cache_creation_input_tokens ?? 0;
+
+    // scope: "session" aninha o custo em planning/orchestration em vez de
+    // total_cost_usd/by_model na raiz — soma os dois blocos nesse caso.
+    const blocks: RawCostBlock[] =
+      raw.scope === "session" ? [raw.planning ?? {}, raw.orchestration ?? {}] : [raw];
+
+    for (const block of blocks) {
+      if (typeof block.total_cost_usd === "number")
+        totalCostUsd = (totalCostUsd ?? 0) + block.total_cost_usd;
+      if (Array.isArray(block.unpriced_models) && block.unpriced_models.length > 0) partial = true;
+      for (const usage of Object.values(block.by_model ?? {})) {
+        tokens.input += usage.input_tokens ?? 0;
+        tokens.output += usage.output_tokens ?? 0;
+        tokens.cacheRead += usage.cache_read_input_tokens ?? 0;
+        tokens.cacheCreation += usage.cache_creation_input_tokens ?? 0;
+      }
     }
   }
 

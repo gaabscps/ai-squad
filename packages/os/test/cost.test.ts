@@ -41,4 +41,16 @@ describe("readCostRollup", () => {
     expect(c.totalCostUsd).toBeCloseTo(0.7, 6); // só o agent-ok.json conta
     expect(c.tokens.input).toBe(7);
   });
+
+  it("soma o custo aninhado de um arquivo scope:\"session\" (planning + orchestration), não só total_cost_usd de raiz", () => {
+    // Regressão: capture-session-cost.py grava scope:"session" com o custo
+    // dentro de planning/orchestration, sem total_cost_usd na raiz do arquivo.
+    // Sem este fix, sumRawCosts ignorava esse arquivo por inteiro e um fallback
+    // de staleness (isStale em cost-report.ts) podia reportar custo $0 mesmo
+    // com gasto real registrado.
+    const c = readCostRollup(fixt("spec-custo-sessao"));
+    expect(c.totalCostUsd).toBeCloseTo(7.0, 6); // 5.5 (planning) + 1.5 (orchestration) + 0 (agent-zero)
+    expect(c.tokens.input).toBe(110); // 100 + 10
+    expect(c.tokens.output).toBe(55); // 50 + 5
+  });
 });

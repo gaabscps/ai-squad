@@ -1,0 +1,9 @@
+{
+  "agent_id": "zero",
+  "transcript_path": "/tmp/does-not-exist.jsonl",
+  "scope": "implementation",
+  "total_cost_usd": 0.0,
+  "by_model": {},
+  "unpriced_models": [],
+  "error": "[Errno 2] No such file or directory"
+}

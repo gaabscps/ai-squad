@@ -1,0 +1,34 @@
+{
+  "session_id": "abc",
+  "scope": "session",
+  "transcript_path": "/tmp/abc.jsonl",
+  "planning": {
+    "total_cost_usd": 5.5,
+    "by_model": {
+      "claude-opus-4-8": {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cache_read_input_tokens": 1000,
+        "cache_creation_input_tokens": 200,
+        "cost_usd": 5.5
+      }
+    },
+    "unpriced_models": [],
+    "error": null
+  },
+  "orchestration": {
+    "total_cost_usd": 1.5,
+    "by_model": {
+      "claude-haiku-4-5": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cost_usd": 1.5
+      }
+    },
+    "unpriced_models": [],
+    "error": null
+  },
+  "window": { "since": "2026-07-11T07:00:00Z", "until": "2026-07-11T08:00:00Z" }
+}
