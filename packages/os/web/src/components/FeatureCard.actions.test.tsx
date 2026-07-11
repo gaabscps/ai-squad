@@ -38,6 +38,8 @@ describe("ações de correção manual", () => {
     render(<FeatureCard item={item} onSelectSession={() => {}} onFeatureAction={onAction}
       knownFeatures={[]} />);
 
+    expect(screen.queryByText("reabrir")).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByText("marcar aguardando deploy"));
     expect(onAction).toHaveBeenCalledWith({
       type: "feature:setDelivery", projectId: "P", featureId: "PAY-1", state: "awaiting_deploy",
@@ -57,6 +59,7 @@ describe("ações de correção manual", () => {
 
     expect(screen.getByText("aguardando deploy")).toBeInTheDocument();
     expect(screen.queryByText("marcar aguardando deploy")).not.toBeInTheDocument();
+    expect(screen.getByText("marcar como entregue")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("reabrir"));
     expect(onAction).toHaveBeenCalledWith({
