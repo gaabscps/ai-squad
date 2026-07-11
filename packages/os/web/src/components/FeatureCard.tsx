@@ -92,8 +92,17 @@ export function FeatureCard({
     : f.cost.totalTokens > 0 ? `${fmtTokens(f.cost.totalTokens)} tokens`
     : null;
 
+  const draggableCard = Boolean(onFeatureAction) && f.status !== "needs_attention";
+
   return (
-    <article className={`fcard${f.status === "needs_attention" ? " fcard-attention" : ""}`}>
+    <article
+      className={`fcard${f.status === "needs_attention" ? " fcard-attention" : ""}${draggableCard ? " fcard-draggable" : ""}`}
+      draggable={draggableCard}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("application/json", JSON.stringify({ projectId: item.projectId, featureId: f.id }));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+    >
       <button type="button" className="fcard-head" onClick={() => setOpen((v) => !v)}
         aria-expanded={open}>
         <span className="fcard-name">{f.name}</span>

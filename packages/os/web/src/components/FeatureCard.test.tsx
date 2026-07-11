@@ -96,4 +96,23 @@ describe("FeatureCard", () => {
     render(<FeatureCard item={item} onSelectSession={() => {}} />);
     expect(screen.getByText("aguardando deploy")).toBeInTheDocument();
   });
+
+  it("feature aberta é arrastável (draggable=true)", () => {
+    render(<FeatureCard item={base} onSelectSession={() => {}} onFeatureAction={vi.fn()} />);
+    const card = screen.getByText("Export de fatura").closest("article")!;
+    expect(card).toHaveAttribute("draggable", "true");
+  });
+
+  it("feature needs_attention não é arrastável", () => {
+    const item = makeItem({}, { status: "needs_attention" });
+    render(<FeatureCard item={item} onSelectSession={() => {}} onFeatureAction={vi.fn()} />);
+    const card = screen.getByText("Export de fatura").closest("article")!;
+    expect(card).toHaveAttribute("draggable", "false");
+  });
+
+  it("sem onFeatureAction, o card não é arrastável (não há pra onde mandar a ação)", () => {
+    render(<FeatureCard item={base} onSelectSession={() => {}} />);
+    const card = screen.getByText("Export de fatura").closest("article")!;
+    expect(card).toHaveAttribute("draggable", "false");
+  });
 });

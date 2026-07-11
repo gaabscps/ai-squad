@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "./KanbanBoard";
 import { makeSpec, makeProject, makeFeature } from "../test-utils";
@@ -65,5 +65,50 @@ describe("KanbanBoard", () => {
     render(<KanbanBoard items={onlyDone} onSelectSession={vi.fn()} />);
     const attentionCol = screen.getByText("Precisa de você").closest("section")!;
     expect(attentionCol.textContent).toContain("nada aqui");
+  });
+
+  it("arrastar um card de Em andamento pra Aguardando deploy emite feature:setDelivery state=awaiting_deploy", () => {
+    const onFeatureAction = vi.fn();
+    render(<KanbanBoard items={items} onSelectSession={vi.fn()} onFeatureAction={onFeatureAction} />);
+    const card = screen.getByText("Feature R").closest("article")!;
+    const deployCol = screen.getByText("Aguardando deploy").closest("section")!;
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(k: string, v: string) { this.data[k] = v; },
+      getData(k: string) { return this.data[k] ?? ""; },
+      effectAllowed: "", dropEffect: "",
+    };
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.dragOver(deployCol, { dataTransfer });
+    fireEvent.drop(deployCol, { dataTransfer });
+
+    expect(onFeatureAction).toHaveBeenCalledWith({
+      type: "feature:setDelivery", projectId: "proj-abc", featureId: "ft-R", state: "awaiting_deploy",
+    });
+  });
+
+  it("card em Precisa de você não é arrastável (draggable=false)", () => {
+    render(<KanbanBoard items={items} onSelectSession={vi.fn()} onFeatureAction={vi.fn()} />);
+    const card = screen.getByText("Feature B").closest("article")!;
+    expect(card).toHaveAttribute("draggable", "false");
+  });
+
+  it("soltar um card na coluna Precisa de você não emite nada (destino não aceita drop)", () => {
+    const onFeatureAction = vi.fn();
+    render(<KanbanBoard items={items} onSelectSession={vi.fn()} onFeatureAction={onFeatureAction} />);
+    const card = screen.getByText("Feature R").closest("article")!;
+    const attentionCol = screen.getByText("Precisa de você").closest("section")!;
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(k: string, v: string) { this.data[k] = v; },
+      getData(k: string) { return this.data[k] ?? ""; },
+      effectAllowed: "", dropEffect: "",
+    };
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.drop(attentionCol, { dataTransfer });
+
+    expect(onFeatureAction).not.toHaveBeenCalled();
   });
 });

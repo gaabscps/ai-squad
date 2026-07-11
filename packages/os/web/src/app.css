@@ -102,6 +102,7 @@ a:hover { text-decoration: underline; }
 .kcol[data-col="done"] .kcol-dot { background: var(--done); }
 .kcol-count { margin-left: auto; color: var(--text-mute); }
 .kcol-empty { font-size: 12px; color: var(--text-mute); padding: 8px 4px; margin: 0; }
+.kcol-dragover { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: var(--radius); }
 
 /* .kcard-why usa as mesmas classes why-* de .drawer-why (DetailDrawer) — mantidas, .kcard-why removida com o KanbanCard */
 .why-blocked { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 10%, transparent); }
@@ -114,6 +115,8 @@ a:hover { text-decoration: underline; }
 /* ---- FeatureCard (card de feature no kanban agrupado) ---- */
 .fcard { background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--text-mute); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); transition: box-shadow 0.12s, border-color 0.12s; }
 .fcard:hover { box-shadow: var(--shadow-lift); border-color: var(--border); }
+.fcard-draggable { cursor: grab; }
+.fcard-draggable:active { cursor: grabbing; }
 .fcard-attention { border-left-color: var(--blocked); }
 .fcard-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; border: 0; background: transparent; padding: 0; margin: 0 0 8px; cursor: pointer; text-align: left; font: inherit; }
 .fcard-name { font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text); }
