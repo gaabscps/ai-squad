@@ -5,6 +5,7 @@ import { Store } from "./store/store.js";
 import { watchProjects } from "./collector/watcher.js";
 import { resolveAddablePath } from "./collector/browse.js";
 import { createServer, type FeatureAction } from "./ui/app.js";
+import { applyFeatureActionToOverlay } from "./collector/feature-actions.js";
 
 const CONFIG_PATH = join(process.cwd(), "aios.config.json");
 const config: AiosConfig = loadConfig(CONFIG_PATH);
@@ -86,21 +87,7 @@ async function removeInclude(path: string): Promise<{ persisted: boolean }> {
 // persiste no aios.config.json e reconstrói o snapshot (padrão do toggleHide).
 function applyFeatureAction(msg: FeatureAction): void {
   const overlay = (config.features ??= {});
-  if (msg.type === "feature:assign") {
-    (overlay.assign ??= {})[`${msg.projectId}/${msg.sessionId}`] = msg.featureId;
-  } else if (msg.type === "feature:markDone") {
-    (overlay.done ??= {})[`${msg.projectId}/${msg.featureId}`] = msg.done;
-  } else if (msg.type === "feature:setDelivery") {
-    const key = `${msg.projectId}/${msg.featureId}`;
-    if (msg.state === "open") {
-      if (overlay.deliveryState) delete overlay.deliveryState[key];
-      if (overlay.done) delete overlay.done[key];
-    } else {
-      (overlay.deliveryState ??= {})[key] = msg.state;
-    }
-  } else {
-    (overlay.names ??= {})[`${msg.projectId}/${msg.featureId}`] = msg.name;
-  }
+  applyFeatureActionToOverlay(overlay, msg);
   void saveConfigFields({ features: config.features }, CONFIG_PATH).then((r) => {
     if (!r.persisted) console.warn(`[aiOS] feature action aplicada em memória mas não persistida em ${CONFIG_PATH}`);
   });
