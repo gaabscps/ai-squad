@@ -7,12 +7,13 @@ export type { SpecWithProject } from "./kanban";
 
 // ─── Colunas ──────────────────────────────────────────────────────────────────
 
-export type ColumnKey = "attention" | "running" | "done";
+export type ColumnKey = "attention" | "running" | "deploy" | "done";
 
-/** Definições das 3 colunas do board observado, na ordem de exibição. */
+/** Definições das 4 colunas do board observado, na ordem de exibição. */
 export const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: "attention", label: "Precisa de você" },
   { key: "running",   label: "Em andamento"    },
+  { key: "deploy",    label: "Aguardando deploy" },
   { key: "done",      label: "Pronto"           },
 ];
 
@@ -115,13 +116,17 @@ export function isDormant(spec: Spec, now: number, dormantAfterDays: number = DO
 // ─── Agrupamento por coluna ───────────────────────────────────────────────────
 
 /**
- * Agrupa os itens em 3 baldes (attention / running / done),
- * preservando a ordem de entrada dentro de cada balde.
+ * Agrupa os itens em 4 baldes (attention / running / deploy / done),
+ * preservando a ordem de entrada dentro de cada balde. O balde deploy fica
+ * sempre vazio aqui: columnForSpec (Specs, modo SDD legado) nunca devolve
+ * "deploy" — o estado de entrega manual só existe na camada de feature
+ * (kanbanFeatures.ts). O balde existe só pra satisfazer o ColumnKey compartilhado.
  */
 export function bucketByColumn(items: SpecWithProject[]): Record<ColumnKey, SpecWithProject[]> {
   const buckets: Record<ColumnKey, SpecWithProject[]> = {
     attention: [],
     running:   [],
+    deploy:    [],
     done:      [],
   };
   for (const item of items) buckets[columnForSpec(item.spec)].push(item);

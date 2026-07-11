@@ -16,11 +16,12 @@ function feat(over: Partial<Feature>): Feature {
 }
 
 describe("featureColumn", () => {
-  it("needs_attention → attention; done → done; running e idle → running", () => {
+  it("needs_attention → attention; done → done; running e idle → running; awaiting_deploy → deploy", () => {
     expect(featureColumn(feat({ status: "needs_attention" }))).toBe("attention");
     expect(featureColumn(feat({ status: "done" }))).toBe("done");
     expect(featureColumn(feat({ status: "running" }))).toBe("running");
     expect(featureColumn(feat({ status: "idle" }))).toBe("running");
+    expect(featureColumn(feat({ status: "awaiting_deploy" }))).toBe("deploy");
   });
 });
 
@@ -34,6 +35,12 @@ describe("bucketFeaturesByColumn", () => {
     expect(buckets.done.map((i) => i.feature.id)).toEqual(["A"]);
     expect(buckets.attention.map((i) => i.feature.id)).toEqual(["B"]);
     expect(buckets.running).toEqual([]);
+  });
+
+  it("awaiting_deploy vai pro balde deploy", () => {
+    const items = [{ feature: feat({ id: "C", status: "awaiting_deploy" as const }), projectId: "P", projectName: "p", sessions: [] }];
+    const buckets = bucketFeaturesByColumn(items);
+    expect(buckets.deploy.map((i) => i.feature.id)).toEqual(["C"]);
   });
 });
 

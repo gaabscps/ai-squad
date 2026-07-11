@@ -177,23 +177,39 @@ describe("bucketByColumn (observed)", () => {
     expect(buckets.running.map((i) => i.spec.id)).toEqual(["OBS-001"]);
     expect(buckets.attention.map((i) => i.spec.id)).toEqual(["OBS-002"]);
     expect(buckets.done.map((i) => i.spec.id)).toEqual(["OBS-003", "OBS-004"]);
+    expect(buckets.deploy).toEqual([]);
   });
 
-  it("resultado tem exatamente as 3 chaves (attention, running, done)", () => {
+  it("resultado tem exatamente as 4 chaves (attention, running, deploy, done)", () => {
     const buckets = bucketByColumn([]);
-    expect(Object.keys(buckets).sort()).toEqual(["attention", "done", "running"]);
+    expect(Object.keys(buckets).sort()).toEqual(["attention", "deploy", "done", "running"]);
   });
 });
 
 // ─── COLUMN_DEFS ───────────────────────────────────────────────────────────────
 
 describe("COLUMN_DEFS (observed)", () => {
-  it("tem 3 colunas na ordem certa", () => {
-    expect(COLUMN_DEFS.map((c) => c.key)).toEqual(["attention", "running", "done"]);
+  it("tem 4 colunas na ordem certa", () => {
+    expect(COLUMN_DEFS.map((c) => c.key)).toEqual(["attention", "running", "deploy", "done"]);
   });
   it("labels em português", () => {
     expect(COLUMN_DEFS[0].label).toBe("Precisa de você");
     expect(COLUMN_DEFS[1].label).toBe("Em andamento");
-    expect(COLUMN_DEFS[2].label).toBe("Pronto");
+    expect(COLUMN_DEFS[2].label).toBe("Aguardando deploy");
+    expect(COLUMN_DEFS[3].label).toBe("Pronto");
+  });
+});
+
+describe("COLUMN_DEFS", () => {
+  it("tem 4 colunas na ordem attention, running, deploy, done", () => {
+    expect(COLUMN_DEFS.map((c) => c.key)).toEqual(["attention", "running", "deploy", "done"]);
+    expect(COLUMN_DEFS.find((c) => c.key === "deploy")!.label).toBe("Aguardando deploy");
+  });
+});
+
+describe("bucketByColumn", () => {
+  it("balde deploy existe e fica vazio (Specs em modo SDD legado nunca caem em deploy)", () => {
+    const buckets = bucketByColumn([]);
+    expect(buckets.deploy).toEqual([]);
   });
 });

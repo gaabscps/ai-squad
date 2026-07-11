@@ -15,6 +15,7 @@ export interface FeatureWithProject {
 /** Coluna de uma feature: mesma semântica do board (atenção vence; idle segue em andamento). */
 export function featureColumn(f: Feature): ColumnKey {
   if (f.status === "needs_attention") return "attention";
+  if (f.status === "awaiting_deploy") return "deploy";
   if (f.status === "done") return "done";
   return "running"; // running e idle
 }
@@ -45,9 +46,9 @@ export function featureMatchesQuery(item: FeatureWithProject, query: string): bo
   return item.sessions.some((s) => matchesQuery(s, query));
 }
 
-/** Agrupa em 3 baldes preservando a ordem de entrada. */
+/** Agrupa em 4 baldes preservando a ordem de entrada. */
 export function bucketFeaturesByColumn(items: FeatureWithProject[]): Record<ColumnKey, FeatureWithProject[]> {
-  const buckets: Record<ColumnKey, FeatureWithProject[]> = { attention: [], running: [], done: [] };
+  const buckets: Record<ColumnKey, FeatureWithProject[]> = { attention: [], running: [], deploy: [], done: [] };
   for (const it of items) buckets[featureColumn(it.feature)].push(it);
   return buckets;
 }
